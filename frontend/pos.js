@@ -1938,6 +1938,19 @@ async function enviarPedidoMobile() {
     const tipoPago = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
     const clienteNombre = document.getElementById('cliente-nombre-mobile')?.value?.trim() || '';
 
+    // Validar nombre del cliente para pedidos para llevar (sin mesa)
+    if (tipoPago === 'anticipado' && !mesaSeleccionada && !clienteNombre) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del cliente para pedidos para llevar', 'danger');
+        document.getElementById('cliente-nombre-mobile')?.focus();
+        return;
+    }
+
+    // Validar que hay productos en el carrito
+    if (carrito.length === 0) {
+        mostrarNotificacion('Error', 'Agrega productos al pedido', 'danger');
+        return;
+    }
+
     // Sincronizar valores con el formulario desktop
     const tipoPagoDesktop = document.getElementById('tipo-pago');
     const clienteNombreDesktop = document.getElementById('cliente-nombre-pedido');
@@ -1952,7 +1965,8 @@ async function enviarPedidoMobile() {
     await enviarPedido();
 
     // Limpiar campos móviles
-    document.getElementById('cliente-nombre-mobile').value = '';
+    const campoNombre = document.getElementById('cliente-nombre-mobile');
+    if (campoNombre) campoNombre.value = '';
     actualizarCarritoMobile();
 }
 
@@ -1995,6 +2009,10 @@ function actualizarBottomNavPorRol(rol) {
     // Hacer visible la navegación inferior
     bottomNav.style.visibility = 'visible';
 
+    // Verificar si es manager para agregar botones extra
+    const usuario = getUsuarioActual ? getUsuarioActual() : null;
+    const esManager = usuario && usuario.rol === 'manager';
+
     if (rol === 'cajero') {
         bottomNav.innerHTML = `
             <div class="bottom-nav-items">
@@ -2010,16 +2028,90 @@ function actualizarBottomNavPorRol(rol) {
                     <i class="bi bi-credit-card"></i>
                     <span>Créditos</span>
                 </button>
-                <button class="bottom-nav-item" onclick="logout()">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span>Salir</span>
-                </button>
+                ${esManager ? `
+                    <button class="bottom-nav-item" onclick="mostrarMenuManager()">
+                        <i class="bi bi-three-dots"></i>
+                        <span>Más</span>
+                    </button>
+                ` : `
+                    <button class="bottom-nav-item" onclick="logout()">
+                        <i class="bi bi-box-arrow-right"></i>
+                        <span>Salir</span>
+                    </button>
+                `}
             </div>
         `;
     } else if (rol === 'mesero') {
-        // Ya está configurado por defecto para mesero
-        document.getElementById('nav-mesas')?.classList.add('active');
+        // Actualizar navegación para mesero
+        bottomNav.innerHTML = `
+            <div class="bottom-nav-items">
+                <button class="bottom-nav-item active" onclick="navegarMobile('mesas')" id="nav-mesas">
+                    <i class="bi bi-grid-3x3"></i>
+                    <span>Mesas</span>
+                </button>
+                <button class="bottom-nav-item" onclick="navegarMobile('menu')" id="nav-menu">
+                    <i class="bi bi-list-ul"></i>
+                    <span>Menú</span>
+                </button>
+                <button class="bottom-nav-item" onclick="navegarMobile('servir')" id="nav-servir">
+                    <i class="bi bi-bell"></i>
+                    <span>Servir</span>
+                </button>
+                ${esManager ? `
+                    <button class="bottom-nav-item" onclick="mostrarMenuManager()">
+                        <i class="bi bi-three-dots"></i>
+                        <span>Más</span>
+                    </button>
+                ` : `
+                    <button class="bottom-nav-item" onclick="logout()">
+                        <i class="bi bi-box-arrow-right"></i>
+                        <span>Salir</span>
+                    </button>
+                `}
+            </div>
+        `;
     }
+}
+
+// Menú de opciones para manager en móvil
+function mostrarMenuManager() {
+    // Crear modal de opciones si no existe
+    let modal = document.getElementById('modalMenuManager');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalMenuManager';
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="bi bi-gear"></i> Opciones</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="list-group list-group-flush">
+                            <a href="admin.html" class="list-group-item list-group-item-action py-3">
+                                <i class="bi bi-gear me-3"></i> Administración
+                            </a>
+                            <a href="index.html" class="list-group-item list-group-item-action py-3">
+                                <i class="bi bi-receipt me-3"></i> Facturación
+                            </a>
+                            <button class="list-group-item list-group-item-action py-3" onclick="mostrarSelectorRol(); bootstrap.Modal.getInstance(document.getElementById('modalMenuManager')).hide();">
+                                <i class="bi bi-arrow-repeat me-3"></i> Cambiar Rol
+                            </button>
+                            <button class="list-group-item list-group-item-action py-3 text-danger" onclick="logout()">
+                                <i class="bi bi-box-arrow-right me-3"></i> Cerrar Sesión
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
 }
 
 function navegarCajeroMobile(destino) {
