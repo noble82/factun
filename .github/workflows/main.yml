@@ -17,7 +17,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Eliminamos apt-get install porque ya está preinstalado en ubuntu-latest
       - name: Verify Docker Compose
         run: docker compose version
 
@@ -39,11 +38,10 @@ jobs:
       - name: Verificar estado del Backend (Health Check)
         run: |
           sleep 15
-          # Ajustado a /healthz como tienes en tu script
           curl --fail http://localhost:5000/healthz || (docker compose logs backend && exit 1)
 
       - name: Limpieza de entorno de pruebas
-        if: always()
+        if: ${{ always() }}
         run: docker compose down
 
   deploy:
@@ -60,17 +58,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/facturacion
-
-            # Sincronizar código
             git pull origin main
-
-            # Re-levantar servicios (backend + frontend + certbot)
             docker compose up -d --build backend frontend certbot
-
-            # Optimización de espacio
             docker image prune -f
-
-            # Verificación final
             docker ps | grep -E "backend|frontend"
 
       - name: Emitir/renovar certificados en VPS (SSH)
@@ -81,20 +71,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/facturacion
-
             DOMAIN=test.irya.xyz
-
-            # Asegurar directorios de certs
             mkdir -p ./certs ./certbot-www
             chown -R 1000:1000 ./certs ./certbot-www || true
-
-            # Intentar emitir/renovar certificado
             if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ] || [ "$FORCE_CERTBOT" = "true" ]; then
               echo "Attempting issuance for ${DOMAIN}..."
-              docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN} \
-                --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
-
-              # Recargar nginx
+              docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN} --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
               docker exec digifact-frontend nginx -s reload || true
             else
               echo "Certificate exists for ${DOMAIN}, skipping issuance."
