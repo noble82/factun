@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   backend:
     build: ./backend
@@ -9,6 +11,8 @@ services:
     volumes:
       - ./backend:/app
     restart: unless-stopped
+    networks:
+      - digifact_net
 
   frontend:
     image: nginx:alpine
@@ -17,13 +21,18 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./frontend:/usr/share/nginx/html
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-      - certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
+      # Corregido: Mapea la carpeta frontend local a la ruta estándar de Nginx
+      - ./frontend:/usr/share/nginx/html:ro
+      # Corregido: Ruta al archivo de configuración
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Volúmenes para certificados
+      - certs:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
     depends_on:
       - backend
     restart: unless-stopped
+    networks:
+      - digifact_net
 
   certbot:
     image: certbot/certbot:v2.5.0
@@ -34,6 +43,13 @@ services:
     entrypoint: ""
     command: "sh -c 'sleep infinity'"
     restart: unless-stopped
+    networks:
+      - digifact_net
+
+networks:
+  digifact_net:
+    driver: bridge
+
 volumes:
   certs:
   certbot-www:
