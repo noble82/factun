@@ -65,7 +65,8 @@ echo "Bringing up frontend and certbot containers"
 docker compose up -d frontend certbot || true
 
 echo "Requesting certificate for ${DOMAIN} (email: ${EMAIL})"
-docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d "${DOMAIN}" \
+# When the certbot service has an overridden entrypoint, invoke the certbot binary explicitly
+docker compose run --rm certbot certbot certonly --webroot -w /var/www/certbot -d "${DOMAIN}" \
   --email "${EMAIL}" --agree-tos --no-eff-email ${STAGING_FLAG}
 
 echo "Reloading nginx to apply certificates"

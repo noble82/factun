@@ -76,7 +76,8 @@ jobs:
             chown -R 1000:1000 ./certs ./certbot-www || true
             if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ] || [ "$FORCE_CERTBOT" = "true" ]; then
               echo "Attempting issuance for ${DOMAIN}..."
-              docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN} --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
+              # Invoke certbot binary explicitly in case service overrides entrypoint
+              docker compose run --rm certbot certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN} --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
               docker exec digifact-frontend nginx -s reload || true
             else
               echo "Certificate exists for ${DOMAIN}, skipping issuance."
