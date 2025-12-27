@@ -33,6 +33,38 @@ async function cargarDatosIniciales() {
 
 // ============ NAVEGACIÓN ============
 
+// Toggle sidebar en móvil
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.querySelector('.sidebar-backdrop');
+    const toggleBtn = document.querySelector('.sidebar-toggle');
+
+    if (sidebar && backdrop) {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+
+        // Cambiar icono del botón
+        if (toggleBtn) {
+            const icon = toggleBtn.querySelector('i');
+            if (sidebar.classList.contains('show')) {
+                icon.className = 'bi bi-x-lg';
+            } else {
+                icon.className = 'bi bi-list';
+            }
+        }
+    }
+}
+
+// Cerrar sidebar al redimensionar a escritorio
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 992) {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('show');
+        if (backdrop) backdrop.classList.remove('show');
+    }
+});
+
 function showSection(section) {
     // Ocultar todas las secciones
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
@@ -41,6 +73,14 @@ function showSection(section) {
     // Mostrar sección seleccionada
     document.getElementById(`section-${section}`).classList.add('active');
     event.target.classList.add('active');
+
+    // Cerrar sidebar en móvil después de seleccionar
+    if (window.innerWidth <= 992) {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.querySelector('.sidebar-backdrop');
+        if (sidebar) sidebar.classList.remove('show');
+        if (backdrop) backdrop.classList.remove('show');
+    }
 
     // Recargar datos de la sección
     switch(section) {

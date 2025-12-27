@@ -668,27 +668,33 @@ def verificar_credito_cliente(id):
             return jsonify({'error': 'Cliente no encontrado'}), 404
 
         credito_autorizado = cliente['credito_autorizado'] or 0
+        conn.close()
 
         if credito_autorizado <= 0:
-            conn.close()
             return jsonify({
                 'aprobado': False,
                 'mensaje': 'El cliente no tiene crédito autorizado'
             })
 
-        # Calcular crédito utilizado
-        cursor.execute('''
-            SELECT COALESCE(SUM(total), 0) as credito_utilizado
-            FROM pedidos
-            WHERE cliente_id = ?
-            AND tipo_pago = 'credito'
-            AND estado NOT IN ('pagado', 'cerrado', 'cancelado')
-        ''', (id,))
+        # Calcular crédito utilizado desde pos.db
+        import sqlite3 as sqlite_pos
+        try:
+            conn_pos = sqlite_pos.connect('pos.db')
+            conn_pos.row_factory = sqlite_pos.Row
+            cursor_pos = conn_pos.cursor()
 
-        credito_utilizado = cursor.fetchone()['credito_utilizado']
+            cursor_pos.execute('''
+                SELECT COALESCE(SUM(total), 0) as credito_utilizado
+                FROM pedidos
+                WHERE cliente_id = ? AND estado = 'credito'
+            ''', (id,))
+
+            credito_utilizado = cursor_pos.fetchone()['credito_utilizado'] or 0
+            conn_pos.close()
+        except Exception:
+            credito_utilizado = 0
+
         credito_disponible = credito_autorizado - credito_utilizado
-
-        conn.close()
 
         if monto > credito_disponible:
             return jsonify({
@@ -710,46 +716,67 @@ def verificar_credito_cliente(id):
 
 @clientes_bp.route('/clientes/alertas-credito', methods=['GET'])
 def get_alertas_credito():
-    """Obtiene clientes con alertas de crédito"""
+    """Obtiene clientes con alertas de crédito (>80% utilizado)"""
     try:
         conn = get_db()
         cursor = conn.cursor()
 
-        # Clientes con crédito utilizado > 80% del autorizado
+        # Obtener clientes con crédito autorizado
         cursor.execute('''
-            SELECT
-                c.id,
-                c.codigo,
-                c.nombre,
-                c.credito_autorizado,
-                COALESCE(SUM(p.total), 0) as credito_utilizado
-            FROM clientes c
-            LEFT JOIN pedidos p ON c.id = p.cliente_id
-                AND p.tipo_pago = 'credito'
-                AND p.estado NOT IN ('pagado', 'cerrado', 'cancelado')
-            WHERE c.activo = 1 AND c.credito_autorizado > 0
-            GROUP BY c.id
-            HAVING credito_utilizado >= (c.credito_autorizado * 0.8)
-            ORDER BY (credito_utilizado / c.credito_autorizado) DESC
+            SELECT id, codigo, nombre, credito_autorizado
+            FROM clientes
+            WHERE activo = 1 AND credito_autorizado > 0
         ''')
 
-        alertas = []
-        for row in cursor.fetchall():
-            cliente = dict(row)
-            porcentaje = (cliente['credito_utilizado'] / cliente['credito_autorizado']) * 100
-            cliente['porcentaje_utilizado'] = round(porcentaje, 1)
-            cliente['credito_disponible'] = cliente['credito_autorizado'] - cliente['credito_utilizado']
-
-            if porcentaje >= 100:
-                cliente['nivel_alerta'] = 'critico'
-            elif porcentaje >= 90:
-                cliente['nivel_alerta'] = 'alto'
-            else:
-                cliente['nivel_alerta'] = 'medio'
-
-            alertas.append(cliente)
-
+        clientes = [dict(row) for row in cursor.fetchall()]
         conn.close()
+
+        if not clientes:
+            return jsonify([])
+
+        # Consultar crédito utilizado desde pos.db
+        import sqlite3 as sqlite_pos
+        alertas = []
+
+        try:
+            conn_pos = sqlite_pos.connect('pos.db')
+            conn_pos.row_factory = sqlite_pos.Row
+            cursor_pos = conn_pos.cursor()
+
+            for cliente in clientes:
+                cursor_pos.execute('''
+                    SELECT COALESCE(SUM(total), 0) as credito_utilizado
+                    FROM pedidos
+                    WHERE cliente_id = ? AND estado = 'credito'
+                ''', (cliente['id'],))
+
+                credito_utilizado = cursor_pos.fetchone()['credito_utilizado'] or 0
+                credito_autorizado = cliente['credito_autorizado']
+
+                if credito_autorizado > 0:
+                    porcentaje = (credito_utilizado / credito_autorizado) * 100
+
+                    # Solo incluir si está por encima del 80%
+                    if porcentaje >= 80:
+                        cliente['credito_utilizado'] = credito_utilizado
+                        cliente['porcentaje_utilizado'] = round(porcentaje, 1)
+                        cliente['credito_disponible'] = credito_autorizado - credito_utilizado
+
+                        if porcentaje >= 100:
+                            cliente['nivel_alerta'] = 'critico'
+                        elif porcentaje >= 90:
+                            cliente['nivel_alerta'] = 'alto'
+                        else:
+                            cliente['nivel_alerta'] = 'medio'
+
+                        alertas.append(cliente)
+
+            conn_pos.close()
+        except Exception as e:
+            print(f"Error consultando pos.db para alertas: {e}")
+
+        # Ordenar por porcentaje descendente
+        alertas.sort(key=lambda x: x.get('porcentaje_utilizado', 0), reverse=True)
 
         return jsonify(alertas)
     except Exception as e:

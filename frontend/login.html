@@ -2,10 +2,13 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Iniciar Sesi&oacute;n - Pupuser&iacute;a</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="styles-responsive.css">
     <style>
         :root {
             --primary-color: #e74c3c;
@@ -96,6 +99,59 @@
         .role-mesero { background: #3498db; color: white; }
         .role-cajero { background: #27ae60; color: white; }
         .role-cocinero { background: #e67e22; color: white; }
+
+        /* Mobile responsive styles */
+        @media (max-width: 576px) {
+            body {
+                padding: 15px;
+            }
+            .login-container {
+                border-radius: 15px;
+                margin: 0;
+            }
+            .login-header {
+                padding: 20px;
+            }
+            .login-header i {
+                font-size: 3rem;
+            }
+            .login-header h1 {
+                font-size: 1.3rem;
+            }
+            .login-body {
+                padding: 20px;
+            }
+            .form-control {
+                font-size: 16px !important;
+                min-height: 48px;
+            }
+            .input-group-text {
+                min-height: 48px;
+            }
+            .btn-login {
+                min-height: 50px;
+                font-size: 1rem;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .role-badge {
+                padding: 4px 10px;
+                font-size: 0.7rem;
+                margin: 2px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .login-header i {
+                font-size: 2.5rem;
+            }
+            .login-header h1 {
+                font-size: 1.1rem;
+            }
+            .role-badge {
+                padding: 3px 8px;
+                font-size: 0.65rem;
+            }
+        }
     </style>
 </head>
 <body>

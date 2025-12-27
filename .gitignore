@@ -4,3 +4,4 @@ __pycache__/
 documentacion/
 venv/
 .env
+nginx.conf

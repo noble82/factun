@@ -2,10 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e65100">
     <title>POS Pupusería - Sistema de Pedidos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="styles-responsive.css">
     <style>
         :root {
             --primary-color: #e65100;
@@ -220,6 +224,173 @@
             justify-content: center;
             font-size: 0.75rem;
             font-weight: bold;
+        }
+
+        /* ============ ESTILOS RESPONSIVOS POS ============ */
+        @media (max-width: 992px) {
+            .mesa-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.75rem;
+            }
+            .cart-panel {
+                height: auto;
+                max-height: 50vh;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding-bottom: 70px;
+            }
+            .navbar-pos {
+                padding: 0.5rem;
+            }
+            .navbar-brand {
+                font-size: 0.95rem;
+            }
+            .mesa-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.5rem;
+            }
+            .mesa-card {
+                font-size: 0.85rem;
+                padding: 0.5rem;
+            }
+            .mesa-card i {
+                font-size: 1.25rem;
+            }
+            .menu-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+            .product-card {
+                padding: 0.75rem 0.5rem;
+            }
+            .product-card h6 {
+                font-size: 0.8rem;
+                margin-bottom: 0.25rem;
+            }
+            .product-price {
+                font-size: 1rem;
+            }
+            .cart-panel {
+                border-radius: 10px;
+                height: auto;
+                max-height: 40vh;
+            }
+            .cart-items {
+                padding: 0.5rem;
+            }
+            .cart-item {
+                padding: 0.4rem;
+                font-size: 0.9rem;
+            }
+            .cart-total {
+                padding: 0.75rem;
+            }
+            .pedido-card {
+                margin-bottom: 0.75rem;
+            }
+            .pedido-header {
+                padding: 0.75rem;
+            }
+            .pedido-body {
+                padding: 0.75rem;
+            }
+            .categoria-tabs {
+                padding-bottom: 0.75rem;
+                margin-bottom: 0.75rem;
+                -webkit-overflow-scrolling: touch;
+            }
+            .categoria-tab {
+                padding: 0.5rem 0.875rem;
+                font-size: 0.85rem;
+            }
+            .role-selector {
+                padding: 1rem;
+                border-radius: 10px;
+            }
+            .role-card {
+                padding: 1rem !important;
+            }
+            .role-icon {
+                font-size: 2rem;
+                margin-bottom: 0.5rem;
+            }
+            .role-card h5 {
+                font-size: 1rem;
+            }
+            .container-fluid {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            .row {
+                margin-left: -0.375rem;
+                margin-right: -0.375rem;
+            }
+            .row > * {
+                padding-left: 0.375rem;
+                padding-right: 0.375rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .mesa-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .menu-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .product-card h6 {
+                font-size: 0.75rem;
+            }
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+            .modal-body {
+                padding: 1rem;
+            }
+            .btn-group-sm > .btn {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* Carrito móvil fijo abajo */
+        @media (max-width: 768px) {
+            .cart-mobile-summary {
+                position: fixed;
+                bottom: 70px;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 0.75rem 1rem;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                z-index: 1020;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .cart-mobile-summary.d-none {
+                display: none !important;
+            }
+        }
+
+        /* Mejoras de interacción táctil */
+        .mesa-card:active,
+        .product-card:active,
+        .categoria-tab:active {
+            transform: scale(0.95);
+            opacity: 0.9;
+        }
+
+        /* Scroll suave en categorías */
+        .categoria-tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+        .categoria-tabs::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 2px;
         }
     </style>
 </head>

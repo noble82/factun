@@ -106,10 +106,10 @@ nano .env  # Editar con credenciales
 
 ```bash
 # Desde la raíz del proyecto
-docker-compose up -d
+docker compose up -d
 
 # Ver logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### 3. Acceder al sistema
@@ -121,7 +121,7 @@ docker-compose logs -f
 | POS | http://localhost/pos.html |
 | Cocina | http://localhost/cocina.html |
 | API Backend | http://localhost/api |
-| Health Check | http://localhost/health |
+| Health Check (CI) | http://localhost/healthz |
 
 ## Usuarios del Sistema
 
@@ -290,7 +290,8 @@ DATABASE_PATH=./database
 - Puerto 80 para frontend
 - Proxy a backend en puerto 5000
 - Rutas `/api/*` redirigidas al backend
-- Health check en `/health`
+- Health check público para CI en `/healthz` y health protegido en `/health` (solo `manager`)
+- Asegúrate de configurar `server_name` y certificados para tu dominio (ej. `test.irya.xyz`)
 
 ## Tecnologías
 
@@ -300,6 +301,8 @@ DATABASE_PATH=./database
 - SQLite3
 - Flask-CORS
 - Requests (para Digifact API)
+
+Nota: la aplicación se inicia con `python app.py` dentro del contenedor. No se usa Gunicorn en esta configuración por decisión del despliegue actual.
 
 ### Frontend
 - HTML5 / CSS3 / JavaScript (Vanilla)
@@ -314,22 +317,22 @@ DATABASE_PATH=./database
 
 ```bash
 # Iniciar servicios
-docker-compose up -d
+docker compose up -d
 
 # Ver logs en tiempo real
-docker-compose logs -f
+docker compose logs -f
 
 # Reiniciar backend
-docker-compose restart backend
+docker compose restart backend
 
 # Reconstruir después de cambios
-docker-compose up -d --build
+docker compose up -d --build
 
 # Detener servicios
-docker-compose down
+docker compose down
 
 # Ver estado de contenedores
-docker-compose ps
+docker compose ps
 
 # Acceder a shell del backend
 docker exec -it facturacion-backend-1 /bin/sh
@@ -344,8 +347,8 @@ docker cp facturacion-backend-1:/app/database/pos.db ./backup_pos.db
 ## Troubleshooting
 
 ### El login no funciona
-1. Verificar que el backend esté corriendo: `docker-compose ps`
-2. Revisar logs: `docker-compose logs backend`
+1. Verificar que el backend esté corriendo: `docker compose ps`
+2. Revisar logs: `docker compose logs backend`
 3. Verificar que existe la base de datos auth.db
 
 ### La cocina no muestra pedidos
@@ -360,8 +363,8 @@ docker cp facturacion-backend-1:/app/database/pos.db ./backup_pos.db
 
 ### Error 502 Bad Gateway
 1. El backend puede estar iniciando: esperar 10-15 segundos
-2. Verificar logs del backend: `docker-compose logs backend`
-3. Reiniciar servicios: `docker-compose restart`
+2. Verificar logs del backend: `docker compose logs backend`
+3. Reiniciar servicios: `docker compose restart`
 
 ### Error de CORS
 - Nginx maneja CORS automáticamente
@@ -371,8 +374,8 @@ docker cp facturacion-backend-1:/app/database/pos.db ./backup_pos.db
 ```bash
 # Backup y reinicio
 docker cp facturacion-backend-1:/app/database ./backup_db
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
 ## Seguridad

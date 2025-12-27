@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="theme-color" content="#007bff">
     <title>Comprobante</title>
     <style>
         * {
@@ -180,6 +181,30 @@
 
         .btn-close:hover {
             background: #545b62;
+        }
+
+        /* Mobile responsive improvements */
+        @media (max-width: 576px) {
+            body {
+                padding: 10px;
+            }
+            .ticket-container {
+                max-width: 100%;
+                padding: 12px;
+            }
+            .no-print {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding: 0 10px;
+            }
+            .btn-print {
+                min-height: 48px;
+                font-size: 16px;
+                width: 100%;
+                margin: 0;
+                -webkit-tap-highlight-color: transparent;
+            }
         }
 
         @media print {
