@@ -773,24 +773,48 @@ async function cargarProductosCajero() {
 
 function renderizarProductosCajero() {
     const container = document.getElementById('productos-container-cajero');
-    if (!container) return;
+    if (!container) {
+        console.log('productos-container-cajero no encontrado');
+        return;
+    }
 
     const productosFiltrados = categoriaActivaCajero
         ? productos.filter(p => p.categoria_id === categoriaActivaCajero)
         : productos;
 
+    console.log('renderizarProductosCajero() - Renderizando', productosFiltrados.length, 'productos');
+
     container.innerHTML = productosFiltrados.map(producto => `
-        <div class="product-card ${!producto.disponible ? 'disabled' : ''}" onclick="agregarAlCarritoCajero(${producto.id})">
+        <div class="product-card ${!producto.disponible ? 'disabled' : ''}"
+             data-producto-id="${producto.id}"
+             onclick="window.agregarAlCarritoCajero(${producto.id}); return false;">
             <div class="fw-bold">${producto.nombre}</div>
             <small class="text-muted">${producto.descripcion || ''}</small>
             <div class="product-price">$${producto.precio.toFixed(2)}</div>
         </div>
     `).join('');
+
+    // Añadir event listeners táctiles como respaldo
+    container.querySelectorAll('.product-card:not(.disabled)').forEach(card => {
+        card.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            const id = parseInt(this.dataset.productoId);
+            console.log('Touch en producto cajero:', id);
+            agregarAlCarritoCajero(id);
+        }, { passive: false });
+    });
+
+    console.log('Productos cajero renderizados con event listeners');
 }
 
 function agregarAlCarritoCajero(productoId) {
+    console.log('agregarAlCarritoCajero:', productoId);
+
     const producto = productos.find(p => p.id === productoId);
-    if (!producto || !producto.disponible) return;
+    if (!producto || !producto.disponible) {
+        console.log('Producto no encontrado o no disponible:', productoId);
+        return;
+    }
 
     const itemExistente = carritoCajero.find(item => item.producto_id === productoId);
 
@@ -807,7 +831,18 @@ function agregarAlCarritoCajero(productoId) {
         });
     }
 
+    console.log('Carrito cajero actualizado:', carritoCajero.length, 'items');
     renderizarCarritoCajero();
+
+    // También actualizar el carrito móvil
+    actualizarCarritoMobile();
+
+    // Feedback visual en móvil
+    const fab = document.getElementById('cart-fab');
+    if (fab) {
+        fab.classList.add('pulse');
+        setTimeout(() => fab.classList.remove('pulse'), 300);
+    }
 }
 
 function modificarCantidadCajero(productoId, delta) {
@@ -823,6 +858,7 @@ function modificarCantidadCajero(productoId, delta) {
     }
 
     renderizarCarritoCajero();
+    actualizarCarritoMobile();
 }
 
 function renderizarCarritoCajero() {
@@ -1935,9 +1971,18 @@ function toggleCartSheet() {
     }
 }
 
+// Obtener el carrito actual según el rol
+function getCarritoActual() {
+    if (rolActual === 'cajero') {
+        return carritoCajero;
+    }
+    return carrito;
+}
+
 // Actualizar el carrito en el bottom sheet móvil
 function actualizarCarritoMobile() {
-    console.log('actualizarCarritoMobile() - carrito tiene', carrito.length, 'items');
+    const carritoActual = getCarritoActual();
+    console.log('actualizarCarritoMobile() - rol:', rolActual, '- items:', carritoActual.length);
 
     const container = document.getElementById('cart-sheet-items');
     const fabCount = document.getElementById('cart-fab-count');
@@ -1949,19 +1994,19 @@ function actualizarCarritoMobile() {
     }
 
     // Actualizar contador del FAB
-    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+    const totalItems = carritoActual.reduce((sum, item) => sum + item.cantidad, 0);
     if (fabCount) {
         fabCount.textContent = totalItems;
         fabCount.style.display = totalItems > 0 ? 'flex' : 'none';
     }
 
-    if (carrito.length === 0) {
+    if (carritoActual.length === 0) {
         container.innerHTML = '<p class="text-muted text-center py-3">Carrito vacío</p>';
         if (btnEnviar) btnEnviar.disabled = true;
         return;
     }
 
-    container.innerHTML = carrito.map(item => `
+    container.innerHTML = carritoActual.map(item => `
         <div class="cart-item d-flex justify-content-between align-items-center py-2 border-bottom">
             <div>
                 <strong>${item.nombre}</strong><br>
@@ -1981,20 +2026,28 @@ function actualizarCarritoMobile() {
     `).join('');
 
     // Calcular totales
-    const subtotal = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const subtotal = carritoActual.reduce((sum, item) => sum + item.subtotal, 0);
     const iva = subtotal * 0.13;
     const total = subtotal + iva;
 
-    document.getElementById('cart-sheet-subtotal').textContent = `$${subtotal.toFixed(2)}`;
-    document.getElementById('cart-sheet-iva').textContent = `$${iva.toFixed(2)}`;
-    document.getElementById('cart-sheet-total').textContent = `$${total.toFixed(2)}`;
+    const subtotalEl = document.getElementById('cart-sheet-subtotal');
+    const ivaEl = document.getElementById('cart-sheet-iva');
+    const totalEl = document.getElementById('cart-sheet-total');
+
+    if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+    if (ivaEl) ivaEl.textContent = `$${iva.toFixed(2)}`;
+    if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
 
     if (btnEnviar) btnEnviar.disabled = false;
 }
 
 // Modificar cantidad desde móvil
 function modificarCantidadMobile(productoId, delta) {
-    modificarCantidad(productoId, delta);
+    if (rolActual === 'cajero') {
+        modificarCantidadCajero(productoId, delta);
+    } else {
+        modificarCantidad(productoId, delta);
+    }
     actualizarCarritoMobile();
 }
 
@@ -2017,34 +2070,44 @@ function toggleOpcionesPagoMobile() {
 
 // Enviar pedido desde móvil
 async function enviarPedidoMobile() {
-    const tipoPago = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
-    const clienteNombre = document.getElementById('cliente-nombre-mobile')?.value?.trim() || '';
+    console.log('enviarPedidoMobile() - rol:', rolActual);
 
-    // Validar nombre del cliente para pedidos para llevar (sin mesa)
-    if (tipoPago === 'anticipado' && !mesaSeleccionada && !clienteNombre) {
-        mostrarNotificacion('Error', 'Ingresa el nombre del cliente para pedidos para llevar', 'danger');
+    const clienteNombre = document.getElementById('cliente-nombre-mobile')?.value?.trim() || '';
+    const carritoActual = getCarritoActual();
+
+    // Validar nombre del cliente
+    if (!clienteNombre) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del cliente', 'danger');
         document.getElementById('cliente-nombre-mobile')?.focus();
         return;
     }
 
     // Validar que hay productos en el carrito
-    if (carrito.length === 0) {
+    if (carritoActual.length === 0) {
         mostrarNotificacion('Error', 'Agrega productos al pedido', 'danger');
         return;
     }
 
-    // Sincronizar valores con el formulario desktop
-    const tipoPagoDesktop = document.getElementById('tipo-pago');
-    const clienteNombreDesktop = document.getElementById('cliente-nombre-pedido');
-
-    if (tipoPagoDesktop) tipoPagoDesktop.value = tipoPago;
-    if (clienteNombreDesktop) clienteNombreDesktop.value = clienteNombre;
-
     // Cerrar el sheet antes de enviar
     toggleCartSheet();
 
-    // Usar la función existente de enviar pedido
-    await enviarPedido();
+    if (rolActual === 'cajero') {
+        // Para cajero, sincronizar con su formulario y usar su función
+        const clienteNombreCajero = document.getElementById('cliente-nombre-cajero');
+        if (clienteNombreCajero) clienteNombreCajero.value = clienteNombre;
+
+        await crearPedidoCajero();
+    } else {
+        // Para mesero, sincronizar con su formulario
+        const tipoPago = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
+        const tipoPagoDesktop = document.getElementById('tipo-pago');
+        const clienteNombreDesktop = document.getElementById('cliente-nombre-pedido');
+
+        if (tipoPagoDesktop) tipoPagoDesktop.value = tipoPago;
+        if (clienteNombreDesktop) clienteNombreDesktop.value = clienteNombre;
+
+        await enviarPedido();
+    }
 
     // Limpiar campos móviles
     const campoNombre = document.getElementById('cliente-nombre-mobile');
@@ -2234,11 +2297,14 @@ function navegarCajeroMobile(destino) {
 
 // ============ EXPORTAR FUNCIONES GLOBALES ============
 window.agregarAlCarrito = agregarAlCarrito;
+window.agregarAlCarritoCajero = agregarAlCarritoCajero;
 window.toggleCartSheet = toggleCartSheet;
 window.enviarPedidoMobile = enviarPedidoMobile;
 window.navegarMobile = navegarMobile;
 window.navegarCajeroMobile = navegarCajeroMobile;
 window.modificarCantidadMobile = modificarCantidadMobile;
+window.modificarCantidadCajero = modificarCantidadCajero;
 window.mostrarMenuManager = mostrarMenuManager;
+window.filtrarCategoriaCajero = filtrarCategoriaCajero;
 
-console.log("POS.js cargado completamente");
+console.log("POS.js cargado completamente - rol actual:", rolActual);
