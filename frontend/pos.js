@@ -110,6 +110,15 @@ function toggleDatosCliente() {
     const container = document.getElementById('datos-cliente-container');
     if (container) {
         container.style.display = tipoFactura ? 'block' : 'none';
+
+        // Mostrar u ocultar campos de crédito: solo si es factura y el cliente es contribuyente
+        const creditoField = document.getElementById('cliente-credito');
+        const diasField = document.getElementById('cliente-dias-credito');
+        const clienteId = document.getElementById('cliente-id-factura')?.value;
+
+        const mostrarCredito = tipoFactura && (clienteId ? true : false);
+        if (creditoField) creditoField.closest('.row')?.classList.toggle('d-none', !mostrarCredito);
+        if (diasField) diasField.closest('.row')?.classList.toggle('d-none', !mostrarCredito);
     }
 }
 
@@ -1260,6 +1269,15 @@ async function seleccionarClienteFactura(clienteId) {
             // Cargar información de crédito del cliente
             await cargarCreditoCliente(cliente.id);
 
+            // Mostrar campos de crédito solo si el cliente es contribuyente
+            const creditoField = document.getElementById('cliente-credito');
+            const diasField = document.getElementById('cliente-dias-credito');
+            const filaCredito = creditoField ? creditoField.closest('.row') : null;
+            const filaDias = diasField ? diasField.closest('.row') : null;
+            const esContribuyente = cliente.tipo_cliente === 'contribuyente';
+            if (filaCredito) filaCredito.classList.toggle('d-none', !esContribuyente);
+            if (filaDias) filaDias.classList.toggle('d-none', !esContribuyente);
+
             mostrarNotificacion('Cliente', `Datos de "${cliente.nombre}" cargados`, 'success');
         }
     } catch (error) {
@@ -1396,6 +1414,12 @@ function limpiarClienteFactura() {
     creditoClienteActual = null;
     document.getElementById('info-credito-cliente').classList.add('d-none');
     document.getElementById('alerta-sin-credito').classList.add('d-none');
+
+    // Ocultar campos de crédito del formulario
+    const creditoField = document.getElementById('cliente-credito');
+    const diasField = document.getElementById('cliente-dias-credito');
+    if (creditoField) creditoField.closest('.row')?.classList.add('d-none');
+    if (diasField) diasField.closest('.row')?.classList.add('d-none');
 
     // Resetear método de pago a efectivo
     document.getElementById('pago-efectivo').checked = true;
