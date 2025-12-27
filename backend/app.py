@@ -181,6 +181,42 @@ def health():
     """Endpoint de salud (protegido: solo `manager`)"""
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
+
+@app.route('/healthz', methods=['GET'])
+def healthz():
+    """Public health endpoint for CI / load balancers."""
+    # Intentar obtener información de commit/version desde variables de entorno
+    git_commit = os.getenv('GIT_COMMIT')
+    app_version = os.getenv('APP_VERSION')
+
+    if not git_commit:
+        # Intentar leer .git (si está disponible en la imagen de CI)
+        try:
+            head_path = os.path.join(os.path.dirname(__file__), '..', '.git', 'HEAD')
+            head_path = os.path.abspath(head_path)
+            if os.path.exists(head_path):
+                with open(head_path, 'r') as f:
+                    ref = f.read().strip()
+                if ref.startswith('ref:'):
+                    ref_path = ref.split(' ', 1)[1].strip()
+                    ref_file = os.path.join(os.path.dirname(__file__), '..', '.git', ref_path)
+                    ref_file = os.path.abspath(ref_file)
+                    if os.path.exists(ref_file):
+                        with open(ref_file, 'r') as rf:
+                            git_commit = rf.read().strip()[:40]
+                else:
+                    git_commit = ref[:40]
+        except Exception:
+            git_commit = None
+
+    payload = {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "git_commit": git_commit,
+        "version": app_version
+    }
+    return jsonify(payload)
+
 @app.route('/api/auth/test', methods=['POST'])
 def test_auth():
     """Prueba credenciales y conexión"""
