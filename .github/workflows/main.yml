@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Despliegue vía SSH
+      - name: Despliegue: pull y levantar contenedores (SSH)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -60,28 +60,42 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/facturacion
-            
+
             # Sincronizar código
             git pull origin main
-            
-            # Re-levantar servicios
+
+            # Re-levantar servicios (backend + frontend + certbot)
             docker compose up -d --build backend frontend certbot
-            
-            # Gestión de Certificado SSL
-            DOMAIN=test.irya.xyz
-            if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ]; then
-              echo "No certificate found for ${DOMAIN}, attempting issuance..."
-              docker run --rm -v $(pwd)/certs:/etc/letsencrypt -v $(pwd)/certbot-www:/var/www/certbot \
-                certbot/certbot:v2.5.0 certonly --webroot -w /var/www/certbot -d ${DOMAIN} \
-                --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
-              
-              docker exec digifact-frontend nginx -s reload || true
-            else
-              echo "Certificate already present for ${DOMAIN}, skipping issuance."
-            fi
-            
+
             # Optimización de espacio
             docker image prune -f
-            
+
             # Verificación final
             docker ps | grep -E "backend|frontend"
+
+      - name: Emitir/renovar certificados en VPS (SSH)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/facturacion
+
+            DOMAIN=test.irya.xyz
+
+            # Asegurar directorios de certs
+            mkdir -p ./certs ./certbot-www
+            chown -R 1000:1000 ./certs ./certbot-www || true
+
+            # Intentar emitir/renovar certificado
+            if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ] || [ "$FORCE_CERTBOT" = "true" ]; then
+              echo "Attempting issuance for ${DOMAIN}..."
+              docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d ${DOMAIN} \
+                --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
+
+              # Recargar nginx
+              docker exec digifact-frontend nginx -s reload || true
+            else
+              echo "Certificate exists for ${DOMAIN}, skipping issuance."
+            fi
