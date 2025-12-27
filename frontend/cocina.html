@@ -323,19 +323,30 @@
             container.innerHTML = pedidosActuales.map(pedido => {
                 const tiempoEspera = calcularTiempoEspera(pedido.created_at);
                 const esUrgente = tiempoEspera > 15;
+                const esParaLlevar = !pedido.mesa_numero || pedido.tipo_pago === 'anticipado';
+                const nombreCliente = pedido.cliente_nombre || 'Cliente';
 
                 return `
                     <div class="col-md-6 col-lg-4">
                         <div class="pedido-card p-3 ${esUrgente ? 'urgente' : ''} ${pedido.estado === 'en_cocina' ? 'preparando' : ''}">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
-                                    <span class="badge bg-primary mesa-badge">${pedido.mesa_numero ? 'Mesa ' + pedido.mesa_numero : (pedido.cliente_nombre || 'Para llevar')}</span>
+                                    ${esParaLlevar
+                                        ? `<span class="badge bg-warning text-dark mesa-badge"><i class="bi bi-bag"></i> LLEVAR</span>`
+                                        : `<span class="badge bg-primary mesa-badge">Mesa ${pedido.mesa_numero}</span>`
+                                    }
                                     <span class="badge bg-secondary ms-2">#${pedido.id}</span>
                                 </div>
                                 <div class="tiempo-espera ${esUrgente ? 'alerta' : ''}">
                                     <i class="bi bi-clock"></i> ${tiempoEspera} min
                                 </div>
                             </div>
+                            ${esParaLlevar ? `
+                                <div class="alert alert-warning py-2 mb-2 text-center">
+                                    <i class="bi bi-person-fill"></i>
+                                    <strong class="fs-5">${nombreCliente}</strong>
+                                </div>
+                            ` : ''}
 
                             <div class="items-lista mb-3">
                                 ${pedido.items ? pedido.items.map(item => `

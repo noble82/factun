@@ -4,5 +4,3 @@ __pycache__/
 documentacion/
 venv/
 .env
-nginx.conf
-deploy-cert.sh

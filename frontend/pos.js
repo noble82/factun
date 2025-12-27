@@ -566,31 +566,45 @@ function renderizarPedidosServir(pedidos) {
         return;
     }
 
-    container.innerHTML = pedidos.map(pedido => `
-        <div class="pedido-card">
-            <div class="pedido-header listo">
-                <div>
-                    <strong>Pedido #${pedido.id}</strong>
-                    <span class="ms-2">Mesa ${pedido.mesa_numero || 'N/A'}</span>
-                </div>
-                <span class="badge bg-light text-dark">LISTO</span>
-            </div>
-            <div class="pedido-body">
-                ${pedido.items.map(item => `
-                    <div class="pedido-item">
-                        <span>${item.cantidad}x ${item.producto_nombre}</span>
+    container.innerHTML = pedidos.map(pedido => {
+        const esParaLlevar = pedido.tipo_pago === 'anticipado' || !pedido.mesa_id;
+        const nombreCliente = pedido.cliente_nombre || 'Cliente';
+
+        return `
+            <div class="pedido-card">
+                <div class="pedido-header listo">
+                    <div>
+                        <strong>Pedido #${pedido.id}</strong>
+                        ${esParaLlevar
+                            ? `<span class="badge bg-warning text-dark ms-2"><i class="bi bi-bag"></i> PARA LLEVAR</span>`
+                            : `<span class="ms-2">Mesa ${pedido.mesa_numero || 'N/A'}</span>`
+                        }
                     </div>
-                `).join('')}
-                <hr>
-                <div class="d-flex justify-content-between align-items-center">
-                    <strong>Total: $${pedido.total.toFixed(2)}</strong>
-                    <button class="btn btn-info" onclick="marcarServido(${pedido.id}, '${pedido.tipo_pago}')">
-                        <i class="bi bi-check2-circle"></i> Marcar Servido
-                    </button>
+                    <span class="badge bg-light text-dark">LISTO</span>
+                </div>
+                <div class="pedido-body">
+                    ${esParaLlevar ? `
+                        <div class="alert alert-warning py-2 mb-2">
+                            <i class="bi bi-person-fill"></i>
+                            <strong class="fs-5">${nombreCliente}</strong>
+                        </div>
+                    ` : ''}
+                    ${pedido.items.map(item => `
+                        <div class="pedido-item">
+                            <span>${item.cantidad}x ${item.producto_nombre}</span>
+                        </div>
+                    `).join('')}
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>Total: $${pedido.total.toFixed(2)}</strong>
+                        <button class="btn btn-info" onclick="marcarServido(${pedido.id}, '${pedido.tipo_pago}')">
+                            <i class="bi bi-check2-circle"></i> ${esParaLlevar ? 'Entregar' : 'Marcar Servido'}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function marcarServido(pedidoId, tipoPago) {
@@ -1811,8 +1825,10 @@ function limpiarClienteFactura() {
     if (diasField) diasField.closest('.row')?.classList.add('d-none');
 
     // Resetear método de pago a efectivo
-    document.getElementById('pago-efectivo').checked = true;
-    document.getElementById('seccion-monto-recibido').style.display = 'block';
+    const pagoEfectivo = document.getElementById('pago-efectivo');
+    const seccionMonto = document.getElementById('seccion-monto-recibido');
+    if (pagoEfectivo) pagoEfectivo.checked = true;
+    if (seccionMonto) seccionMonto.style.display = 'block';
 }
 
 // Cerrar resultados al hacer clic fuera
