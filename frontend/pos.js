@@ -439,26 +439,33 @@ function modificarCantidad(productoId, delta) {
 
 function renderizarCarrito() {
     const container = document.getElementById('cart-items');
+    const btnEnviar = document.getElementById('btn-enviar-pedido');
+    const subtotalEl = document.getElementById('cart-subtotal');
+    const ivaEl = document.getElementById('cart-iva');
+    const totalEl = document.getElementById('cart-total');
 
-    if (carrito.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">Selecciona productos del menú</p>';
-        document.getElementById('btn-enviar-pedido').disabled = true;
-    } else {
-        container.innerHTML = carrito.map(item => `
-            <div class="cart-item">
-                <div>
-                    <strong>${item.nombre}</strong><br>
-                    <small>$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+    // Actualizar carrito desktop si existe
+    if (container) {
+        if (carrito.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">Selecciona productos del menú</p>';
+            if (btnEnviar) btnEnviar.disabled = true;
+        } else {
+            container.innerHTML = carrito.map(item => `
+                <div class="cart-item">
+                    <div>
+                        <strong>${item.nombre}</strong><br>
+                        <small>$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, -1)">-</button>
+                        <span>${item.cantidad}</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, 1)">+</button>
+                        <strong>$${item.subtotal.toFixed(2)}</strong>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, -1)">-</button>
-                    <span>${item.cantidad}</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, 1)">+</button>
-                    <strong>$${item.subtotal.toFixed(2)}</strong>
-                </div>
-            </div>
-        `).join('');
-        document.getElementById('btn-enviar-pedido').disabled = false;
+            `).join('');
+            if (btnEnviar) btnEnviar.disabled = false;
+        }
     }
 
     // Calcular totales
@@ -466,14 +473,14 @@ function renderizarCarrito() {
     const iva = subtotal * 0.13;
     const total = subtotal + iva;
 
-    document.getElementById('cart-subtotal').textContent = `$${subtotal.toFixed(2)}`;
-    document.getElementById('cart-iva').textContent = `$${iva.toFixed(2)}`;
-    document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+    if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+    if (ivaEl) ivaEl.textContent = `$${iva.toFixed(2)}`;
+    if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
 
-    // Actualizar carrito móvil si la función existe
-    if (typeof actualizarCarritoMobile === 'function') {
-        actualizarCarritoMobile();
-    }
+    // SIEMPRE actualizar carrito móvil
+    actualizarCarritoMobile();
+
+    console.log('renderizarCarrito() - items en carrito:', carrito.length);
 }
 
 async function enviarPedido() {
@@ -1882,11 +1889,16 @@ function toggleCartSheet() {
 
 // Actualizar el carrito en el bottom sheet móvil
 function actualizarCarritoMobile() {
+    console.log('actualizarCarritoMobile() - carrito tiene', carrito.length, 'items');
+
     const container = document.getElementById('cart-sheet-items');
     const fabCount = document.getElementById('cart-fab-count');
     const btnEnviar = document.getElementById('btn-enviar-mobile');
 
-    if (!container) return;
+    if (!container) {
+        console.log('cart-sheet-items no encontrado');
+        return;
+    }
 
     // Actualizar contador del FAB
     const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
