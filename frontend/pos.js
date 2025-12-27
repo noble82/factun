@@ -376,7 +376,12 @@ function renderizarProductos() {
 }
 
 function agregarAlCarrito(productoId) {
-    const tipoPago = document.getElementById('tipo-pago')?.value || 'anticipado';
+    // Obtener tipo de pago de móvil o desktop
+    const tipoPagoMobile = document.getElementById('tipo-pago-mobile')?.value;
+    const tipoPagoDesktop = document.getElementById('tipo-pago')?.value;
+    const tipoPago = tipoPagoMobile || tipoPagoDesktop || 'anticipado';
+
+    console.log('Agregando al carrito:', productoId, 'Tipo pago:', tipoPago, 'Mesa:', mesaSeleccionada);
 
     // Para pago al final (en mesa), se requiere mesa seleccionada
     // Para pago anticipado (para llevar), NO se requiere mesa
@@ -386,7 +391,10 @@ function agregarAlCarrito(productoId) {
     }
 
     const producto = productos.find(p => p.id === productoId);
-    if (!producto || !producto.disponible) return;
+    if (!producto || !producto.disponible) {
+        console.log('Producto no encontrado o no disponible:', productoId);
+        return;
+    }
 
     const itemExistente = carrito.find(item => item.producto_id === productoId);
 
@@ -403,7 +411,15 @@ function agregarAlCarrito(productoId) {
         });
     }
 
+    console.log('Carrito actualizado:', carrito.length, 'items');
     renderizarCarrito();
+
+    // Feedback visual en móvil
+    const fab = document.getElementById('cart-fab');
+    if (fab) {
+        fab.classList.add('pulse');
+        setTimeout(() => fab.classList.remove('pulse'), 300);
+    }
 }
 
 function modificarCantidad(productoId, delta) {
