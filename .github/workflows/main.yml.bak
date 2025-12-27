@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     steps:
-      - name: "Despliegue: pull y levantar contenedores (SSH)"
+      - name: Despliegue: pull y levantar contenedores (SSH)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -63,7 +63,7 @@ jobs:
             docker image prune -f
             docker ps | grep -E "backend|frontend"
 
-      - name: "Emitir/renovar certificados en VPS (SSH)"
+      - name: Emitir/renovar certificados en VPS (SSH)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
