@@ -68,7 +68,7 @@ jobs:
             docker compose up -d --build backend frontend certbot
             
             # Gestión de Certificado SSL
-            DOMAIN=test.irya.yxz
+            DOMAIN=test.irya.xyz
             if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ]; then
               echo "No certificate found for ${DOMAIN}, attempting issuance..."
               docker run --rm -v $(pwd)/certs:/etc/letsencrypt -v $(pwd)/certbot-www:/var/www/certbot \
