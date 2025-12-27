@@ -61,6 +61,8 @@ jobs:
             git pull origin main
             docker compose up -d --build backend frontend certbot
             docker image prune -f
+            # Recargar nginx para que tome los nuevos archivos
+            docker exec digifact-frontend nginx -s reload || true
             docker ps | grep -E "backend|frontend"
 
       - name: "Emitir/renovar certificados en VPS (SSH)"
