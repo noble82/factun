@@ -39,10 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Ocultar elementos móviles hasta que se seleccione un rol
+    // Esto será sobrescrito por activarElementosMovil() cuando auth-check.js complete
     const cartFab = document.getElementById('cart-fab');
     const bottomNav = document.getElementById('bottom-nav');
-    if (cartFab) cartFab.style.display = 'none';
-    if (bottomNav) bottomNav.style.visibility = 'hidden';
+    if (cartFab) cartFab.style.cssText = 'display: none;';
+    if (bottomNav) {
+        bottomNav.style.display = 'none';
+        bottomNav.style.visibility = 'hidden';
+    }
 });
 
 // Callback que será llamado por auth-check.js cuando la verificación esté completa
@@ -93,21 +97,26 @@ window.onAuthVerificado = function(usuario) {
 
 // Activar elementos móviles (FAB, navegación inferior)
 function activarElementosMovil(rol) {
-    console.log('activarElementosMovil() - rol:', rol);
+    console.log('activarElementosMovil() - rol:', rol, '- ancho:', window.innerWidth);
 
-    // Mostrar FAB del carrito para mesero y cajero (forzar display en móvil)
+    const esMobile = window.innerWidth <= 768;
+    const esRolConCarrito = (rol === 'mesero' || rol === 'cajero');
+
+    // Mostrar FAB del carrito para mesero y cajero en móvil
     const cartFab = document.getElementById('cart-fab');
     if (cartFab) {
-        // Verificar si es móvil (ancho <= 768px)
-        const esMobile = window.innerWidth <= 768;
-        if (esMobile && (rol === 'mesero' || rol === 'cajero')) {
-            cartFab.style.display = 'flex';
-            cartFab.style.alignItems = 'center';
-            cartFab.style.justifyContent = 'center';
+        if (esMobile && esRolConCarrito) {
+            // Forzar visibilidad con estilos inline para sobreescribir cualquier CSS
+            cartFab.style.cssText = 'display: flex !important; align-items: center; justify-content: center;';
             console.log('FAB activado (móvil) - display: flex');
+        } else if (!esMobile) {
+            // En desktop, ocultar FAB (el carrito se muestra inline)
+            cartFab.style.cssText = 'display: none;';
+            console.log('FAB oculto (desktop)');
         } else {
-            cartFab.style.display = '';
-            console.log('FAB en modo desktop o rol no aplica');
+            // Rol sin carrito (cocina, etc)
+            cartFab.style.cssText = 'display: none;';
+            console.log('FAB oculto (rol sin carrito)');
         }
     }
 
@@ -116,12 +125,19 @@ function activarElementosMovil(rol) {
 
     const bottomNav = document.getElementById('bottom-nav');
     if (bottomNav) {
-        const esMobile = window.innerWidth <= 768;
         if (esMobile) {
             bottomNav.style.display = 'block';
+            bottomNav.style.visibility = 'visible';
+            console.log('Bottom nav visible (móvil)');
+        } else {
+            bottomNav.style.display = 'none';
+            console.log('Bottom nav oculto (desktop)');
         }
-        bottomNav.style.visibility = 'visible';
-        console.log('Bottom nav visible');
+    }
+
+    // Actualizar también el carrito móvil
+    if (esRolConCarrito) {
+        actualizarCarritoMobile();
     }
 }
 
@@ -2332,5 +2348,27 @@ window.modificarCantidadMobile = modificarCantidadMobile;
 window.modificarCantidadCajero = modificarCantidadCajero;
 window.mostrarMenuManager = mostrarMenuManager;
 window.filtrarCategoriaCajero = filtrarCategoriaCajero;
+
+// ============ MANEJADOR DE RESIZE PARA RESPONSIVIDAD ============
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        console.log('Window resize detectado - ancho:', window.innerWidth);
+        if (rolActual) {
+            activarElementosMovil(rolActual);
+        }
+    }, 150);
+});
+
+// Handler de orientationchange para móviles
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        console.log('Orientation change detectado');
+        if (rolActual) {
+            activarElementosMovil(rolActual);
+        }
+    }, 100);
+});
 
 console.log("POS.js cargado completamente - rol actual:", rolActual);
