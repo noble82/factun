@@ -511,6 +511,23 @@
             }
         }
 
+        /* Clases para forzar visibilidad en móvil (JS las agrega/remueve) */
+        .cart-fab.mobile-active {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .cart-fab.mobile-hidden {
+            display: none !important;
+        }
+        .bottom-nav.mobile-active {
+            display: block !important;
+            visibility: visible !important;
+        }
+        .bottom-nav.mobile-hidden {
+            display: none !important;
+        }
+
         /* ============ BOTTOM SHEET CARRITO ============ */
         .cart-sheet {
             display: none;
@@ -1262,6 +1279,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="auth-check.js?v=5"></script>
-    <script src="pos.js?v=13"></script>
+    <script src="pos.js?v=14"></script>
 </body>
 </html>

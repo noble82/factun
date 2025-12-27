@@ -42,16 +42,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Esto será sobrescrito por activarElementosMovil() cuando auth-check.js complete
     const cartFab = document.getElementById('cart-fab');
     const bottomNav = document.getElementById('bottom-nav');
-    if (cartFab) cartFab.style.cssText = 'display: none;';
+    if (cartFab) {
+        cartFab.classList.add('mobile-hidden');
+    }
     if (bottomNav) {
-        bottomNav.style.display = 'none';
-        bottomNav.style.visibility = 'hidden';
+        bottomNav.classList.add('mobile-hidden');
     }
 });
 
 // Callback que será llamado por auth-check.js cuando la verificación esté completa
 window.onAuthVerificado = function(usuario) {
-    console.log('onAuthVerificado llamado con usuario:', usuario);
+    console.log('=== onAuthVerificado llamado ===');
+    console.log('Usuario:', usuario);
 
     // auth-check.js ya muestra el panel, aquí cargamos los datos Y activamos elementos móviles
     if (usuario.rol === 'mesero') {
@@ -61,13 +63,21 @@ window.onAuthVerificado = function(usuario) {
         // Cargar datos
         cargarDatosMesero().then(() => {
             console.log('Datos de mesero cargados');
+            // Re-activar elementos móviles después de cargar datos (fallback)
+            activarElementosMovil('mesero');
         }).catch(err => {
             console.error('Error cargando datos mesero:', err);
         });
         iniciarActualizacionMesero();
 
-        // Activar navegación móvil y FAB
+        // Activar navegación móvil y FAB inmediatamente
         activarElementosMovil('mesero');
+
+        // Fallback: re-activar después de 500ms por si algo lo oculta
+        setTimeout(() => {
+            console.log('Fallback timeout - re-activando elementos mesero');
+            activarElementosMovil('mesero');
+        }, 500);
 
     } else if (usuario.rol === 'cajero') {
         console.log('Configurando cajero...');
@@ -76,13 +86,21 @@ window.onAuthVerificado = function(usuario) {
         // Cargar datos
         cargarDatosCajero().then(() => {
             console.log('Datos de cajero cargados');
+            // Re-activar elementos móviles después de cargar datos (fallback)
+            activarElementosMovil('cajero');
         }).catch(err => {
             console.error('Error cargando datos cajero:', err);
         });
         iniciarActualizacionCajero();
 
-        // Activar navegación móvil y FAB
+        // Activar navegación móvil y FAB inmediatamente
         activarElementosMovil('cajero');
+
+        // Fallback: re-activar después de 500ms por si algo lo oculta
+        setTimeout(() => {
+            console.log('Fallback timeout - re-activando elementos cajero');
+            activarElementosMovil('cajero');
+        }, 500);
 
     } else if (usuario.rol === 'manager') {
         console.log('Manager: selector de roles visible');
@@ -93,52 +111,65 @@ window.onAuthVerificado = function(usuario) {
             console.log('Enlaces de manager mostrados');
         }
     }
+
+    console.log('=== Fin onAuthVerificado ===');
 };
 
 // Activar elementos móviles (FAB, navegación inferior)
 function activarElementosMovil(rol) {
-    console.log('activarElementosMovil() - rol:', rol, '- ancho:', window.innerWidth);
+    console.log('=== activarElementosMovil() ===');
+    console.log('Rol:', rol, '- Ancho ventana:', window.innerWidth);
 
     const esMobile = window.innerWidth <= 768;
     const esRolConCarrito = (rol === 'mesero' || rol === 'cajero');
 
+    console.log('Es móvil:', esMobile, '- Rol con carrito:', esRolConCarrito);
+
     // Mostrar FAB del carrito para mesero y cajero en móvil
     const cartFab = document.getElementById('cart-fab');
     if (cartFab) {
+        // Limpiar estilos inline y clases previas
+        cartFab.style.cssText = '';
+        cartFab.classList.remove('mobile-active', 'mobile-hidden');
+
         if (esMobile && esRolConCarrito) {
-            // Forzar visibilidad con estilos inline para sobreescribir cualquier CSS
-            cartFab.style.cssText = 'display: flex !important; align-items: center; justify-content: center;';
-            console.log('FAB activado (móvil) - display: flex');
-        } else if (!esMobile) {
-            // En desktop, ocultar FAB (el carrito se muestra inline)
-            cartFab.style.cssText = 'display: none;';
-            console.log('FAB oculto (desktop)');
+            cartFab.classList.add('mobile-active');
+            console.log('✓ FAB activado con clase mobile-active');
         } else {
-            // Rol sin carrito (cocina, etc)
-            cartFab.style.cssText = 'display: none;';
-            console.log('FAB oculto (rol sin carrito)');
+            cartFab.classList.add('mobile-hidden');
+            console.log('✗ FAB oculto con clase mobile-hidden');
         }
+    } else {
+        console.error('✗ cart-fab NO encontrado en el DOM');
     }
 
-    // Actualizar y mostrar navegación inferior
+    // Actualizar contenido de navegación inferior según rol
     actualizarBottomNavPorRol(rol);
 
+    // Mostrar/ocultar navegación inferior
     const bottomNav = document.getElementById('bottom-nav');
     if (bottomNav) {
+        // Limpiar estilos inline y clases previas
+        bottomNav.style.cssText = '';
+        bottomNav.classList.remove('mobile-active', 'mobile-hidden');
+
         if (esMobile) {
-            bottomNav.style.display = 'block';
-            bottomNav.style.visibility = 'visible';
-            console.log('Bottom nav visible (móvil)');
+            bottomNav.classList.add('mobile-active');
+            console.log('✓ Bottom nav activado con clase mobile-active');
         } else {
-            bottomNav.style.display = 'none';
-            console.log('Bottom nav oculto (desktop)');
+            bottomNav.classList.add('mobile-hidden');
+            console.log('✗ Bottom nav oculto (desktop)');
         }
+    } else {
+        console.error('✗ bottom-nav NO encontrado en el DOM');
     }
 
-    // Actualizar también el carrito móvil
+    // Actualizar el carrito móvil
     if (esRolConCarrito) {
         actualizarCarritoMobile();
     }
+
+    console.log('=== Fin activarElementosMovil() ===');
 }
 
 function autoSeleccionarRol(user) {
@@ -287,6 +318,12 @@ function seleccionarRol(rol) {
 
     // Activar elementos móviles (FAB y navegación)
     activarElementosMovil(rol);
+
+    // Fallback: re-activar después de 500ms por si algo lo oculta
+    setTimeout(() => {
+        console.log('Fallback timeout (seleccionarRol) - re-activando elementos:', rol);
+        activarElementosMovil(rol);
+    }, 500);
 }
 
 function mostrarSelectorRol() {
