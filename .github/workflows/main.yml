@@ -22,23 +22,24 @@ jobs:
         # Esto es vital para que Flask no falle al iniciar
         # Debes configurar estos secretos en GitHub Settings > Secrets
         run: |
+          echo "DIGIFACT_URL=${{ secrets.DIGIFACT_URL }}" >> ./backend/.env
           echo "DIGIFACT_USER=${{ secrets.DIGIFACT_USER }}" >> ./backend/.env
           echo "DIGIFACT_PASSWORD=${{ secrets.DIGIFACT_PASSWORD }}" >> ./backend/.env
           echo "FLASK_ENV=development" >> ./backend/.env
 
       - name: Build de los contenedores
-        run: docker-compose build backend
+        run: docker compose build backend
 
       - name: Levantar infraestructura
         # Levantamos el backend para probar que el Dockerfile y app.py funcionan
-        run: docker-compose up -d backend
+        run: docker compose up -d backend
 
       - name: Verificar estado del Backend (Health Check)
         # Esperamos unos segundos a que Flask inicie y probamos con curl
         run: |
           sleep 10
-          curl --fail http://localhost:5000/ || (docker-compose logs backend && exit 1)
+          curl --fail http://localhost:5000/ || (docker compose logs backend && exit 1)
 
       - name: Limpieza
         if: always()
-        run: docker-compose down
+        run: docker compose down
