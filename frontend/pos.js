@@ -40,25 +40,37 @@ document.addEventListener('DOMContentLoaded', () => {
 window.onAuthVerificado = function(usuario) {
     console.log('onAuthVerificado llamado con usuario:', usuario);
 
-    // auth-check.js ya muestra el panel, aquí solo cargamos los datos
+    // auth-check.js ya muestra el panel, aquí cargamos los datos Y activamos elementos móviles
     if (usuario.rol === 'mesero') {
-        console.log('Cargando datos para mesero...');
+        console.log('Configurando mesero...');
         rolActual = 'mesero';
+
+        // Cargar datos
         cargarDatosMesero().then(() => {
             console.log('Datos de mesero cargados');
         }).catch(err => {
             console.error('Error cargando datos mesero:', err);
         });
         iniciarActualizacionMesero();
+
+        // Activar navegación móvil y FAB
+        activarElementosMovil('mesero');
+
     } else if (usuario.rol === 'cajero') {
-        console.log('Cargando datos para cajero...');
+        console.log('Configurando cajero...');
         rolActual = 'cajero';
+
+        // Cargar datos
         cargarDatosCajero().then(() => {
             console.log('Datos de cajero cargados');
         }).catch(err => {
             console.error('Error cargando datos cajero:', err);
         });
         iniciarActualizacionCajero();
+
+        // Activar navegación móvil y FAB
+        activarElementosMovil('cajero');
+
     } else if (usuario.rol === 'manager') {
         console.log('Manager: selector de roles visible');
         // Mostrar enlaces de navegación para manager
@@ -69,6 +81,27 @@ window.onAuthVerificado = function(usuario) {
         }
     }
 };
+
+// Activar elementos móviles (FAB, navegación inferior)
+function activarElementosMovil(rol) {
+    console.log('Activando elementos móvil para rol:', rol);
+
+    // Mostrar FAB del carrito para mesero y cajero
+    const cartFab = document.getElementById('cart-fab');
+    if (cartFab) {
+        cartFab.style.display = '';
+        console.log('FAB activado');
+    }
+
+    // Actualizar y mostrar navegación inferior
+    actualizarBottomNavPorRol(rol);
+
+    const bottomNav = document.getElementById('bottom-nav');
+    if (bottomNav) {
+        bottomNav.style.visibility = 'visible';
+        console.log('Bottom nav visible');
+    }
+}
 
 function autoSeleccionarRol(user) {
     // Si no se pasó usuario, intentar obtenerlo del localStorage
@@ -365,14 +398,29 @@ function renderizarProductos() {
         ? productos.filter(p => p.categoria_id === categoriaActiva)
         : productos;
 
-    console.log('Renderizando', productosFiltrados.length, 'productos');
+    console.log('renderizarProductos() - Renderizando', productosFiltrados.length, 'productos');
+
     container.innerHTML = productosFiltrados.map(producto => `
-        <div class="product-card ${!producto.disponible ? 'disabled' : ''}" onclick="agregarAlCarrito(${producto.id})">
+        <div class="product-card ${!producto.disponible ? 'disabled' : ''}"
+             data-producto-id="${producto.id}"
+             onclick="window.agregarAlCarrito(${producto.id}); return false;">
             <div class="fw-bold">${producto.nombre}</div>
             <small class="text-muted">${producto.descripcion || ''}</small>
             <div class="product-price">$${producto.precio.toFixed(2)}</div>
         </div>
     `).join('');
+
+    // Añadir event listeners táctiles como respaldo
+    container.querySelectorAll('.product-card:not(.disabled)').forEach(card => {
+        card.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            const id = parseInt(this.dataset.productoId);
+            console.log('Touch en producto:', id);
+            agregarAlCarrito(id);
+        }, { passive: false });
+    });
+
+    console.log('Productos renderizados con event listeners');
 }
 
 function agregarAlCarrito(productoId) {
@@ -2006,6 +2054,8 @@ async function enviarPedidoMobile() {
 
 // Navegación móvil entre tabs
 function navegarMobile(destino) {
+    console.log('navegarMobile() - destino:', destino);
+
     // Actualizar navegación activa
     document.querySelectorAll('.bottom-nav-item').forEach(item => {
         item.classList.remove('active');
@@ -2028,9 +2078,11 @@ function navegarMobile(destino) {
 
     if (tabId) {
         const tabTrigger = document.querySelector(`[data-bs-target="#${tabId}"]`);
+        console.log('Tab trigger encontrado:', !!tabTrigger, tabId);
         if (tabTrigger) {
             const tab = new bootstrap.Tab(tabTrigger);
             tab.show();
+            console.log('Tab mostrado:', tabId);
         }
     }
 }
@@ -2178,3 +2230,15 @@ function navegarCajeroMobile(destino) {
     }
 }
 
+
+
+// ============ EXPORTAR FUNCIONES GLOBALES ============
+window.agregarAlCarrito = agregarAlCarrito;
+window.toggleCartSheet = toggleCartSheet;
+window.enviarPedidoMobile = enviarPedidoMobile;
+window.navegarMobile = navegarMobile;
+window.navegarCajeroMobile = navegarCajeroMobile;
+window.modificarCantidadMobile = modificarCantidadMobile;
+window.mostrarMenuManager = mostrarMenuManager;
+
+console.log("POS.js cargado completamente");
