@@ -50,7 +50,7 @@ jobs:
     name: Deploy to VPS
     needs: build-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     steps:
       - name: Despliegue: pull y levantar contenedores (SSH)
         uses: appleboy/ssh-action@v1.0.3
