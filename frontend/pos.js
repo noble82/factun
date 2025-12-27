@@ -28,6 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Event listeners para mostrar/ocultar datos de cliente
     document.getElementById('tipo-ticket')?.addEventListener('change', toggleDatosCliente);
     document.getElementById('tipo-factura')?.addEventListener('change', toggleDatosCliente);
+
+    // Ocultar elementos móviles hasta que se seleccione un rol
+    const cartFab = document.getElementById('cart-fab');
+    const bottomNav = document.getElementById('bottom-nav');
+    if (cartFab) cartFab.style.display = 'none';
+    if (bottomNav) bottomNav.style.visibility = 'hidden';
 });
 
 // Callback que será llamado por auth-check.js cuando la verificación esté completa
@@ -206,6 +212,15 @@ function seleccionarRol(rol) {
             cargarDatosCocina();
             iniciarActualizacionCocina();
             break;
+    }
+
+    // Actualizar navegación móvil según el rol
+    actualizarBottomNavPorRol(rol);
+
+    // Mostrar/ocultar FAB del carrito según rol
+    const cartFab = document.getElementById('cart-fab');
+    if (cartFab) {
+        cartFab.style.display = (rol === 'mesero' || rol === 'cajero') ? '' : 'none';
     }
 }
 
@@ -438,6 +453,11 @@ function renderizarCarrito() {
     document.getElementById('cart-subtotal').textContent = `$${subtotal.toFixed(2)}`;
     document.getElementById('cart-iva').textContent = `$${iva.toFixed(2)}`;
     document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+
+    // Actualizar carrito móvil si la función existe
+    if (typeof actualizarCarritoMobile === 'function') {
+        actualizarCarritoMobile();
+    }
 }
 
 async function enviarPedido() {
@@ -1951,17 +1971,13 @@ function navegarMobile(destino) {
     }
 }
 
-// Actualizar el carrito móvil cuando se modifica el carrito principal
-const originalRenderizarCarrito = renderizarCarrito;
-renderizarCarrito = function() {
-    originalRenderizarCarrito();
-    actualizarCarritoMobile();
-};
-
 // Inicializar navegación móvil según el rol
 function actualizarBottomNavPorRol(rol) {
     const bottomNav = document.getElementById('bottom-nav');
     if (!bottomNav) return;
+
+    // Hacer visible la navegación inferior
+    bottomNav.style.visibility = 'visible';
 
     if (rol === 'cajero') {
         bottomNav.innerHTML = `
@@ -2020,15 +2036,3 @@ function navegarCajeroMobile(destino) {
     }
 }
 
-// Hook para actualizar la navegación cuando se selecciona un rol
-const originalSeleccionarRol = seleccionarRol;
-seleccionarRol = function(rol) {
-    originalSeleccionarRol(rol);
-    actualizarBottomNavPorRol(rol);
-
-    // Ocultar FAB del carrito para cajero en tab de cobros
-    const cartFab = document.getElementById('cart-fab');
-    if (cartFab) {
-        cartFab.style.display = (rol === 'mesero' || rol === 'cajero') ? '' : 'none';
-    }
-};

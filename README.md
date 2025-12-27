@@ -331,6 +331,31 @@ Notas operativas:
 - Para depuración, revisa los logs del contenedor certbot:
      `docker compose logs certbot`.
 
+### Script de ayuda: `deploy-cert.sh`
+
+Se ha incluido un script auxiliar `deploy-cert.sh` en la raíz del proyecto para automatizar la emisión y recarga de nginx.
+
+Uso recomendado (ejemplo de staging):
+
+```bash
+# Hacer ejecutable si aún no lo es
+chmod +x deploy-cert.sh
+
+# Emisión en modo staging (pruebas)
+./deploy-cert.sh -d test.irya.xyz -e tu@correo.test -m staging
+
+# Emisión en producción (cuando DNS ya apunte)
+./deploy-cert.sh -d test.irya.xyz -e tu@correo.test -m prod
+```
+
+Opciones principales:
+- `-d DOMAIN` dominio a emitir (ej. `test.irya.xyz`)
+- `-e EMAIL` correo para registro en Let's Encrypt
+- `-m staging|prod` modo (`staging` para pruebas)
+- `-f` forzar re-emisión si ya existen certificados
+
+El script crea los directorios `./certs` y `./certbot-www` si no existen, levanta los contenedores necesarios y solicita el certificado con `certbot`, luego recarga nginx.
+
 ## Tecnologías
 
 ### Backend
