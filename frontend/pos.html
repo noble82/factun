@@ -567,14 +567,26 @@
             transform: translateX(-50%);
         }
         .cart-sheet-body {
-            max-height: 40vh;
+            max-height: 30vh;
             overflow-y: auto;
-            padding: 0.75rem;
+            padding: 0.5rem 0.75rem;
         }
         .cart-sheet-footer {
-            padding: 1rem;
+            padding: 0.75rem;
             background: #f8f9fa;
             border-top: 1px solid #eee;
+        }
+        .cart-sheet-footer .mb-2 {
+            margin-bottom: 0.4rem !important;
+        }
+        .cart-sheet-footer .form-control,
+        .cart-sheet-footer .form-select {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.9rem;
+        }
+        .cart-sheet-footer .btn-lg {
+            padding: 0.6rem 1rem;
+            font-size: 1rem;
         }
         .cart-sheet-overlay {
             display: none;
@@ -1230,28 +1242,22 @@
             <p class="text-muted text-center py-3">Carrito vacío</p>
         </div>
         <div class="cart-sheet-footer">
-            <div class="d-flex justify-content-between mb-2">
-                <span>Subtotal:</span>
-                <span id="cart-sheet-subtotal">$0.00</span>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <small>Sub: <span id="cart-sheet-subtotal">$0.00</span> + IVA: <span id="cart-sheet-iva">$0.00</span></small>
+                <strong class="text-primary fs-5"><span id="cart-sheet-total">$0.00</span></strong>
             </div>
-            <div class="d-flex justify-content-between mb-2">
-                <span>IVA (13%):</span>
-                <span id="cart-sheet-iva">$0.00</span>
+            <div class="row g-2 mb-2">
+                <div class="col-5">
+                    <select class="form-select form-select-sm" id="tipo-pago-mobile" onchange="toggleOpcionesPagoMobile()">
+                        <option value="anticipado">Llevar</option>
+                        <option value="al_final">Mesa</option>
+                    </select>
+                </div>
+                <div class="col-7">
+                    <input type="text" class="form-control form-control-sm" id="cliente-nombre-mobile" placeholder="Nombre cliente">
+                </div>
             </div>
-            <div class="d-flex justify-content-between mb-2">
-                <strong>Total:</strong>
-                <strong id="cart-sheet-total" class="text-primary fs-5">$0.00</strong>
-            </div>
-            <div class="mb-2">
-                <select class="form-select" id="tipo-pago-mobile" onchange="toggleOpcionesPagoMobile()">
-                    <option value="anticipado">Para llevar (pago ahora)</option>
-                    <option value="al_final">En mesa (pago al final)</option>
-                </select>
-            </div>
-            <div id="opciones-para-llevar-mobile" class="mb-2">
-                <input type="text" class="form-control" id="cliente-nombre-mobile" placeholder="Nombre del cliente">
-            </div>
-            <button class="btn btn-primary btn-lg w-100" onclick="enviarPedidoMobile()" id="btn-enviar-mobile" disabled>
+            <button class="btn btn-primary w-100" onclick="enviarPedidoMobile()" id="btn-enviar-mobile" disabled>
                 <i class="bi bi-send"></i> Enviar Pedido
             </button>
         </div>
@@ -1281,6 +1287,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="auth-check.js?v=5"></script>
-    <script src="pos.js?v=15"></script>
+    <script src="pos.js?v=16"></script>
 </body>
 </html>
