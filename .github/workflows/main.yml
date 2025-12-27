@@ -17,20 +17,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Install Docker Compose (plugin)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
-          docker compose version
+      # Eliminamos apt-get install porque ya está preinstalado en ubuntu-latest
+      - name: Verify Docker Compose
+        run: docker compose version
 
       - name: Crear archivo .env de prueba
         run: |
           echo "DIGIFACT_URL=${{ secrets.DIGIFACT_URL }}" >> ./backend/.env
           echo "DIGIFACT_USER=${{ secrets.DIGIFACT_USER }}" >> ./backend/.env
-          # Usar la variable que espera la aplicación: DIGIFACT_PASS
           echo "DIGIFACT_PASS=${{ secrets.DIGIFACT_PASS }}" >> ./backend/.env
-          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> ./backend/.env
           echo "DIGIFACT_NIT=${{ secrets.DIGIFACT_NIT }}" >> ./backend/.env
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> ./backend/.env
           echo "FLASK_ENV=development" >> ./backend/.env
 
       - name: Build de los contenedores
@@ -42,6 +39,7 @@ jobs:
       - name: Verificar estado del Backend (Health Check)
         run: |
           sleep 15
+          # Ajustado a /healthz como tienes en tu script
           curl --fail http://localhost:5000/healthz || (docker compose logs backend && exit 1)
 
       - name: Limpieza de entorno de pruebas
@@ -62,23 +60,28 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /root/facturacion
-            # Sincronizar código (Asegúrate de tener el Token guardado en el VPS)
+            
+            # Sincronizar código
             git pull origin main
-            # Re-levantar con nueva imagen (backend + frontend + certbot)
+            
+            # Re-levantar servicios
             docker compose up -d --build backend frontend certbot
-            # Intentar emitir certificado con Certbot (webroot). Reemplaza dominio si es necesario.
+            
+            # Gestión de Certificado SSL
             DOMAIN=test.irya.yxz
             if [ ! -f ./certs/live/${DOMAIN}/fullchain.pem ]; then
               echo "No certificate found for ${DOMAIN}, attempting issuance..."
               docker run --rm -v $(pwd)/certs:/etc/letsencrypt -v $(pwd)/certbot-www:/var/www/certbot \
                 certbot/certbot:v2.5.0 certonly --webroot -w /var/www/certbot -d ${DOMAIN} \
                 --email ${{ secrets.CERT_EMAIL }} --agree-tos --no-eff-email || true
-              # Recargar nginx para aplicar certs
+              
               docker exec digifact-frontend nginx -s reload || true
             else
               echo "Certificate already present for ${DOMAIN}, skipping issuance."
             fi
-            # Limpiar imágenes en desuso para optimizar espacio en el VPS
+            
+            # Optimización de espacio
             docker image prune -f
-            # Confirmación de despliegue
-            docker ps | grep digifact-backend
+            
+            # Verificación final
+            docker ps | grep -E "backend|frontend"
