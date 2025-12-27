@@ -18,28 +18,32 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      # Este paso asegura que docker-compose (V1) o docker compose (V2) funcione
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
+
       - name: Crear archivo .env de prueba
-        # Esto es vital para que Flask no falle al iniciar
-        # Debes configurar estos secretos en GitHub Settings > Secrets
         run: |
           echo "DIGIFACT_URL=${{ secrets.DIGIFACT_URL }}" >> ./backend/.env
           echo "DIGIFACT_USER=${{ secrets.DIGIFACT_USER }}" >> ./backend/.env
           echo "DIGIFACT_PASSWORD=${{ secrets.DIGIFACT_PASSWORD }}" >> ./backend/.env
+          echo "DIGIFACT_NIT=${{ secrets.DIGIFACT_NIT }}" >> ./backend/.env
           echo "FLASK_ENV=development" >> ./backend/.env
 
       - name: Build de los contenedores
-        run: docker compose build backend
+        run: docker-compose build backend
 
       - name: Levantar infraestructura
-        # Levantamos el backend para probar que el Dockerfile y app.py funcionan
-        run: docker compose up -d backend
+        run: docker-compose up -d backend
 
       - name: Verificar estado del Backend (Health Check)
-        # Esperamos unos segundos a que Flask inicie y probamos con curl
         run: |
-          sleep 10
-          curl --fail http://localhost:5000/ || (docker compose logs backend && exit 1)
+          sleep 15
+          curl --fail http://localhost:5000/ || (docker-compose logs backend && exit 1)
 
       - name: Limpieza
         if: always()
-        run: docker compose down
+        run: docker-compose down
