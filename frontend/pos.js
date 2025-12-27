@@ -38,15 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarCarritoMobile();
     });
 
-    // Ocultar elementos móviles hasta que se seleccione un rol
+    // Ocultar FAB del carrito hasta que se seleccione un rol
     // Esto será sobrescrito por activarElementosMovil() cuando auth-check.js complete
     const cartFab = document.getElementById('cart-fab');
-    const bottomNav = document.getElementById('bottom-nav');
     if (cartFab) {
         cartFab.classList.add('mobile-hidden');
-    }
-    if (bottomNav) {
-        bottomNav.classList.add('mobile-hidden');
     }
 });
 
@@ -143,26 +139,8 @@ function activarElementosMovil(rol) {
         console.error('✗ cart-fab NO encontrado en el DOM');
     }
 
-    // Actualizar contenido de navegación inferior según rol
-    actualizarBottomNavPorRol(rol);
-
-    // Mostrar/ocultar navegación inferior
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) {
-        // Limpiar estilos inline y clases previas
-        bottomNav.style.cssText = '';
-        bottomNav.classList.remove('mobile-active', 'mobile-hidden');
-
-        if (esMobile) {
-            bottomNav.classList.add('mobile-active');
-            console.log('✓ Bottom nav activado con clase mobile-active');
-        } else {
-            bottomNav.classList.add('mobile-hidden');
-            console.log('✗ Bottom nav oculto (desktop)');
-        }
-    } else {
-        console.error('✗ bottom-nav NO encontrado en el DOM');
-    }
+    // Bottom nav deshabilitado - las opciones están en los tabs superiores
+    // Solo mantenemos el FAB del carrito
 
     // Actualizar el carrito móvil
     if (esRolConCarrito) {
