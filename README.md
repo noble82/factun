@@ -293,6 +293,44 @@ DATABASE_PATH=./database
 - Health check público para CI en `/healthz` y health protegido en `/health` (solo `manager`)
 - Asegúrate de configurar `server_name` y certificados para tu dominio (ej. `test.irya.xyz`)
 
+## SSL / Certbot (Let's Encrypt)
+
+Recomendado para emitir certificados TLS y habilitar HTTPS. Pruebas con el entorno `staging` de Let's Encrypt evitan límites durante las pruebas.
+
+Requisitos:
+- DNS A record apuntando a la IP de tu servidor para `test.irya.xyz`.
+- Volúmenes `certs` y `certbot-www` creados y accesibles por Docker.
+
+Comandos de ejemplo (primero probar con `--staging`):
+
+```bash
+# Levantar servicios necesarios (backend + nginx + contenedor certbot)
+docker compose up -d backend frontend certbot
+
+# Emisión de prueba (staging) - no produce certificados válidos pero permite probar flujo
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d test.irya.xyz \
+     --email tu@correo.test --agree-tos --no-eff-email --staging
+
+# Emisión (producción) - usar solo cuando DNS ya apunte correctamente
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d test.irya.xyz \
+     --email tu@correo.test --agree-tos --no-eff-email
+
+# Recargar nginx para aplicar certificados
+docker compose exec frontend nginx -s reload
+```
+
+Renovación recomendada (cron o systemd timer). Ejemplo cron semanal:
+
+```bash
+# Crontab (ejecutar como root):
+# 0 3 * * 0 cd /root/facturacion && docker compose run --rm certbot renew --deploy-hook "docker compose exec frontend nginx -s reload"
+```
+
+Notas operativas:
+- Si certbot falla por permisos, comprueba que `./certs` y `./certbot-www` existan y sean escribibles por Docker.
+- Para depuración, revisa los logs del contenedor certbot:
+     `docker compose logs certbot`.
+
 ## Tecnologías
 
 ### Backend

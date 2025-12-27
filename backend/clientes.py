@@ -252,21 +252,24 @@ def crear_cliente():
 
 @clientes_bp.route('/clientes/<int:id>', methods=['PUT'])
 def actualizar_cliente(id):
-    """Actualiza un cliente existente"""
+    """Actualiza un cliente existente (actualización parcial permitida)"""
     try:
         data = request.get_json()
 
         conn = get_db()
         cursor = conn.cursor()
 
-        # Verificar que existe
-        cursor.execute('SELECT id FROM clientes WHERE id = ?', (id,))
-        if not cursor.fetchone():
+        # Verificar que existe y obtener datos actuales
+        cursor.execute('SELECT * FROM clientes WHERE id = ?', (id,))
+        cliente_actual = cursor.fetchone()
+        if not cliente_actual:
             conn.close()
             return jsonify({'error': 'Cliente no encontrado'}), 404
 
+        cliente_actual = dict(cliente_actual)
+
         # Validar documento único (excluyendo el actual)
-        if data.get('numero_documento'):
+        if 'numero_documento' in data and data.get('numero_documento'):
             cursor.execute(
                 'SELECT id FROM clientes WHERE numero_documento = ? AND id != ? AND activo = 1',
                 (data['numero_documento'], id)
@@ -276,7 +279,7 @@ def actualizar_cliente(id):
                 return jsonify({'error': 'Ya existe otro cliente con ese documento'}), 400
 
         # Validar NRC único (excluyendo el actual)
-        if data.get('nrc'):
+        if 'nrc' in data and data.get('nrc'):
             cursor.execute(
                 'SELECT id FROM clientes WHERE nrc = ? AND id != ? AND activo = 1',
                 (data['nrc'], id)
@@ -285,27 +288,28 @@ def actualizar_cliente(id):
                 conn.close()
                 return jsonify({'error': 'Ya existe otro cliente con ese NRC'}), 400
 
+        # Usar valores actuales si no se proporcionan nuevos (actualización parcial)
         cursor.execute('''
             UPDATE clientes SET
-                tipo_documento = ?,
-                numero_documento = ?,
-                nrc = ?,
-                nombre = ?,
-                nombre_comercial = ?,
-                direccion = ?,
-                departamento = ?,
-                municipio = ?,
-                telefono = ?,
-                email = ?,
-                tipo_cliente = ?,
-                actividad_economica = ?,
-                credito_autorizado = ?,
-                dias_credito = ?,
-                notas = ?,
+                tipo_documento = COALESCE(?, tipo_documento),
+                numero_documento = COALESCE(?, numero_documento),
+                nrc = COALESCE(?, nrc),
+                nombre = COALESCE(?, nombre),
+                nombre_comercial = COALESCE(?, nombre_comercial),
+                direccion = COALESCE(?, direccion),
+                departamento = COALESCE(?, departamento),
+                municipio = COALESCE(?, municipio),
+                telefono = COALESCE(?, telefono),
+                email = COALESCE(?, email),
+                tipo_cliente = COALESCE(?, tipo_cliente),
+                actividad_economica = COALESCE(?, actividad_economica),
+                credito_autorizado = COALESCE(?, credito_autorizado),
+                dias_credito = COALESCE(?, dias_credito),
+                notas = COALESCE(?, notas),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (
-            data.get('tipo_documento', 'DUI'),
+            data.get('tipo_documento'),
             data.get('numero_documento'),
             data.get('nrc'),
             data.get('nombre'),
@@ -315,10 +319,10 @@ def actualizar_cliente(id):
             data.get('municipio'),
             data.get('telefono'),
             data.get('email'),
-            data.get('tipo_cliente', 'consumidor_final'),
+            data.get('tipo_cliente'),
             data.get('actividad_economica'),
-            data.get('credito_autorizado', 0),
-            data.get('dias_credito', 0),
+            data.get('credito_autorizado'),
+            data.get('dias_credito'),
             data.get('notas'),
             id
         ))

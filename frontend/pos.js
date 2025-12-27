@@ -361,8 +361,12 @@ function renderizarProductos() {
 }
 
 function agregarAlCarrito(productoId) {
-    if (!mesaSeleccionada) {
-        mostrarNotificacion('Atención', 'Primero selecciona una mesa', 'warning');
+    const tipoPago = document.getElementById('tipo-pago')?.value || 'anticipado';
+
+    // Para pago al final (en mesa), se requiere mesa seleccionada
+    // Para pago anticipado (para llevar), NO se requiere mesa
+    if (tipoPago === 'al_final' && !mesaSeleccionada) {
+        mostrarNotificacion('Atención', 'Para pedidos en mesa, primero selecciona una mesa', 'warning');
         return;
     }
 
@@ -438,19 +442,21 @@ function renderizarCarrito() {
 
 async function enviarPedido() {
     const tipoPago = document.getElementById('tipo-pago').value;
-    const clienteNombre = document.getElementById('cliente-nombre-pedido')?.value || '';
+    const clienteNombre = document.getElementById('cliente-nombre-pedido')?.value?.trim() || '';
 
     // Validaciones según tipo de pago
     if (tipoPago === 'al_final') {
-        // Para pago al final, se requiere mesa
+        // Para pago al final (en mesa), se requiere mesa
         if (!mesaSeleccionada) {
             mostrarNotificacion('Error', 'Selecciona una mesa para pedidos en mesa', 'danger');
             return;
         }
     } else {
-        // Para pago anticipado (para llevar), se recomienda nombre de cliente
-        if (!clienteNombre && !mesaSeleccionada) {
-            mostrarNotificacion('Atención', 'Ingresa el nombre del cliente para pedidos para llevar', 'warning');
+        // Para pago anticipado (para llevar), se REQUIERE nombre si no hay mesa
+        if (!mesaSeleccionada && !clienteNombre) {
+            mostrarNotificacion('Error', 'Ingresa el nombre del cliente para pedidos para llevar', 'danger');
+            document.getElementById('cliente-nombre-pedido')?.focus();
+            return;
         }
     }
 
@@ -604,11 +610,374 @@ async function marcarServido(pedidoId, tipoPago) {
 
 // ============ FUNCIONES DEL CAJERO ============
 
+let carritoCajero = [];
+let categoriaActivaCajero = null;
+
 async function cargarDatosCajero() {
     await Promise.all([
         cargarPedidosCajero(),
-        cargarEstadisticas()
+        cargarEstadisticas(),
+        cargarProductosCajero(),
+        cargarCategoriasCajero(),
+        cargarCreditosPendientes()
     ]);
+}
+
+// Cargar categorías para el cajero
+async function cargarCategoriasCajero() {
+    try {
+        const response = await fetch(`${API_BASE}/categorias`);
+        const cats = await response.json();
+        renderizarCategoriasCajero(cats);
+    } catch (error) {
+        console.error('Error cargando categorías cajero:', error);
+    }
+}
+
+function renderizarCategoriasCajero(cats) {
+    const container = document.getElementById('categorias-container-cajero');
+    if (!container) return;
+    container.innerHTML = `
+        <div class="categoria-tab ${!categoriaActivaCajero ? 'active' : ''}" onclick="filtrarCategoriaCajero(null)">Todos</div>
+        ${cats.map(cat => `
+            <div class="categoria-tab ${categoriaActivaCajero === cat.id ? 'active' : ''}" onclick="filtrarCategoriaCajero(${cat.id})">${cat.nombre}</div>
+        `).join('')}
+    `;
+}
+
+function filtrarCategoriaCajero(categoriaId) {
+    categoriaActivaCajero = categoriaId;
+    cargarCategoriasCajero();
+    renderizarProductosCajero();
+}
+
+// Cargar productos para el cajero
+async function cargarProductosCajero() {
+    try {
+        const response = await fetch(`${API_BASE}/productos`);
+        const prods = await response.json();
+        // Guardar en variable global si no existe
+        if (!productos || productos.length === 0) {
+            productos = prods;
+        }
+        renderizarProductosCajero();
+    } catch (error) {
+        console.error('Error cargando productos cajero:', error);
+    }
+}
+
+function renderizarProductosCajero() {
+    const container = document.getElementById('productos-container-cajero');
+    if (!container) return;
+
+    const productosFiltrados = categoriaActivaCajero
+        ? productos.filter(p => p.categoria_id === categoriaActivaCajero)
+        : productos;
+
+    container.innerHTML = productosFiltrados.map(producto => `
+        <div class="product-card ${!producto.disponible ? 'disabled' : ''}" onclick="agregarAlCarritoCajero(${producto.id})">
+            <div class="fw-bold">${producto.nombre}</div>
+            <small class="text-muted">${producto.descripcion || ''}</small>
+            <div class="product-price">$${producto.precio.toFixed(2)}</div>
+        </div>
+    `).join('');
+}
+
+function agregarAlCarritoCajero(productoId) {
+    const producto = productos.find(p => p.id === productoId);
+    if (!producto || !producto.disponible) return;
+
+    const itemExistente = carritoCajero.find(item => item.producto_id === productoId);
+
+    if (itemExistente) {
+        itemExistente.cantidad++;
+        itemExistente.subtotal = itemExistente.cantidad * producto.precio;
+    } else {
+        carritoCajero.push({
+            producto_id: productoId,
+            nombre: producto.nombre,
+            precio: producto.precio,
+            cantidad: 1,
+            subtotal: producto.precio
+        });
+    }
+
+    renderizarCarritoCajero();
+}
+
+function modificarCantidadCajero(productoId, delta) {
+    const item = carritoCajero.find(i => i.producto_id === productoId);
+    if (!item) return;
+
+    item.cantidad += delta;
+
+    if (item.cantidad <= 0) {
+        carritoCajero = carritoCajero.filter(i => i.producto_id !== productoId);
+    } else {
+        item.subtotal = item.cantidad * item.precio;
+    }
+
+    renderizarCarritoCajero();
+}
+
+function renderizarCarritoCajero() {
+    const container = document.getElementById('cart-items-cajero');
+    if (!container) return;
+
+    if (carritoCajero.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Selecciona productos del menú</p>';
+        document.getElementById('btn-crear-pedido-cajero').disabled = true;
+    } else {
+        container.innerHTML = carritoCajero.map(item => `
+            <div class="cart-item">
+                <div>
+                    <strong>${item.nombre}</strong><br>
+                    <small>$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidadCajero(${item.producto_id}, -1)">-</button>
+                    <span>${item.cantidad}</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidadCajero(${item.producto_id}, 1)">+</button>
+                    <strong>$${item.subtotal.toFixed(2)}</strong>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('btn-crear-pedido-cajero').disabled = false;
+    }
+
+    // Calcular totales
+    const subtotal = carritoCajero.reduce((sum, item) => sum + item.subtotal, 0);
+    const iva = subtotal * 0.13;
+    const total = subtotal + iva;
+
+    document.getElementById('cart-subtotal-cajero').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('cart-iva-cajero').textContent = `$${iva.toFixed(2)}`;
+    document.getElementById('cart-total-cajero').textContent = `$${total.toFixed(2)}`;
+}
+
+// Crear pedido desde cajero (para llevar con pago inmediato)
+async function crearPedidoCajero() {
+    const clienteNombre = document.getElementById('cliente-nombre-cajero')?.value?.trim();
+
+    if (!clienteNombre) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del cliente', 'danger');
+        document.getElementById('cliente-nombre-cajero')?.focus();
+        return;
+    }
+
+    if (carritoCajero.length === 0) {
+        mostrarNotificacion('Error', 'Agrega productos al pedido', 'danger');
+        return;
+    }
+
+    const usuario = getUsuarioActual ? getUsuarioActual() : null;
+
+    const pedido = {
+        mesa_id: null,  // Para llevar, sin mesa
+        mesero: usuario ? usuario.nombre : 'Cajero',
+        tipo_pago: 'anticipado',
+        cliente_nombre: clienteNombre,
+        items: carritoCajero.map(item => ({
+            producto_id: item.producto_id,
+            cantidad: item.cantidad,
+            notas: ''
+        }))
+    };
+
+    try {
+        // 1. Crear el pedido
+        const response = await fetch(`${API_BASE}/pedidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pedido)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // 2. Abrir modal de pago inmediatamente
+            pedidoActualPago = { id: result.pedido_id, total: result.total };
+            document.getElementById('detalle-pago').innerHTML = `
+                <h4 class="text-center">Pedido Para Llevar</h4>
+                <p class="text-center text-muted">${clienteNombre}</p>
+                <h2 class="text-center text-success">$${result.total.toFixed(2)}</h2>
+            `;
+            document.getElementById('monto-recibido').value = '';
+            document.getElementById('cambio-container').style.display = 'none';
+            document.getElementById('pago-efectivo').checked = true;
+            onMetodoPagoChange();
+
+            const modal = new bootstrap.Modal(document.getElementById('modalPago'));
+            modal.show();
+
+            // 3. Limpiar carrito del cajero
+            carritoCajero = [];
+            document.getElementById('cliente-nombre-cajero').value = '';
+            renderizarCarritoCajero();
+        } else {
+            mostrarNotificacion('Error', result.error, 'danger');
+        }
+    } catch (error) {
+        console.error('Error creando pedido:', error);
+        mostrarNotificacion('Error', 'No se pudo crear el pedido', 'danger');
+    }
+}
+
+// ============ FUNCIONES DE GESTIÓN DE CRÉDITOS (CAJERO) ============
+
+let timeoutBusquedaCredito = null;
+
+async function buscarClienteCredito(texto) {
+    const resultadosDiv = document.getElementById('resultados-cliente-credito');
+
+    clearTimeout(timeoutBusquedaCredito);
+
+    if (texto.length < 2) {
+        resultadosDiv.innerHTML = '';
+        return;
+    }
+
+    timeoutBusquedaCredito = setTimeout(async () => {
+        try {
+            const response = await fetch(`${API_CLIENTES}/clientes?buscar=${encodeURIComponent(texto)}&activo=1`);
+            const clientes = await response.json();
+
+            if (clientes.length === 0) {
+                resultadosDiv.innerHTML = '<div class="list-group-item text-muted">No se encontraron clientes</div>';
+                return;
+            }
+
+            resultadosDiv.innerHTML = clientes.slice(0, 5).map(cliente => `
+                <button type="button" class="list-group-item list-group-item-action"
+                        onclick="seleccionarClienteCredito(${cliente.id})">
+                    <strong>${cliente.nombre}</strong>
+                    <small class="text-muted d-block">${cliente.numero_documento || 'Sin documento'}</small>
+                </button>
+            `).join('');
+        } catch (error) {
+            console.error('Error buscando clientes:', error);
+        }
+    }, 300);
+}
+
+async function seleccionarClienteCredito(clienteId) {
+    try {
+        // Obtener datos del cliente
+        const response = await fetch(`${API_CLIENTES}/clientes/${clienteId}`);
+        const cliente = await response.json();
+
+        // Obtener info de crédito
+        const creditoResponse = await fetch(`${API_CLIENTES}/clientes/${clienteId}/credito`);
+        const credito = await creditoResponse.json();
+
+        // Mostrar formulario
+        document.getElementById('form-credito-cliente').style.display = 'block';
+        document.getElementById('nombre-cliente-credito').textContent = cliente.nombre;
+        document.getElementById('id-cliente-credito').value = clienteId;
+        document.getElementById('monto-credito-autorizado').value = credito.credito_autorizado || 0;
+        document.getElementById('dias-credito-cliente').value = cliente.dias_credito || 30;
+        document.getElementById('credito-utilizado-info').textContent = `$${(credito.credito_utilizado || 0).toFixed(2)}`;
+        document.getElementById('credito-disponible-info').textContent = `$${(credito.credito_disponible || 0).toFixed(2)}`;
+
+        // Limpiar búsqueda
+        document.getElementById('resultados-cliente-credito').innerHTML = '';
+        document.getElementById('buscar-cliente-credito').value = cliente.nombre;
+
+    } catch (error) {
+        console.error('Error cargando cliente:', error);
+        mostrarNotificacion('Error', 'No se pudo cargar el cliente', 'danger');
+    }
+}
+
+async function guardarCreditoCliente() {
+    const clienteId = document.getElementById('id-cliente-credito').value;
+    const creditoAutorizado = parseFloat(document.getElementById('monto-credito-autorizado').value) || 0;
+    const diasCredito = parseInt(document.getElementById('dias-credito-cliente').value) || 30;
+
+    if (!clienteId) {
+        mostrarNotificacion('Error', 'Selecciona un cliente primero', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_CLIENTES}/clientes/${clienteId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                credito_autorizado: creditoAutorizado,
+                dias_credito: diasCredito
+            })
+        });
+
+        if (response.ok) {
+            mostrarNotificacion('Éxito', `Crédito de $${creditoAutorizado.toFixed(2)} autorizado correctamente`, 'success');
+            // Refrescar info
+            await seleccionarClienteCredito(clienteId);
+        } else {
+            const error = await response.json();
+            mostrarNotificacion('Error', error.error || 'No se pudo guardar', 'danger');
+        }
+    } catch (error) {
+        console.error('Error guardando crédito:', error);
+        mostrarNotificacion('Error', 'Error de conexión', 'danger');
+    }
+}
+
+async function cargarCreditosPendientes() {
+    const container = document.getElementById('lista-creditos-pendientes');
+    if (!container) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/pedidos?estado=credito`);
+        const pedidos = await response.json();
+
+        if (pedidos.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No hay ventas a crédito pendientes</p>';
+            return;
+        }
+
+        container.innerHTML = pedidos.map(pedido => `
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${pedido.cliente_nombre || 'Cliente #' + pedido.cliente_id}</strong>
+                            <small class="d-block text-muted">${new Date(pedido.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong class="text-danger">$${pedido.total.toFixed(2)}</strong>
+                            <button class="btn btn-sm btn-success ms-2" onclick="cobrarCredito(${pedido.id}, ${pedido.total})">
+                                <i class="bi bi-cash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando créditos:', error);
+        container.innerHTML = '<p class="text-danger text-center">Error cargando datos</p>';
+    }
+}
+
+async function cobrarCredito(pedidoId, total) {
+    if (!confirm(`¿Cobrar crédito de $${total.toFixed(2)}?`)) return;
+
+    try {
+        // Cambiar estado a cerrado (pagado)
+        await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'cerrado' })
+        });
+
+        mostrarNotificacion('Éxito', `Crédito de $${total.toFixed(2)} cobrado`, 'success');
+        cargarCreditosPendientes();
+        cargarEstadisticas();
+    } catch (error) {
+        console.error('Error cobrando crédito:', error);
+        mostrarNotificacion('Error', 'No se pudo cobrar el crédito', 'danger');
+    }
 }
 
 function iniciarActualizacionCajero() {
@@ -1434,3 +1803,232 @@ document.addEventListener('click', function(e) {
         resultados.innerHTML = '';
     }
 });
+
+// ============ FUNCIONES MÓVIL ============
+
+// Toggle del carrito bottom sheet
+function toggleCartSheet() {
+    const sheet = document.getElementById('cart-sheet');
+    const overlay = document.getElementById('cart-sheet-overlay');
+
+    if (sheet && overlay) {
+        sheet.classList.toggle('show');
+        overlay.classList.toggle('show');
+
+        // Actualizar contenido del carrito móvil
+        if (sheet.classList.contains('show')) {
+            actualizarCarritoMobile();
+        }
+    }
+}
+
+// Actualizar el carrito en el bottom sheet móvil
+function actualizarCarritoMobile() {
+    const container = document.getElementById('cart-sheet-items');
+    const fabCount = document.getElementById('cart-fab-count');
+    const btnEnviar = document.getElementById('btn-enviar-mobile');
+
+    if (!container) return;
+
+    // Actualizar contador del FAB
+    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
+    if (fabCount) {
+        fabCount.textContent = totalItems;
+        fabCount.style.display = totalItems > 0 ? 'flex' : 'none';
+    }
+
+    if (carrito.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-3">Carrito vacío</p>';
+        if (btnEnviar) btnEnviar.disabled = true;
+        return;
+    }
+
+    container.innerHTML = carrito.map(item => `
+        <div class="cart-item d-flex justify-content-between align-items-center py-2 border-bottom">
+            <div>
+                <strong>${item.nombre}</strong><br>
+                <small class="text-muted">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" style="width:36px;height:36px;" onclick="modificarCantidadMobile(${item.producto_id}, -1)">
+                    <i class="bi bi-dash"></i>
+                </button>
+                <span class="fw-bold">${item.cantidad}</span>
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" style="width:36px;height:36px;" onclick="modificarCantidadMobile(${item.producto_id}, 1)">
+                    <i class="bi bi-plus"></i>
+                </button>
+                <strong class="ms-2">$${item.subtotal.toFixed(2)}</strong>
+            </div>
+        </div>
+    `).join('');
+
+    // Calcular totales
+    const subtotal = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const iva = subtotal * 0.13;
+    const total = subtotal + iva;
+
+    document.getElementById('cart-sheet-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('cart-sheet-iva').textContent = `$${iva.toFixed(2)}`;
+    document.getElementById('cart-sheet-total').textContent = `$${total.toFixed(2)}`;
+
+    if (btnEnviar) btnEnviar.disabled = false;
+}
+
+// Modificar cantidad desde móvil
+function modificarCantidadMobile(productoId, delta) {
+    modificarCantidad(productoId, delta);
+    actualizarCarritoMobile();
+}
+
+// Toggle opciones de pago en móvil
+function toggleOpcionesPagoMobile() {
+    const tipoPago = document.getElementById('tipo-pago-mobile')?.value;
+    const opcionesLlevar = document.getElementById('opciones-para-llevar-mobile');
+
+    if (opcionesLlevar) {
+        opcionesLlevar.style.display = tipoPago === 'anticipado' ? 'block' : 'none';
+    }
+
+    // Sincronizar con el select del carrito desktop
+    const tipoPagoDesktop = document.getElementById('tipo-pago');
+    if (tipoPagoDesktop) {
+        tipoPagoDesktop.value = tipoPago;
+        toggleOpcionesPago();
+    }
+}
+
+// Enviar pedido desde móvil
+async function enviarPedidoMobile() {
+    const tipoPago = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
+    const clienteNombre = document.getElementById('cliente-nombre-mobile')?.value?.trim() || '';
+
+    // Sincronizar valores con el formulario desktop
+    const tipoPagoDesktop = document.getElementById('tipo-pago');
+    const clienteNombreDesktop = document.getElementById('cliente-nombre-pedido');
+
+    if (tipoPagoDesktop) tipoPagoDesktop.value = tipoPago;
+    if (clienteNombreDesktop) clienteNombreDesktop.value = clienteNombre;
+
+    // Cerrar el sheet antes de enviar
+    toggleCartSheet();
+
+    // Usar la función existente de enviar pedido
+    await enviarPedido();
+
+    // Limpiar campos móviles
+    document.getElementById('cliente-nombre-mobile').value = '';
+    actualizarCarritoMobile();
+}
+
+// Navegación móvil entre tabs
+function navegarMobile(destino) {
+    // Actualizar navegación activa
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.getElementById(`nav-${destino}`)?.classList.add('active');
+
+    // Activar el tab correspondiente
+    let tabId;
+    switch(destino) {
+        case 'mesas':
+            tabId = 'mesas-tab';
+            break;
+        case 'menu':
+            tabId = 'menu-tab';
+            break;
+        case 'servir':
+            tabId = 'servir-tab';
+            break;
+    }
+
+    if (tabId) {
+        const tabTrigger = document.querySelector(`[data-bs-target="#${tabId}"]`);
+        if (tabTrigger) {
+            const tab = new bootstrap.Tab(tabTrigger);
+            tab.show();
+        }
+    }
+}
+
+// Actualizar el carrito móvil cuando se modifica el carrito principal
+const originalRenderizarCarrito = renderizarCarrito;
+renderizarCarrito = function() {
+    originalRenderizarCarrito();
+    actualizarCarritoMobile();
+};
+
+// Inicializar navegación móvil según el rol
+function actualizarBottomNavPorRol(rol) {
+    const bottomNav = document.getElementById('bottom-nav');
+    if (!bottomNav) return;
+
+    if (rol === 'cajero') {
+        bottomNav.innerHTML = `
+            <div class="bottom-nav-items">
+                <button class="bottom-nav-item active" onclick="navegarCajeroMobile('cobros')" id="nav-cobros">
+                    <i class="bi bi-cash-stack"></i>
+                    <span>Cobros</span>
+                </button>
+                <button class="bottom-nav-item" onclick="navegarCajeroMobile('pedido')" id="nav-pedido">
+                    <i class="bi bi-bag-plus"></i>
+                    <span>Pedido</span>
+                </button>
+                <button class="bottom-nav-item" onclick="navegarCajeroMobile('creditos')" id="nav-creditos">
+                    <i class="bi bi-credit-card"></i>
+                    <span>Créditos</span>
+                </button>
+                <button class="bottom-nav-item" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Salir</span>
+                </button>
+            </div>
+        `;
+    } else if (rol === 'mesero') {
+        // Ya está configurado por defecto para mesero
+        document.getElementById('nav-mesas')?.classList.add('active');
+    }
+}
+
+function navegarCajeroMobile(destino) {
+    // Actualizar navegación activa
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.getElementById(`nav-${destino}`)?.classList.add('active');
+
+    // Activar el tab correspondiente
+    let tabId;
+    switch(destino) {
+        case 'cobros':
+            tabId = 'cajero-cobros-tab';
+            break;
+        case 'pedido':
+            tabId = 'cajero-pedido-tab';
+            break;
+        case 'creditos':
+            tabId = 'cajero-creditos-tab';
+            break;
+    }
+
+    if (tabId) {
+        const tabTrigger = document.querySelector(`[data-bs-target="#${tabId}"]`);
+        if (tabTrigger) {
+            const tab = new bootstrap.Tab(tabTrigger);
+            tab.show();
+        }
+    }
+}
+
+// Hook para actualizar la navegación cuando se selecciona un rol
+const originalSeleccionarRol = seleccionarRol;
+seleccionarRol = function(rol) {
+    originalSeleccionarRol(rol);
+    actualizarBottomNavPorRol(rol);
+
+    // Ocultar FAB del carrito para cajero en tab de cobros
+    const cartFab = document.getElementById('cart-fab');
+    if (cartFab) {
+        cartFab.style.display = (rol === 'mesero' || rol === 'cajero') ? '' : 'none';
+    }
+};
