@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesi&oacute;n - Pupuser&iacute;a</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #e74c3c;
+            --secondary-color: #c0392b;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .login-header i {
+            font-size: 4rem;
+            margin-bottom: 10px;
+        }
+        .login-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+        .login-header p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+        .login-body {
+            padding: 30px;
+        }
+        .form-control {
+            border-radius: 10px;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+        }
+        .input-group-text {
+            border-radius: 10px 0 0 10px;
+            border: 2px solid #e0e0e0;
+            border-right: none;
+            background: #f8f9fa;
+        }
+        .input-group .form-control {
+            border-radius: 0 10px 10px 0;
+        }
+        .btn-login {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            width: 100%;
+            color: white;
+            font-size: 1.1rem;
+        }
+        .btn-login:hover {
+            background: linear-gradient(135deg, var(--secondary-color), #a93226);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(231, 76, 60, 0.4);
+        }
+        .alert {
+            border-radius: 10px;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin: 3px;
+        }
+        .role-manager { background: #9b59b6; color: white; }
+        .role-mesero { background: #3498db; color: white; }
+        .role-cajero { background: #27ae60; color: white; }
+        .role-cocinero { background: #e67e22; color: white; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <i class="bi bi-shop"></i>
+            <h1>Pupuser&iacute;a POS</h1>
+            <p>Sistema de Punto de Venta</p>
+        </div>
+        <div class="login-body">
+            <div id="alert-container"></div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="username" placeholder="Ingrese su usuario" required autofocus>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Contrase&ntilde;a</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                        <input type="password" class="form-control" id="password" placeholder="Ingrese su contrase&ntilde;a" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-login" id="btnLogin">
+                    <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n
+                </button>
+            </form>
+
+            <hr class="my-4">
+
+            <div class="text-center">
+                <small class="text-muted">Roles disponibles:</small><br>
+                <span class="role-badge role-manager"><i class="bi bi-star-fill"></i> Manager</span>
+                <span class="role-badge role-mesero"><i class="bi bi-person-badge"></i> Mesero</span>
+                <span class="role-badge role-cajero"><i class="bi bi-cash-register"></i> Cajero</span>
+                <span class="role-badge role-cocinero"><i class="bi bi-fire"></i> Cocinero</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_AUTH = '/api/auth';
+
+        // Verificar si ya hay sesi&oacute;n activa
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                try {
+                    const response = await fetch(`${API_AUTH}/me`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const user = await response.json();
+                        redirectByRole(user.rol);
+                        return;
+                    }
+                } catch (e) {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
+                }
+            }
+        });
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const btnLogin = document.getElementById('btnLogin');
+            const alertContainer = document.getElementById('alert-container');
+
+            btnLogin.disabled = true;
+            btnLogin.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando...';
+            alertContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_AUTH}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Guardar token y datos de usuario
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.usuario));
+
+                    showAlert('success', `Bienvenido, ${data.usuario.nombre}!`);
+
+                    setTimeout(() => {
+                        redirectByRole(data.usuario.rol);
+                    }, 1000);
+                } else {
+                    showAlert('danger', data.error || 'Error al iniciar sesi&oacute;n');
+                    btnLogin.disabled = false;
+                    btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('danger', 'Error de conexi&oacute;n. Intente nuevamente.');
+                btnLogin.disabled = false;
+                btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n';
+            }
+        }
+
+        function redirectByRole(rol) {
+            switch(rol) {
+                case 'manager':
+                    window.location.href = 'admin.html';
+                    break;
+                case 'mesero':
+                    window.location.href = 'pos.html?rol=mesero';
+                    break;
+                case 'cajero':
+                    window.location.href = 'pos.html?rol=cajero';
+                    break;
+                case 'cocinero':
+                    window.location.href = 'cocina.html';
+                    break;
+                default:
+                    window.location.href = 'pos.html';
+            }
+        }
+
+        function showAlert(type, message) {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1412 @@
+/**
+ * POS Pupusería - Sistema de Punto de Venta
+ * Maneja los flujos de Mesero, Cajero y Cocina
+ */
+
+const API_BASE = '/api/pos';
+const API_CLIENTES = '/api/clientes';
+let rolActual = null;
+let mesaSeleccionada = null;
+let carrito = [];
+let productos = [];
+let categorias = [];
+let categoriaActiva = null;
+let pedidoActualPago = null;
+
+// Intervalos para actualización automática
+let updateInterval = null;
+
+// ============ INICIALIZACIÓN ============
+
+document.addEventListener('DOMContentLoaded', () => {
+    actualizarReloj();
+    setInterval(actualizarReloj, 1000);
+
+    // Event listener para calcular cambio
+    document.getElementById('monto-recibido')?.addEventListener('input', calcularCambio);
+
+    // Event listeners para mostrar/ocultar datos de cliente
+    document.getElementById('tipo-ticket')?.addEventListener('change', toggleDatosCliente);
+    document.getElementById('tipo-factura')?.addEventListener('change', toggleDatosCliente);
+});
+
+// Callback que será llamado por auth-check.js cuando la verificación esté completa
+window.onAuthVerificado = function(usuario) {
+    console.log('onAuthVerificado llamado con usuario:', usuario);
+
+    // auth-check.js ya muestra el panel, aquí solo cargamos los datos
+    if (usuario.rol === 'mesero') {
+        console.log('Cargando datos para mesero...');
+        rolActual = 'mesero';
+        cargarDatosMesero().then(() => {
+            console.log('Datos de mesero cargados');
+        }).catch(err => {
+            console.error('Error cargando datos mesero:', err);
+        });
+        iniciarActualizacionMesero();
+    } else if (usuario.rol === 'cajero') {
+        console.log('Cargando datos para cajero...');
+        rolActual = 'cajero';
+        cargarDatosCajero().then(() => {
+            console.log('Datos de cajero cargados');
+        }).catch(err => {
+            console.error('Error cargando datos cajero:', err);
+        });
+        iniciarActualizacionCajero();
+    } else if (usuario.rol === 'manager') {
+        console.log('Manager: selector de roles visible');
+        // Mostrar enlaces de navegación para manager
+        const managerNavLinks = document.getElementById('manager-nav-links');
+        if (managerNavLinks) {
+            managerNavLinks.classList.remove('d-none');
+            console.log('Enlaces de manager mostrados');
+        }
+    }
+};
+
+function autoSeleccionarRol(user) {
+    // Si no se pasó usuario, intentar obtenerlo del localStorage
+    if (!user) {
+        user = getUsuarioActual ? getUsuarioActual() : null;
+    }
+
+    if (!user || !user.rol) {
+        // Sin sesión, redirigir a login
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Mostrar nombre de usuario
+    const userInfo = document.getElementById('usuario-info');
+    const userName = document.getElementById('usuario-nombre-display');
+    if (userInfo && userName) {
+        userName.textContent = user.nombre;
+        userInfo.classList.remove('d-none');
+    }
+
+    // Auto-seleccionar rol según el usuario
+    switch(user.rol) {
+        case 'mesero':
+            // Mesero va directo a su panel, sin ver selector
+            seleccionarRol('mesero');
+            break;
+        case 'cajero':
+            // Cajero va directo a su panel, sin ver selector
+            seleccionarRol('cajero');
+            break;
+        case 'cocinero':
+            // Cocinero no tiene acceso a POS, redirigir a cocina
+            window.location.href = 'cocina.html';
+            break;
+        case 'manager':
+            // Manager puede elegir cualquier rol, mostrar selector
+            document.getElementById('role-selector').style.display = 'block';
+            break;
+    }
+}
+
+function toggleDatosCliente() {
+    const tipoFactura = document.getElementById('tipo-factura')?.checked;
+    const container = document.getElementById('datos-cliente-container');
+    if (container) {
+        container.style.display = tipoFactura ? 'block' : 'none';
+    }
+}
+
+function toggleOpcionesPago() {
+    const tipoPago = document.getElementById('tipo-pago').value;
+    const opcionesParaLlevar = document.getElementById('opciones-para-llevar');
+
+    if (opcionesParaLlevar) {
+        // Mostrar nombre de cliente solo para pago anticipado (para llevar)
+        opcionesParaLlevar.style.display = tipoPago === 'anticipado' ? 'block' : 'none';
+    }
+}
+
+function actualizarReloj() {
+    const now = new Date();
+    document.getElementById('current-time').textContent = now.toLocaleTimeString('es-SV');
+}
+
+// ============ GESTIÓN DE ROLES ============
+
+function seleccionarRol(rol) {
+    // Validar que el usuario puede seleccionar este rol
+    const user = getUsuarioActual ? getUsuarioActual() : null;
+
+    if (!user) {
+        alert('Sesión no válida. Por favor inicie sesión nuevamente.');
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Solo el manager puede elegir cualquier rol
+    // Mesero solo puede ser mesero, Cajero solo puede ser cajero
+    if (user.rol !== 'manager') {
+        if (user.rol === 'mesero' && rol !== 'mesero') {
+            alert('Solo tienes acceso al panel de Mesero');
+            return;
+        }
+        if (user.rol === 'cajero' && rol !== 'cajero') {
+            alert('Solo tienes acceso al panel de Cajero');
+            return;
+        }
+        if (user.rol === 'cocinero') {
+            window.location.href = 'cocina.html';
+            return;
+        }
+    }
+
+    rolActual = rol;
+
+    // Ocultar selector de rol
+    document.getElementById('role-selector').style.display = 'none';
+
+    // Mostrar elementos de navegación
+    document.getElementById('current-role').textContent = rol.charAt(0).toUpperCase() + rol.slice(1);
+    document.getElementById('current-role').classList.remove('d-none');
+
+    // Solo mostrar botón de cambiar rol y enlaces de navegación para managers
+    if (user.rol === 'manager') {
+        document.getElementById('btn-cambiar-rol').classList.remove('d-none');
+        const managerNavLinks = document.getElementById('manager-nav-links');
+        if (managerNavLinks) managerNavLinks.classList.remove('d-none');
+    } else {
+        document.getElementById('btn-cambiar-rol').classList.add('d-none');
+        const managerNavLinks = document.getElementById('manager-nav-links');
+        if (managerNavLinks) managerNavLinks.classList.add('d-none');
+    }
+
+    // Ocultar todos los paneles
+    document.querySelectorAll('.work-panel').forEach(p => p.classList.remove('active'));
+
+    // Mostrar panel correspondiente
+    document.getElementById(`panel-${rol}`).classList.add('active');
+
+    // Cargar datos según el rol
+    switch(rol) {
+        case 'mesero':
+            cargarDatosMesero();
+            iniciarActualizacionMesero();
+            break;
+        case 'cajero':
+            cargarDatosCajero();
+            iniciarActualizacionCajero();
+            break;
+        case 'cocina':
+            cargarDatosCocina();
+            iniciarActualizacionCocina();
+            break;
+    }
+}
+
+function mostrarSelectorRol() {
+    // Solo manager puede cambiar de rol
+    const user = getUsuarioActual ? getUsuarioActual() : null;
+    if (!user || user.rol !== 'manager') {
+        alert('Solo el manager puede cambiar de rol');
+        return;
+    }
+
+    // Limpiar intervalo de actualización
+    if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
+    }
+
+    rolActual = null;
+    mesaSeleccionada = null;
+    carrito = [];
+
+    document.getElementById('role-selector').style.display = 'block';
+    document.getElementById('current-role').classList.add('d-none');
+    document.getElementById('btn-cambiar-rol').classList.add('d-none');
+    // Mantener enlaces de navegación visibles para manager
+    const managerNavLinks = document.getElementById('manager-nav-links');
+    if (managerNavLinks && user && user.rol === 'manager') {
+        managerNavLinks.classList.remove('d-none');
+    }
+    document.querySelectorAll('.work-panel').forEach(p => p.classList.remove('active'));
+}
+
+// ============ FUNCIONES DEL MESERO ============
+
+async function cargarDatosMesero() {
+    console.log('cargarDatosMesero() iniciando...');
+    try {
+        await Promise.all([
+            cargarMesas(),
+            cargarCategorias(),
+            cargarProductos(),
+            cargarPedidosParaServir()
+        ]);
+        console.log('cargarDatosMesero() completado');
+    } catch (error) {
+        console.error('Error en cargarDatosMesero:', error);
+        throw error;
+    }
+}
+
+function iniciarActualizacionMesero() {
+    updateInterval = setInterval(() => {
+        cargarMesas();
+        cargarPedidosParaServir();
+    }, 5000);
+}
+
+async function cargarMesas() {
+    console.log('cargarMesas() llamado');
+    try {
+        const response = await fetch(`${API_BASE}/mesas`);
+        const mesas = await response.json();
+        console.log('Mesas recibidas:', mesas.length);
+        renderizarMesas(mesas);
+    } catch (error) {
+        console.error('Error cargando mesas:', error);
+    }
+}
+
+function renderizarMesas(mesas) {
+    const container = document.getElementById('mesas-container');
+    if (!container) {
+        console.error('Container mesas-container no encontrado!');
+        return;
+    }
+    console.log('Renderizando', mesas.length, 'mesas en container:', container);
+    container.innerHTML = mesas.map(mesa => `
+        <div class="mesa-card mesa-${mesa.estado}" onclick="seleccionarMesa(${mesa.id}, ${mesa.numero}, '${mesa.estado}')">
+            <i class="bi bi-${mesa.estado === 'libre' ? 'check-circle' : 'people'} fs-4"></i>
+            <span>Mesa ${mesa.numero}</span>
+            ${mesa.pedidos_activos > 0 ? `<small>${mesa.pedidos_activos} pedido(s)</small>` : ''}
+        </div>
+    `).join('');
+}
+
+function seleccionarMesa(id, numero, estado) {
+    mesaSeleccionada = { id, numero, estado };
+    document.getElementById('mesa-seleccionada').textContent = `Mesa ${numero}`;
+
+    // Cambiar a tab de menú
+    const menuTab = document.querySelector('[data-bs-target="#menu-tab"]');
+    bootstrap.Tab.getOrCreateInstance(menuTab).show();
+
+    mostrarNotificacion('Mesa Seleccionada', `Mesa ${numero} seleccionada. Agrega productos al pedido.`);
+}
+
+async function cargarCategorias() {
+    try {
+        const response = await fetch(`${API_BASE}/categorias`);
+        categorias = await response.json();
+        renderizarCategorias();
+    } catch (error) {
+        console.error('Error cargando categorías:', error);
+    }
+}
+
+function renderizarCategorias() {
+    const container = document.getElementById('categorias-container');
+    container.innerHTML = `
+        <div class="categoria-tab ${!categoriaActiva ? 'active' : ''}" onclick="filtrarCategoria(null)">Todos</div>
+        ${categorias.map(cat => `
+            <div class="categoria-tab ${categoriaActiva === cat.id ? 'active' : ''}" onclick="filtrarCategoria(${cat.id})">${cat.nombre}</div>
+        `).join('')}
+    `;
+}
+
+function filtrarCategoria(categoriaId) {
+    categoriaActiva = categoriaId;
+    renderizarCategorias();
+    renderizarProductos();
+}
+
+async function cargarProductos() {
+    console.log('cargarProductos() llamado');
+    try {
+        const response = await fetch(`${API_BASE}/productos`);
+        productos = await response.json();
+        console.log('Productos recibidos:', productos.length);
+        renderizarProductos();
+    } catch (error) {
+        console.error('Error cargando productos:', error);
+    }
+}
+
+function renderizarProductos() {
+    const container = document.getElementById('productos-container');
+    if (!container) {
+        console.error('Container productos-container no encontrado!');
+        return;
+    }
+    const productosFiltrados = categoriaActiva
+        ? productos.filter(p => p.categoria_id === categoriaActiva)
+        : productos;
+
+    console.log('Renderizando', productosFiltrados.length, 'productos');
+    container.innerHTML = productosFiltrados.map(producto => `
+        <div class="product-card ${!producto.disponible ? 'disabled' : ''}" onclick="agregarAlCarrito(${producto.id})">
+            <div class="fw-bold">${producto.nombre}</div>
+            <small class="text-muted">${producto.descripcion || ''}</small>
+            <div class="product-price">$${producto.precio.toFixed(2)}</div>
+        </div>
+    `).join('');
+}
+
+function agregarAlCarrito(productoId) {
+    if (!mesaSeleccionada) {
+        mostrarNotificacion('Atención', 'Primero selecciona una mesa', 'warning');
+        return;
+    }
+
+    const producto = productos.find(p => p.id === productoId);
+    if (!producto || !producto.disponible) return;
+
+    const itemExistente = carrito.find(item => item.producto_id === productoId);
+
+    if (itemExistente) {
+        itemExistente.cantidad++;
+        itemExistente.subtotal = itemExistente.cantidad * producto.precio;
+    } else {
+        carrito.push({
+            producto_id: productoId,
+            nombre: producto.nombre,
+            precio: producto.precio,
+            cantidad: 1,
+            subtotal: producto.precio
+        });
+    }
+
+    renderizarCarrito();
+}
+
+function modificarCantidad(productoId, delta) {
+    const item = carrito.find(i => i.producto_id === productoId);
+    if (!item) return;
+
+    item.cantidad += delta;
+
+    if (item.cantidad <= 0) {
+        carrito = carrito.filter(i => i.producto_id !== productoId);
+    } else {
+        item.subtotal = item.cantidad * item.precio;
+    }
+
+    renderizarCarrito();
+}
+
+function renderizarCarrito() {
+    const container = document.getElementById('cart-items');
+
+    if (carrito.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Selecciona productos del menú</p>';
+        document.getElementById('btn-enviar-pedido').disabled = true;
+    } else {
+        container.innerHTML = carrito.map(item => `
+            <div class="cart-item">
+                <div>
+                    <strong>${item.nombre}</strong><br>
+                    <small>$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, -1)">-</button>
+                    <span>${item.cantidad}</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="modificarCantidad(${item.producto_id}, 1)">+</button>
+                    <strong>$${item.subtotal.toFixed(2)}</strong>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('btn-enviar-pedido').disabled = false;
+    }
+
+    // Calcular totales
+    const subtotal = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const iva = subtotal * 0.13;
+    const total = subtotal + iva;
+
+    document.getElementById('cart-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('cart-iva').textContent = `$${iva.toFixed(2)}`;
+    document.getElementById('cart-total').textContent = `$${total.toFixed(2)}`;
+}
+
+async function enviarPedido() {
+    const tipoPago = document.getElementById('tipo-pago').value;
+    const clienteNombre = document.getElementById('cliente-nombre-pedido')?.value || '';
+
+    // Validaciones según tipo de pago
+    if (tipoPago === 'al_final') {
+        // Para pago al final, se requiere mesa
+        if (!mesaSeleccionada) {
+            mostrarNotificacion('Error', 'Selecciona una mesa para pedidos en mesa', 'danger');
+            return;
+        }
+    } else {
+        // Para pago anticipado (para llevar), se recomienda nombre de cliente
+        if (!clienteNombre && !mesaSeleccionada) {
+            mostrarNotificacion('Atención', 'Ingresa el nombre del cliente para pedidos para llevar', 'warning');
+        }
+    }
+
+    if (carrito.length === 0) {
+        mostrarNotificacion('Error', 'Agrega productos al pedido', 'danger');
+        return;
+    }
+
+    // Obtener nombre del usuario autenticado
+    const usuario = getUsuarioActual ? getUsuarioActual() : null;
+    const nombreMesero = usuario ? usuario.nombre : 'Mesero';
+
+    const pedido = {
+        mesa_id: mesaSeleccionada ? mesaSeleccionada.id : null,
+        mesero: nombreMesero,
+        tipo_pago: tipoPago,
+        cliente_nombre: clienteNombre,
+        items: carrito.map(item => ({
+            producto_id: item.producto_id,
+            cantidad: item.cantidad,
+            notas: item.notas || ''
+        }))
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/pedidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pedido)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const mensajeMesa = mesaSeleccionada ? `Mesa ${mesaSeleccionada.numero}` : clienteNombre || 'Para llevar';
+            mostrarNotificacion('Pedido Enviado',
+                tipoPago === 'anticipado'
+                    ? `Pedido #${result.pedido_id} (${mensajeMesa}) enviado a caja. Total: $${result.total.toFixed(2)}`
+                    : `Pedido #${result.pedido_id} (${mensajeMesa}) enviado a cocina.`,
+                'success'
+            );
+
+            // Limpiar carrito y formulario
+            carrito = [];
+            mesaSeleccionada = null;
+            document.getElementById('mesa-seleccionada').textContent = '';
+            document.getElementById('cliente-nombre-pedido').value = '';
+            renderizarCarrito();
+            cargarMesas();
+
+            // Volver a tab de mesas
+            const mesasTab = document.querySelector('[data-bs-target="#mesas-tab"]');
+            bootstrap.Tab.getOrCreateInstance(mesasTab).show();
+        } else {
+            mostrarNotificacion('Error', result.error, 'danger');
+        }
+    } catch (error) {
+        console.error('Error enviando pedido:', error);
+        mostrarNotificacion('Error', 'No se pudo enviar el pedido', 'danger');
+    }
+}
+
+async function cargarPedidosParaServir() {
+    try {
+        const response = await fetch(`${API_BASE}/mesero/pedidos`);
+        const pedidos = await response.json();
+
+        const badge = document.getElementById('badge-servir');
+        if (pedidos.length > 0) {
+            badge.textContent = pedidos.length;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+
+        renderizarPedidosServir(pedidos);
+    } catch (error) {
+        console.error('Error cargando pedidos para servir:', error);
+    }
+}
+
+function renderizarPedidosServir(pedidos) {
+    const container = document.getElementById('pedidos-servir-container');
+
+    if (pedidos.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No hay pedidos listos para servir</div>';
+        return;
+    }
+
+    container.innerHTML = pedidos.map(pedido => `
+        <div class="pedido-card">
+            <div class="pedido-header listo">
+                <div>
+                    <strong>Pedido #${pedido.id}</strong>
+                    <span class="ms-2">Mesa ${pedido.mesa_numero || 'N/A'}</span>
+                </div>
+                <span class="badge bg-light text-dark">LISTO</span>
+            </div>
+            <div class="pedido-body">
+                ${pedido.items.map(item => `
+                    <div class="pedido-item">
+                        <span>${item.cantidad}x ${item.producto_nombre}</span>
+                    </div>
+                `).join('')}
+                <hr>
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong>Total: $${pedido.total.toFixed(2)}</strong>
+                    <button class="btn btn-info" onclick="marcarServido(${pedido.id}, '${pedido.tipo_pago}')">
+                        <i class="bi bi-check2-circle"></i> Marcar Servido
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function marcarServido(pedidoId, tipoPago) {
+    try {
+        // Primero marcar como servido
+        await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'servido' })
+        });
+
+        // Si es pago al final, cambiar a pendiente_pago
+        if (tipoPago === 'al_final') {
+            await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'pendiente_pago' })
+            });
+            mostrarNotificacion('Pedido Servido', 'El pedido fue servido. Pendiente de cobro en caja.', 'success');
+        } else {
+            // Si ya estaba pagado, cerrar el pedido
+            await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'cerrado' })
+            });
+            mostrarNotificacion('Pedido Completado', 'El pedido fue servido y cerrado.', 'success');
+        }
+
+        cargarPedidosParaServir();
+        cargarMesas();
+    } catch (error) {
+        console.error('Error marcando servido:', error);
+        mostrarNotificacion('Error', 'No se pudo actualizar el pedido', 'danger');
+    }
+}
+
+// ============ FUNCIONES DEL CAJERO ============
+
+async function cargarDatosCajero() {
+    await Promise.all([
+        cargarPedidosCajero(),
+        cargarEstadisticas()
+    ]);
+}
+
+function iniciarActualizacionCajero() {
+    updateInterval = setInterval(() => {
+        cargarPedidosCajero();
+        cargarEstadisticas();
+    }, 5000);
+}
+
+async function cargarPedidosCajero() {
+    try {
+        const response = await fetch(`${API_BASE}/cajero/pedidos`);
+        const pedidos = await response.json();
+        renderizarPedidosCajero(pedidos);
+    } catch (error) {
+        console.error('Error cargando pedidos cajero:', error);
+    }
+}
+
+function renderizarPedidosCajero(pedidos) {
+    const container = document.getElementById('pedidos-cajero-container');
+
+    if (pedidos.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">No hay pedidos pendientes de pago</div>';
+        return;
+    }
+
+    container.innerHTML = pedidos.map(pedido => {
+        const identificacion = pedido.mesa_numero ? `Mesa ${pedido.mesa_numero}` : (pedido.cliente_nombre || 'Para llevar');
+        const headerClass = pedido.estado === 'servido' ? 'en_mesa' : 'pendiente_pago';
+        const badgeText = pedido.tipo_pago === 'anticipado' ? 'PARA LLEVAR' : 'SERVIDO - COBRAR';
+
+        return `
+        <div class="pedido-card">
+            <div class="pedido-header ${headerClass}">
+                <div>
+                    <strong>Pedido #${pedido.id}</strong>
+                    <span class="ms-2">${identificacion}</span>
+                </div>
+                <span class="badge bg-dark">${badgeText}</span>
+            </div>
+            <div class="pedido-body">
+                ${pedido.items.map(item => `
+                    <div class="pedido-item">
+                        <span>${item.cantidad}x ${item.producto_nombre}</span>
+                        <span>$${item.subtotal.toFixed(2)}</span>
+                    </div>
+                `).join('')}
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal:</span>
+                    <span>$${pedido.subtotal.toFixed(2)}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>IVA (13%):</span>
+                    <span>$${pedido.impuesto.toFixed(2)}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <strong>TOTAL:</strong>
+                    <strong class="fs-4">$${pedido.total.toFixed(2)}</strong>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" onclick="abrirModalPago(${pedido.id}, ${pedido.total})">
+                        <i class="bi bi-cash"></i> Cobrar $${pedido.total.toFixed(2)}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+function abrirModalPago(pedidoId, total) {
+    pedidoActualPago = { id: pedidoId, total: total };
+
+    document.getElementById('detalle-pago').innerHTML = `
+        <h4 class="text-center">Total a cobrar</h4>
+        <h2 class="text-center text-success">$${total.toFixed(2)}</h2>
+    `;
+
+    document.getElementById('monto-recibido').value = '';
+    document.getElementById('cambio-container').style.display = 'none';
+
+    const modal = new bootstrap.Modal(document.getElementById('modalPago'));
+    modal.show();
+}
+
+function calcularCambio() {
+    const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+    const total = pedidoActualPago?.total || 0;
+    const cambio = montoRecibido - total;
+
+    const container = document.getElementById('cambio-container');
+    const montoElement = document.getElementById('monto-cambio');
+
+    if (montoRecibido >= total) {
+        container.style.display = 'block';
+        montoElement.textContent = `$${cambio.toFixed(2)}`;
+        container.className = 'alert alert-success';
+    } else if (montoRecibido > 0) {
+        container.style.display = 'block';
+        montoElement.textContent = `Falta: $${Math.abs(cambio).toFixed(2)}`;
+        container.className = 'alert alert-warning';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+async function confirmarPago() {
+    if (!pedidoActualPago) return;
+
+    const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+
+    if (montoRecibido < pedidoActualPago.total) {
+        mostrarNotificacion('Error', 'El monto recibido es insuficiente', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'pagado' })
+        });
+
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            mostrarNotificacion('Pago Exitoso', `Pago de $${pedidoActualPago.total.toFixed(2)} procesado correctamente`, 'success');
+            pedidoActualPago = null;
+            cargarPedidosCajero();
+            cargarEstadisticas();
+        }
+    } catch (error) {
+        console.error('Error procesando pago:', error);
+        mostrarNotificacion('Error', 'No se pudo procesar el pago', 'danger');
+    }
+}
+
+async function confirmarPagoSinComprobante() {
+    if (!pedidoActualPago) return;
+
+    const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+
+    if (montoRecibido < pedidoActualPago.total) {
+        mostrarNotificacion('Error', 'El monto recibido es insuficiente', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'pagado' })
+        });
+
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            mostrarNotificacion('Pago Exitoso', `Pago de $${pedidoActualPago.total.toFixed(2)} procesado sin comprobante`, 'success');
+            limpiarFormularioCliente();
+            pedidoActualPago = null;
+            cargarPedidosCajero();
+            cargarEstadisticas();
+        }
+    } catch (error) {
+        console.error('Error procesando pago:', error);
+        mostrarNotificacion('Error', 'No se pudo procesar el pago', 'danger');
+    }
+}
+
+async function confirmarPagoConComprobante() {
+    if (!pedidoActualPago) return;
+
+    const metodoPago = document.querySelector('input[name="metodoPago"]:checked')?.value || 'efectivo';
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value || 'ticket';
+    const esCredito = metodoPago === 'credito';
+
+    // Validaciones según método de pago
+    if (esCredito) {
+        // Validar crédito
+        const clienteId = document.getElementById('cliente-id-factura')?.value;
+        if (!clienteId) {
+            mostrarNotificacion('Error', 'Debe seleccionar un cliente para pagar a crédito', 'danger');
+            return;
+        }
+        if (!creditoClienteActual || creditoClienteActual.credito_autorizado <= 0) {
+            mostrarNotificacion('Error', 'Este cliente no tiene crédito autorizado', 'danger');
+            return;
+        }
+        if (creditoClienteActual.credito_disponible < pedidoActualPago.total) {
+            mostrarNotificacion('Error',
+                `Crédito insuficiente. Disponible: $${creditoClienteActual.credito_disponible.toFixed(2)}, Pedido: $${pedidoActualPago.total.toFixed(2)}`,
+                'danger');
+            return;
+        }
+    } else {
+        // Validar efectivo
+        const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+        if (montoRecibido < pedidoActualPago.total) {
+            mostrarNotificacion('Error', 'El monto recibido es insuficiente', 'danger');
+            return;
+        }
+    }
+
+    try {
+        let clienteId = document.getElementById('cliente-id-factura')?.value || null;
+
+        // 1. Guardar datos del cliente (siempre para crédito, opcional para factura)
+        if (esCredito || tipoComprobante === 'factura') {
+            const datosCliente = {
+                nombre: document.getElementById('cliente-nombre')?.value || '',
+                tipo_doc: document.getElementById('cliente-tipo-doc')?.value || '',
+                num_doc: document.getElementById('cliente-num-doc')?.value || '',
+                nrc: document.getElementById('cliente-nrc')?.value || '',
+                direccion: document.getElementById('cliente-direccion')?.value || '',
+                telefono: document.getElementById('cliente-telefono')?.value || '',
+                correo: document.getElementById('cliente-correo')?.value || ''
+            };
+
+            // Campos opcionales para crédito, si existen en la UI
+            const creditoField = document.getElementById('cliente-credito');
+            const diasCreditoField = document.getElementById('cliente-dias-credito');
+            if (creditoField) datosCliente.credito_autorizado = parseFloat(creditoField.value) || 0;
+            if (diasCreditoField) datosCliente.dias_credito = parseInt(diasCreditoField.value) || 0;
+
+            // Si hay datos del cliente pero no hay cliente_id, crear nuevo cliente
+            if (datosCliente.nombre && datosCliente.num_doc && !clienteId) {
+                try {
+                    const nuevoCliente = await crearClienteRapido(datosCliente);
+                    if (nuevoCliente && nuevoCliente.id) {
+                        clienteId = nuevoCliente.id;
+                        if (!nuevoCliente.existente) {
+                            mostrarNotificacion('Cliente', `Cliente "${datosCliente.nombre}" guardado automáticamente`, 'info');
+                        }
+                    }
+                } catch (e) {
+                    console.log('Cliente ya existe o error al crear:', e);
+                }
+            }
+
+            if (datosCliente.nombre || clienteId) {
+                // Actualizar datos del cliente en el pedido
+                await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/cliente`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cliente_id: clienteId,
+                        ...datosCliente
+                    })
+                });
+            }
+        }
+
+        // 2. Procesar según método de pago
+        if (esCredito) {
+            // Para crédito: el pedido queda como "pendiente_credito" (no pagado aún)
+            // Se factura pero no se cierra hasta que paguen
+            const pagoResponse = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/credito`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cliente_id: clienteId,
+                    monto: pedidoActualPago.total
+                })
+            });
+
+            if (!pagoResponse.ok) {
+                const errorData = await pagoResponse.json();
+                throw new Error(errorData.error || 'Error al procesar crédito');
+            }
+        } else {
+            // Para efectivo: marcar como pagado
+            const pagoResponse = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'pagado' })
+            });
+
+            if (!pagoResponse.ok) {
+                throw new Error('Error al procesar el pago');
+            }
+        }
+
+        // 3. Generar el comprobante
+        const facturaResponse = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/facturar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo: tipoComprobante })
+        });
+
+        const facturaResult = await facturaResponse.json();
+
+        if (facturaResult.success) {
+            // 4. Cerrar el pedido (para efectivo inmediatamente, para crédito también)
+            await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: esCredito ? 'credito' : 'cerrado' })
+            });
+
+            bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+
+            const tipoNombre = tipoComprobante === 'factura' ? 'Factura Electrónica' : 'Ticket';
+            const numero = facturaResult.numero_control || facturaResult.numero;
+            const metodoPagoNombre = esCredito ? ' (Crédito)' : '';
+
+            mostrarNotificacion(
+                'Pago y Comprobante',
+                `${esCredito ? 'Venta a crédito registrada' : 'Pago procesado'}. ${tipoNombre}: ${numero}${metodoPagoNombre}`,
+                'success'
+            );
+
+            // Abrir ventana para imprimir el comprobante
+            abrirComprobante(pedidoActualPago.id);
+
+            limpiarFormularioCliente();
+            pedidoActualPago = null;
+            cargarPedidosCajero();
+            cargarEstadisticas();
+            cargarMesas();
+        } else {
+            // Hubo error en facturación pero la transacción continúa
+            await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: esCredito ? 'credito' : 'cerrado' })
+            });
+
+            mostrarNotificacion(
+                esCredito ? 'Crédito registrado' : 'Pago procesado',
+                `${esCredito ? 'Venta a crédito' : 'Pago'} exitoso pero error al generar comprobante: ${facturaResult.error}`,
+                'warning'
+            );
+            bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            limpiarFormularioCliente();
+            pedidoActualPago = null;
+            cargarPedidosCajero();
+            cargarMesas();
+        }
+    } catch (error) {
+        console.error('Error procesando pago con comprobante:', error);
+        mostrarNotificacion('Error', error.message || 'No se pudo procesar el pago', 'danger');
+    }
+}
+
+// Crear cliente rápidamente desde el proceso de facturación
+async function crearClienteRapido(datos) {
+    const tipoDoc = datos.tipo_doc;
+    let tipoDocumento = null;
+    if (tipoDoc === '36') tipoDocumento = 'NIT';
+    else if (tipoDoc === '13') tipoDocumento = 'DUI';
+    else if (tipoDoc === '37') tipoDocumento = 'Otro';
+
+    const clienteData = {
+        nombre: datos.nombre,
+        tipo_documento: tipoDocumento,
+        numero_documento: datos.num_doc,
+        nrc: datos.nrc || null,
+        tipo_cliente: datos.nrc ? 'contribuyente' : 'consumidor_final',
+        direccion: datos.direccion || null,
+        telefono: datos.telefono || null,
+        email: datos.correo || null
+    };
+
+    // Enviar crédito si fue provisto en "datos" o existe un campo en la UI
+    if (typeof datos.credito_autorizado !== 'undefined' && datos.credito_autorizado !== null) {
+        clienteData.credito_autorizado = Number(datos.credito_autorizado) || 0;
+    } else {
+        const campoCredito = document.getElementById('cliente-credito');
+        if (campoCredito) clienteData.credito_autorizado = parseFloat(campoCredito.value) || 0;
+    }
+
+    if (typeof datos.dias_credito !== 'undefined' && datos.dias_credito !== null) {
+        clienteData.dias_credito = parseInt(datos.dias_credito) || 0;
+    } else {
+        const campoDias = document.getElementById('cliente-dias-credito');
+        if (campoDias) clienteData.dias_credito = parseInt(campoDias.value) || 0;
+    }
+
+    const response = await fetch(`${API_CLIENTES}/clientes/crear-rapido`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clienteData)
+    });
+
+    return await response.json();
+}
+
+function abrirComprobante(pedidoId) {
+    const url = `ticket.html?pedido=${pedidoId}`;
+    window.open(url, '_blank', 'width=400,height=600');
+}
+
+function limpiarFormularioCliente() {
+    document.getElementById('tipo-ticket').checked = true;
+    document.getElementById('datos-cliente-container').style.display = 'none';
+    document.getElementById('cliente-nombre').value = '';
+    document.getElementById('cliente-tipo-doc').value = '';
+    document.getElementById('cliente-num-doc').value = '';
+    document.getElementById('cliente-nrc').value = '';
+    document.getElementById('cliente-direccion').value = '';
+    document.getElementById('cliente-telefono').value = '';
+    document.getElementById('cliente-correo').value = '';
+}
+
+async function cargarEstadisticas() {
+    try {
+        const response = await fetch(`${API_BASE}/estadisticas/hoy`);
+        const stats = await response.json();
+
+        document.getElementById('stat-pedidos').textContent = stats.ventas.total_pedidos;
+        document.getElementById('stat-ventas').textContent = `$${parseFloat(stats.ventas.total_ventas).toFixed(2)}`;
+
+        const topList = document.getElementById('stat-top-productos');
+        if (stats.top_productos.length > 0) {
+            topList.innerHTML = stats.top_productos.map(p => `
+                <li>${p.nombre}: ${p.cantidad} unidades</li>
+            `).join('');
+        } else {
+            topList.innerHTML = '<li class="text-muted">Sin ventas aún</li>';
+        }
+    } catch (error) {
+        console.error('Error cargando estadísticas:', error);
+    }
+}
+
+// ============ FUNCIONES DE COCINA ============
+
+async function cargarDatosCocina() {
+    await cargarPedidosCocina();
+}
+
+function iniciarActualizacionCocina() {
+    updateInterval = setInterval(cargarPedidosCocina, 3000);
+}
+
+async function cargarPedidosCocina() {
+    try {
+        const response = await fetch(`${API_BASE}/cocina/pedidos`);
+        const pedidos = await response.json();
+        renderizarPedidosCocina(pedidos);
+    } catch (error) {
+        console.error('Error cargando pedidos cocina:', error);
+    }
+}
+
+function renderizarPedidosCocina(pedidos) {
+    const container = document.getElementById('pedidos-cocina-container');
+
+    if (pedidos.length === 0) {
+        container.innerHTML = '<div class="col-12"><div class="alert alert-info">No hay pedidos en cola</div></div>';
+        return;
+    }
+
+    container.innerHTML = pedidos.map(pedido => `
+        <div class="col-md-4 col-lg-3">
+            <div class="pedido-card ${pedido.estado === 'pagado' ? 'pedido-nuevo' : ''}">
+                <div class="pedido-header ${pedido.estado}">
+                    <div>
+                        <strong>#${pedido.id}</strong>
+                        <span class="ms-2">Mesa ${pedido.mesa_numero || 'N/A'}</span>
+                    </div>
+                    <span class="badge bg-light text-dark">
+                        ${pedido.estado === 'pagado' ? 'NUEVO' : 'EN PREPARACIÓN'}
+                    </span>
+                </div>
+                <div class="pedido-body">
+                    ${pedido.items.map(item => `
+                        <div class="pedido-item">
+                            <strong>${item.cantidad}x</strong> ${item.producto_nombre}
+                            ${item.notas ? `<br><small class="text-muted">${item.notas}</small>` : ''}
+                        </div>
+                    `).join('')}
+                    <hr>
+                    <small class="text-muted">
+                        ${calcularTiempoTranscurrido(pedido.created_at)}
+                    </small>
+                    <div class="d-grid gap-2 mt-2">
+                        ${pedido.estado === 'pagado' ? `
+                            <button class="btn btn-warning" onclick="iniciarPreparacion(${pedido.id})">
+                                <i class="bi bi-play-fill"></i> Iniciar Preparación
+                            </button>
+                        ` : `
+                            <button class="btn btn-success" onclick="marcarListo(${pedido.id})">
+                                <i class="bi bi-check-lg"></i> Listo para Servir
+                            </button>
+                        `}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function calcularTiempoTranscurrido(fechaStr) {
+    const fecha = new Date(fechaStr);
+    const ahora = new Date();
+    const diffMs = ahora - fecha;
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Hace un momento';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    return `Hace ${diffHours}h ${diffMins % 60}min`;
+}
+
+async function iniciarPreparacion(pedidoId) {
+    try {
+        await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'en_cocina' })
+        });
+
+        cargarPedidosCocina();
+    } catch (error) {
+        console.error('Error iniciando preparación:', error);
+        mostrarNotificacion('Error', 'No se pudo actualizar el pedido', 'danger');
+    }
+}
+
+async function marcarListo(pedidoId) {
+    try {
+        await fetch(`${API_BASE}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'listo' })
+        });
+
+        mostrarNotificacion('Pedido Listo', `Pedido #${pedidoId} listo para servir`, 'success');
+        cargarPedidosCocina();
+    } catch (error) {
+        console.error('Error marcando listo:', error);
+        mostrarNotificacion('Error', 'No se pudo actualizar el pedido', 'danger');
+    }
+}
+
+// ============ UTILIDADES ============
+
+function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
+    const toast = document.getElementById('toast-notification');
+    const toastTitle = document.getElementById('toast-title');
+    const toastMessage = document.getElementById('toast-message');
+
+    toastTitle.textContent = titulo;
+    toastMessage.textContent = mensaje;
+
+    // Cambiar color según tipo
+    toast.className = 'toast';
+    if (tipo === 'success') toast.classList.add('bg-success', 'text-white');
+    else if (tipo === 'danger') toast.classList.add('bg-danger', 'text-white');
+    else if (tipo === 'warning') toast.classList.add('bg-warning');
+
+    const bsToast = bootstrap.Toast.getOrCreateInstance(toast);
+    bsToast.show();
+}
+
+// Reproducir sonido de notificación (opcional)
+function playNotificationSound() {
+    try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH6AgnqGiYeAd3V4fYOHg4B6fYKHg4B7foSHhYJ+gISDg4GAgYKCgoKBgYGBgYGBgQ==');
+        audio.volume = 0.5;
+        audio.play();
+    } catch (e) {
+        // Ignorar errores de audio
+    }
+}
+
+// ============ BÚSQUEDA DE CLIENTES PARA FACTURACIÓN ============
+
+let timeoutBusquedaCliente = null;
+
+async function buscarClienteFactura(texto) {
+    const resultadosDiv = document.getElementById('resultados-busqueda-cliente');
+
+    // Limpiar timeout anterior
+    clearTimeout(timeoutBusquedaCliente);
+
+    // Si el texto es muy corto, limpiar resultados
+    if (texto.length < 2) {
+        resultadosDiv.innerHTML = '';
+        return;
+    }
+
+    // Esperar 300ms antes de buscar (debounce)
+    timeoutBusquedaCliente = setTimeout(async () => {
+        try {
+            const response = await fetch(`${API_CLIENTES}/clientes?buscar=${encodeURIComponent(texto)}&activo=1`);
+            const clientes = await response.json();
+
+            if (clientes.length === 0) {
+                resultadosDiv.innerHTML = `
+                    <div class="list-group-item list-group-item-light text-muted small">
+                        No se encontraron clientes. Los datos se guardarán como nuevo.
+                    </div>
+                `;
+                return;
+            }
+
+            resultadosDiv.innerHTML = clientes.slice(0, 5).map(cliente => `
+                <button type="button" class="list-group-item list-group-item-action py-2"
+                        onclick="seleccionarClienteFactura(${cliente.id})">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${cliente.nombre}</strong>
+                            ${cliente.nombre_comercial ? `<br><small class="text-muted">${cliente.nombre_comercial}</small>` : ''}
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">${cliente.numero_documento || ''}</small>
+                            <br>
+                            <span class="badge ${cliente.tipo_cliente === 'contribuyente' ? 'bg-success' : 'bg-info'} badge-sm">
+                                ${cliente.tipo_cliente === 'contribuyente' ? 'Contrib.' : 'C. Final'}
+                            </span>
+                        </div>
+                    </div>
+                </button>
+            `).join('');
+        } catch (error) {
+            console.error('Error buscando clientes:', error);
+            resultadosDiv.innerHTML = '';
+        }
+    }, 300);
+}
+
+async function seleccionarClienteFactura(clienteId) {
+    try {
+        const response = await fetch(`${API_CLIENTES}/clientes/${clienteId}`);
+        const cliente = await response.json();
+
+        if (response.ok) {
+            // Guardar ID del cliente
+            document.getElementById('cliente-id-factura').value = cliente.id;
+
+            // Llenar campos del formulario
+            document.getElementById('cliente-nombre').value = cliente.nombre || '';
+            document.getElementById('cliente-num-doc').value = cliente.numero_documento || '';
+            document.getElementById('cliente-nrc').value = cliente.nrc || '';
+            document.getElementById('cliente-direccion').value = cliente.direccion || '';
+            document.getElementById('cliente-telefono').value = cliente.telefono || '';
+            document.getElementById('cliente-correo').value = cliente.email || '';
+
+            // Seleccionar tipo de documento
+            const tipoDocSelect = document.getElementById('cliente-tipo-doc');
+            if (cliente.tipo_documento === 'NIT') {
+                tipoDocSelect.value = '36';
+            } else if (cliente.tipo_documento === 'DUI') {
+                tipoDocSelect.value = '13';
+            } else if (cliente.tipo_documento) {
+                tipoDocSelect.value = '37';
+            } else {
+                tipoDocSelect.value = '';
+            }
+
+            // Limpiar búsqueda
+            document.getElementById('buscar-cliente-factura').value = cliente.nombre;
+            document.getElementById('resultados-busqueda-cliente').innerHTML = '';
+
+            // Cargar información de crédito del cliente
+            await cargarCreditoCliente(cliente.id);
+
+            mostrarNotificacion('Cliente', `Datos de "${cliente.nombre}" cargados`, 'success');
+        }
+    } catch (error) {
+        console.error('Error cargando cliente:', error);
+    }
+}
+
+// Variable global para almacenar el crédito del cliente actual
+let creditoClienteActual = null;
+
+// Cargar información de crédito del cliente
+async function cargarCreditoCliente(clienteId) {
+    const infoCreditoDiv = document.getElementById('info-credito-cliente');
+    const alertaSinCredito = document.getElementById('alerta-sin-credito');
+    const btnPagoCredito = document.getElementById('pago-credito');
+
+    try {
+        const response = await fetch(`${API_CLIENTES}/clientes/${clienteId}/credito`);
+        const credito = await response.json();
+
+        if (response.ok && credito.credito_autorizado > 0) {
+            creditoClienteActual = credito;
+
+            // Mostrar información de crédito
+            document.getElementById('credito-disponible-pago').textContent = `$${credito.credito_disponible.toFixed(2)}`;
+            document.getElementById('credito-usado-pago').textContent = `$${credito.credito_utilizado.toFixed(2)}`;
+            document.getElementById('credito-limite-pago').textContent = `$${credito.credito_autorizado.toFixed(2)}`;
+
+            // Calcular porcentaje de uso
+            const porcentaje = (credito.credito_utilizado / credito.credito_autorizado) * 100;
+            const barraCredito = document.getElementById('barra-credito-pago');
+            barraCredito.style.width = `${Math.min(porcentaje, 100)}%`;
+
+            // Color según porcentaje
+            barraCredito.className = 'progress-bar';
+            if (porcentaje >= 90) {
+                barraCredito.classList.add('bg-danger');
+            } else if (porcentaje >= 70) {
+                barraCredito.classList.add('bg-warning');
+            } else {
+                barraCredito.classList.add('bg-success');
+            }
+
+            // Habilitar botón de crédito
+            btnPagoCredito.disabled = false;
+            infoCreditoDiv.classList.remove('d-none');
+            alertaSinCredito.classList.add('d-none');
+
+            // Verificar si el crédito disponible es suficiente para el pedido
+            if (pedidoActualPago && credito.credito_disponible < pedidoActualPago.total) {
+                alertaSinCredito.classList.remove('d-none');
+                document.getElementById('mensaje-sin-credito').textContent =
+                    `Crédito insuficiente. Disponible: $${credito.credito_disponible.toFixed(2)}, Pedido: $${pedidoActualPago.total.toFixed(2)}`;
+            }
+        } else {
+            // Cliente sin crédito autorizado
+            creditoClienteActual = null;
+            infoCreditoDiv.classList.add('d-none');
+
+            // Si está seleccionado pago a crédito, mostrar alerta
+            if (document.getElementById('pago-credito').checked) {
+                alertaSinCredito.classList.remove('d-none');
+                document.getElementById('mensaje-sin-credito').textContent = 'Este cliente no tiene crédito autorizado.';
+            }
+        }
+    } catch (error) {
+        console.error('Error cargando crédito:', error);
+        creditoClienteActual = null;
+        infoCreditoDiv.classList.add('d-none');
+    }
+}
+
+// Manejar cambio de método de pago
+function onMetodoPagoChange() {
+    const metodoPago = document.querySelector('input[name="metodoPago"]:checked')?.value || 'efectivo';
+    const seccionMonto = document.getElementById('seccion-monto-recibido');
+    const cambioContainer = document.getElementById('cambio-container');
+    const alertaSinCredito = document.getElementById('alerta-sin-credito');
+    const infoCreditoDiv = document.getElementById('info-credito-cliente');
+    const clienteId = document.getElementById('cliente-id-factura')?.value;
+
+    if (metodoPago === 'credito') {
+        // Ocultar sección de monto recibido
+        seccionMonto.style.display = 'none';
+        cambioContainer.style.display = 'none';
+
+        // Verificar si hay cliente seleccionado con crédito
+        if (!clienteId) {
+            alertaSinCredito.classList.remove('d-none');
+            document.getElementById('mensaje-sin-credito').textContent = 'Debe seleccionar un cliente para pagar a crédito.';
+            infoCreditoDiv.classList.add('d-none');
+        } else if (!creditoClienteActual || creditoClienteActual.credito_autorizado <= 0) {
+            alertaSinCredito.classList.remove('d-none');
+            document.getElementById('mensaje-sin-credito').textContent = 'Este cliente no tiene crédito autorizado.';
+            infoCreditoDiv.classList.add('d-none');
+        } else if (pedidoActualPago && creditoClienteActual.credito_disponible < pedidoActualPago.total) {
+            alertaSinCredito.classList.remove('d-none');
+            document.getElementById('mensaje-sin-credito').textContent =
+                `Crédito insuficiente. Disponible: $${creditoClienteActual.credito_disponible.toFixed(2)}, Pedido: $${pedidoActualPago.total.toFixed(2)}`;
+            infoCreditoDiv.classList.remove('d-none');
+        } else {
+            alertaSinCredito.classList.add('d-none');
+            if (creditoClienteActual) {
+                infoCreditoDiv.classList.remove('d-none');
+            }
+        }
+    } else {
+        // Mostrar sección de monto recibido
+        seccionMonto.style.display = 'block';
+        alertaSinCredito.classList.add('d-none');
+
+        // Mostrar info de crédito solo si el cliente tiene
+        if (creditoClienteActual && creditoClienteActual.credito_autorizado > 0) {
+            infoCreditoDiv.classList.remove('d-none');
+        } else {
+            infoCreditoDiv.classList.add('d-none');
+        }
+    }
+}
+
+function limpiarClienteFactura() {
+    document.getElementById('cliente-id-factura').value = '';
+    document.getElementById('buscar-cliente-factura').value = '';
+    document.getElementById('cliente-nombre').value = '';
+    document.getElementById('cliente-tipo-doc').value = '';
+    document.getElementById('cliente-num-doc').value = '';
+    document.getElementById('cliente-nrc').value = '';
+    document.getElementById('cliente-direccion').value = '';
+    document.getElementById('cliente-telefono').value = '';
+    document.getElementById('cliente-correo').value = '';
+    document.getElementById('resultados-busqueda-cliente').innerHTML = '';
+
+    // Limpiar información de crédito
+    creditoClienteActual = null;
+    document.getElementById('info-credito-cliente').classList.add('d-none');
+    document.getElementById('alerta-sin-credito').classList.add('d-none');
+
+    // Resetear método de pago a efectivo
+    document.getElementById('pago-efectivo').checked = true;
+    document.getElementById('seccion-monto-recibido').style.display = 'block';
+}
+
+// Cerrar resultados al hacer clic fuera
+document.addEventListener('click', function(e) {
+    const resultados = document.getElementById('resultados-busqueda-cliente');
+    const buscador = document.getElementById('buscar-cliente-factura');
+    if (resultados && buscador && !resultados.contains(e.target) && !buscador.contains(e.target)) {
+        resultados.innerHTML = '';
+    }
+});

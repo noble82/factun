@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digifact SV - Panel de Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-receipt-cutoff"></i> Digifact SV - Facturación Electrónica
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <a href="pos.html" class="btn btn-warning">
+                    <i class="bi bi-shop"></i> POS Pupuser&iacute;a
+                </a>
+                <a href="admin.html" class="btn btn-info">
+                    <i class="bi bi-gear"></i> Administraci&oacute;n
+                </a>
+                <span id="status-badge" class="badge bg-secondary">Desconectado</span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Tabs de navegación -->
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="certificar-tab" data-bs-toggle="tab" data-bs-target="#certificar" type="button">
+                    <i class="bi bi-check-circle"></i> Certificar DTE
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="anular-tab" data-bs-toggle="tab" data-bs-target="#anular" type="button">
+                    <i class="bi bi-x-circle"></i> Anular DTE
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="consultar-tab" data-bs-toggle="tab" data-bs-target="#consultar" type="button">
+                    <i class="bi bi-search"></i> Consultar DTE
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-3" id="mainTabsContent">
+            <!-- TAB: Certificar DTE -->
+            <div class="tab-pane fade show active" id="certificar" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-file-earmark-arrow-up"></i> Certificar Factura Electrónica</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="xmlFile" class="form-label">Archivo XML del DTE</label>
+                            <input type="file" class="form-control" id="xmlFile" accept=".xml">
+                            <div class="form-text">Sube el archivo XML generado según normativa MH El Salvador</div>
+                        </div>
+                        <button onclick="certificarDTE()" class="btn btn-success">
+                            <i class="bi bi-send"></i> Certificar DTE
+                        </button>
+                        <button onclick="limpiarResultado('resultCertificar')" class="btn btn-secondary ms-2">
+                            <i class="bi bi-trash"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultCertificar" class="mt-3"></div>
+            </div>
+
+            <!-- TAB: Anular DTE -->
+            <div class="tab-pane fade" id="anular" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="bi bi-x-octagon"></i> Anular Documento Electrónico</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="anularGuid" class="form-label">GUID</label>
+                            <input type="text" class="form-control" id="anularGuid" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="anularSerie" class="form-label">Serie</label>
+                                <input type="text" class="form-control" id="anularSerie" placeholder="F">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="anularNumero" class="form-label">Número</label>
+                                <input type="number" class="form-control" id="anularNumero" placeholder="1">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="anularMotivo" class="form-label">Motivo (opcional)</label>
+                            <textarea class="form-control" id="anularMotivo" rows="2"></textarea>
+                        </div>
+                        <button onclick="anularDTE()" class="btn btn-danger">
+                            <i class="bi bi-x-circle"></i> Anular DTE
+                        </button>
+                        <button onclick="limpiarResultado('resultAnular')" class="btn btn-secondary ms-2">
+                            <i class="bi bi-trash"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultAnular" class="mt-3"></div>
+            </div>
+
+            <!-- TAB: Consultar DTE -->
+            <div class="tab-pane fade" id="consultar" role="tabpanel">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-search"></i> Consultar Documento Electrónico</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="consultarNit" class="form-label">NIT Emisor</label>
+                            <input type="text" class="form-control" id="consultarNit" placeholder="0614-010101-001-0">
+                        </div>
+                        <div class="mb-3">
+                            <label for="consultarGuid" class="form-label">GUID del DTE</label>
+                            <input type="text" class="form-control" id="consultarGuid" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+                        <button onclick="consultarDTE()" class="btn btn-info">
+                            <i class="bi bi-search"></i> Consultar
+                        </button>
+                        <button onclick="limpiarResultado('resultConsultar')" class="btn btn-secondary ms-2">
+                            <i class="bi bi-trash"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultConsultar" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spinner modal -->
+    <div class="modal fade" id="loadingModal" data-bs-backdrop="static" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2 mb-0">Procesando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-check.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

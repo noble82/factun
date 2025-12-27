@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Pupusería - Sistema de Pedidos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #e65100;
+            --secondary-color: #ff9800;
+            --success-color: #4caf50;
+            --warning-color: #ffc107;
+            --danger-color: #f44336;
+            --info-color: #2196f3;
+        }
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-pos {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        .role-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .role-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            border-radius: 15px;
+        }
+        .role-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .role-card.selected {
+            border-color: var(--primary-color);
+            background-color: #fff3e0;
+        }
+        .role-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .role-mesero { color: var(--info-color); }
+        .role-cajero { color: var(--success-color); }
+        .role-cocina { color: var(--danger-color); }
+
+        /* Panel de trabajo */
+        .work-panel {
+            display: none;
+        }
+        .work-panel.active {
+            display: block;
+        }
+
+        /* Menú de productos */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        .product-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid #eee;
+        }
+        .product-card:hover {
+            border-color: var(--primary-color);
+            transform: scale(1.02);
+        }
+        .product-card.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .product-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        /* Carrito */
+        .cart-panel {
+            background: white;
+            border-radius: 15px;
+            height: calc(100vh - 180px);
+            display: flex;
+            flex-direction: column;
+        }
+        .cart-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        .cart-total {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 0 0 15px 15px;
+        }
+
+        /* Mesas */
+        .mesa-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1rem;
+        }
+        .mesa-card {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        .mesa-libre {
+            background: #e8f5e9;
+            border: 2px solid var(--success-color);
+            color: var(--success-color);
+        }
+        .mesa-ocupada {
+            background: #ffebee;
+            border: 2px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+        .mesa-card:hover {
+            transform: scale(1.05);
+        }
+
+        /* Pedidos */
+        .pedido-card {
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pedido-header {
+            padding: 1rem;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pedido-header.pendiente_pago { background: var(--warning-color); color: #333; }
+        .pedido-header.pagado { background: var(--success-color); }
+        .pedido-header.en_cocina { background: var(--danger-color); }
+        .pedido-header.listo { background: var(--info-color); }
+        .pedido-header.en_mesa { background: #9c27b0; }
+        .pedido-body {
+            padding: 1rem;
+        }
+        .pedido-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+
+        /* Categorías */
+        .categoria-tabs {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .categoria-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: white;
+            border: 2px solid #ddd;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .categoria-tab.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Animaciones */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .pedido-nuevo {
+            animation: pulse 0.5s ease-in-out 3;
+        }
+
+        /* Notificaciones de sonido visual */
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-pos navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-shop"></i> POS Pupusería
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <span id="current-role" class="badge bg-light text-dark d-none"></span>
+                <span class="text-white d-none" id="usuario-info">
+                    <i class="bi bi-person-circle"></i>
+                    <span id="usuario-nombre-display"></span>
+                </span>
+                <span id="current-time" class="text-white"></span>
+                <!-- Enlaces solo para Manager -->
+                <div id="manager-nav-links" class="d-none">
+                    <a href="index.html" class="btn btn-outline-light btn-sm me-1">
+                        <i class="bi bi-receipt"></i> Facturación
+                    </a>
+                    <a href="admin.html" class="btn btn-outline-light btn-sm me-1">
+                        <i class="bi bi-gear"></i> Administración
+                    </a>
+                </div>
+                <button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none" onclick="mostrarSelectorRol()">
+                    <i class="bi bi-arrow-repeat"></i> Cambiar Rol
+                </button>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- Selector de Rol (oculto por defecto, solo visible para managers) -->
+        <div id="role-selector" class="role-selector mx-auto" style="max-width: 800px; display: none;">
+            <h3 class="text-center mb-4">Selecciona tu rol</h3>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('mesero')">
+                        <div class="role-icon role-mesero">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
+                        <h4>Mesero</h4>
+                        <p class="text-muted">Tomar pedidos y servir mesas</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cajero')">
+                        <div class="role-icon role-cajero">
+                            <i class="bi bi-cash-register"></i>
+                        </div>
+                        <h4>Cajero</h4>
+                        <p class="text-muted">Procesar pagos y facturar</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocina')">
+                        <div class="role-icon role-cocina">
+                            <i class="bi bi-fire"></i>
+                        </div>
+                        <h4>Cocina</h4>
+                        <p class="text-muted">Preparar pedidos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Mesero -->
+        <div id="panel-mesero" class="work-panel">
+            <div class="row">
+                <!-- Mesas y Menú -->
+                <div class="col-lg-8">
+                    <ul class="nav nav-tabs mb-3" id="meseroTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#mesas-tab">
+                                <i class="bi bi-grid-3x3"></i> Mesas
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#menu-tab">
+                                <i class="bi bi-menu-button-wide"></i> Menú
+                            </button>
+                        </li>
+                        <li class="nav-item position-relative">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#servir-tab">
+                                <i class="bi bi-bell"></i> Por Servir
+                                <span id="badge-servir" class="notification-badge d-none">0</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Tab Mesas -->
+                        <div class="tab-pane fade show active" id="mesas-tab">
+                            <div class="mesa-grid" id="mesas-container"></div>
+                        </div>
+
+                        <!-- Tab Menú -->
+                        <div class="tab-pane fade" id="menu-tab">
+                            <div class="categoria-tabs" id="categorias-container"></div>
+                            <div class="menu-grid" id="productos-container"></div>
+                        </div>
+
+                        <!-- Tab Por Servir -->
+                        <div class="tab-pane fade" id="servir-tab">
+                            <div id="pedidos-servir-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Carrito -->
+                <div class="col-lg-4">
+                    <div class="cart-panel">
+                        <div class="p-3 border-bottom">
+                            <h5 class="mb-0">
+                                <i class="bi bi-cart3"></i> Pedido Actual
+                                <span id="mesa-seleccionada" class="badge bg-primary ms-2"></span>
+                            </h5>
+                        </div>
+                        <div class="cart-items" id="cart-items">
+                            <p class="text-muted text-center">Selecciona productos del menú</p>
+                        </div>
+                        <div class="cart-total">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Subtotal:</span>
+                                <span id="cart-subtotal">$0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>IVA (13%):</span>
+                                <span id="cart-iva">$0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <strong>Total:</strong>
+                                <strong id="cart-total">$0.00</strong>
+                            </div>
+                            <div class="mb-2">
+                                <select class="form-select form-select-sm" id="tipo-pago" onchange="toggleOpcionesPago()">
+                                    <option value="anticipado">Pago anticipado (para llevar)</option>
+                                    <option value="al_final">Pago al final (en mesa)</option>
+                                </select>
+                            </div>
+                            <div id="opciones-para-llevar" class="mb-2">
+                                <input type="text" class="form-control form-control-sm" id="cliente-nombre-pedido" placeholder="Nombre del cliente">
+                            </div>
+                            <button class="btn btn-primary w-100" onclick="enviarPedido()" id="btn-enviar-pedido" disabled>
+                                <i class="bi bi-send"></i> Enviar Pedido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Cajero -->
+        <div id="panel-cajero" class="work-panel">
+            <div class="row">
+                <div class="col-lg-8">
+                    <h4 class="mb-3"><i class="bi bi-cash-stack"></i> Pedidos Pendientes de Pago</h4>
+                    <div id="pedidos-cajero-container"></div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Resumen del Día</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Pedidos cerrados:</span>
+                                <strong id="stat-pedidos">0</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Ventas totales:</span>
+                                <strong id="stat-ventas">$0.00</strong>
+                            </div>
+                            <hr>
+                            <h6>Top Productos</h6>
+                            <ul id="stat-top-productos" class="list-unstyled small"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Cocina -->
+        <div id="panel-cocina" class="work-panel">
+            <h4 class="mb-3"><i class="bi bi-fire"></i> Pedidos en Cola</h4>
+            <div class="row" id="pedidos-cocina-container"></div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmar Pago -->
+    <div class="modal fade" id="modalPago" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-cash"></i> Confirmar Pago</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div id="detalle-pago"></div>
+                            <hr>
+
+                            <!-- M&eacute;todo de Pago -->
+                            <h6 class="mb-2"><i class="bi bi-wallet2"></i> M&eacute;todo de Pago</h6>
+                            <div class="btn-group w-100 mb-3" role="group">
+                                <input type="radio" class="btn-check" name="metodoPago" id="pago-efectivo" value="efectivo" checked onchange="onMetodoPagoChange()">
+                                <label class="btn btn-outline-success" for="pago-efectivo">
+                                    <i class="bi bi-cash"></i> Efectivo
+                                </label>
+                                <input type="radio" class="btn-check" name="metodoPago" id="pago-credito" value="credito" onchange="onMetodoPagoChange()">
+                                <label class="btn btn-outline-warning" for="pago-credito">
+                                    <i class="bi bi-credit-card"></i> Cr&eacute;dito
+                                </label>
+                            </div>
+
+                            <!-- Alerta de cr&eacute;dito del cliente -->
+                            <div id="info-credito-cliente" class="alert alert-warning d-none mb-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-credit-card"></i> <strong>Cr&eacute;dito disponible:</strong>
+                                        <span id="credito-disponible-pago">$0.00</span>
+                                    </div>
+                                    <small class="text-muted">
+                                        Usado: <span id="credito-usado-pago">$0.00</span> /
+                                        <span id="credito-limite-pago">$0.00</span>
+                                    </small>
+                                </div>
+                                <div class="progress mt-2" style="height: 8px;">
+                                    <div id="barra-credito-pago" class="progress-bar bg-warning" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Alerta cuando no tiene cr&eacute;dito -->
+                            <div id="alerta-sin-credito" class="alert alert-danger d-none mb-3">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Sin cr&eacute;dito disponible.</strong>
+                                <span id="mensaje-sin-credito">Seleccione un cliente con cr&eacute;dito autorizado.</span>
+                            </div>
+
+                            <!-- Monto recibido (solo para efectivo) -->
+                            <div id="seccion-monto-recibido" class="mb-3">
+                                <label class="form-label">Monto recibido:</label>
+                                <input type="number" class="form-control form-control-lg" id="monto-recibido" step="0.01">
+                            </div>
+                            <div class="alert alert-info" id="cambio-container" style="display:none;">
+                                <strong>Cambio: <span id="monto-cambio">$0.00</span></strong>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-3"><i class="bi bi-receipt"></i> Tipo de Comprobante</h6>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked>
+                                <label class="form-check-label" for="tipo-ticket">
+                                    <strong>Ticket</strong> - Comprobante simple (no fiscal)
+                                </label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura">
+                                <label class="form-check-label" for="tipo-factura">
+                                    <strong>Factura Electr&oacute;nica</strong> - DTE (requiere datos)
+                                </label>
+                            </div>
+
+                            <!-- Datos del cliente (para factura) -->
+                            <div id="datos-cliente-container" style="display:none;">
+                                <hr>
+                                <h6 class="mb-3"><i class="bi bi-person"></i> Datos del Cliente</h6>
+
+                                <!-- Buscador de cliente -->
+                                <div class="mb-3">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control" id="buscar-cliente-factura"
+                                               placeholder="Buscar cliente por nombre, DUI, NIT..."
+                                               onkeyup="buscarClienteFactura(this.value)">
+                                        <button class="btn btn-outline-primary" type="button" onclick="limpiarClienteFactura()">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                    <div id="resultados-busqueda-cliente" class="list-group position-absolute w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto;"></div>
+                                </div>
+                                <input type="hidden" id="cliente-id-factura">
+
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm" id="cliente-nombre" placeholder="Nombre del cliente">
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="cliente-tipo-doc">
+                                            <option value="">Sin documento</option>
+                                            <option value="36">NIT</option>
+                                            <option value="13">DUI</option>
+                                            <option value="37">Otro</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="text" class="form-control form-control-sm" id="cliente-num-doc" placeholder="N&uacute;mero documento">
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm" id="cliente-nrc" placeholder="NRC (opcional)">
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm" id="cliente-direccion" placeholder="Direcci&oacute;n">
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-6">
+                                        <input type="tel" class="form-control form-control-sm" id="cliente-telefono" placeholder="Tel&eacute;fono">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="email" class="form-control form-control-sm" id="cliente-correo" placeholder="Correo">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-outline-success" onclick="confirmarPagoSinComprobante()">
+                        <i class="bi bi-check-circle"></i> Solo Pagar
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="confirmarPagoConComprobante()">
+                        <i class="bi bi-receipt"></i> Pagar y Emitir Comprobante
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notificaciones -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="toast-notification" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-bell me-2"></i>
+                <strong class="me-auto" id="toast-title">Notificación</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-check.js"></script>
+    <script src="pos.js"></script>
+</body>
+</html>

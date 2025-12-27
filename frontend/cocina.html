@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocina - Pedidos Pendientes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #e67e22;
+            --secondary-color: #d35400;
+        }
+        body {
+            background-color: #1a1a2e;
+            color: white;
+            min-height: 100vh;
+        }
+        .navbar-cocina {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        .pedido-card {
+            background: #16213e;
+            border-radius: 15px;
+            border-left: 5px solid var(--primary-color);
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .pedido-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .pedido-card.urgente {
+            border-left-color: #e74c3c;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+            50% { box-shadow: 0 0 20px 10px rgba(231, 76, 60, 0.2); }
+        }
+        .pedido-card.listo {
+            border-left-color: #27ae60;
+            opacity: 0.7;
+        }
+        .pedido-card.preparando {
+            border-left-color: #f39c12;
+            background: #1a2744;
+        }
+        .mesa-badge {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .item-producto {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .item-producto .cantidad {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        .btn-listo {
+            background: #27ae60;
+            border: none;
+            font-size: 1.2rem;
+            padding: 15px 30px;
+        }
+        .btn-listo:hover {
+            background: #219a52;
+        }
+        .tiempo-espera {
+            font-size: 0.9rem;
+        }
+        .tiempo-espera.alerta {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .stats-bar {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-numero {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 100px 20px;
+        }
+        .empty-state i {
+            font-size: 5rem;
+            color: #27ae60;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-cocina navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-fire"></i> COCINA
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <!-- Enlaces solo para Manager -->
+                <div id="manager-nav-links" class="d-none">
+                    <a href="pos.html" class="btn btn-outline-light btn-sm me-1">
+                        <i class="bi bi-shop"></i> POS
+                    </a>
+                    <a href="index.html" class="btn btn-outline-light btn-sm me-1">
+                        <i class="bi bi-receipt"></i> Facturación
+                    </a>
+                </div>
+                <span class="text-white">
+                    <i class="bi bi-person-circle"></i>
+                    <span id="usuario-nombre-display">Cocinero</span>
+                </span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Salir
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="row">
+                <div class="col-md-3 stat-item">
+                    <div class="stat-numero text-warning" id="stat-pendientes">0</div>
+                    <small>Pendientes</small>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-numero text-info" id="stat-preparando">0</div>
+                    <small>Preparando</small>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-numero text-success" id="stat-listos">0</div>
+                    <small>Listos Hoy</small>
+                </div>
+                <div class="col-md-3 stat-item">
+                    <div class="stat-numero text-white" id="hora-actual">--:--</div>
+                    <small>Hora Actual</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pedidos -->
+        <div class="row" id="pedidos-container">
+            <div class="col-12 empty-state" id="empty-state">
+                <i class="bi bi-check-circle"></i>
+                <h3>No hay pedidos pendientes</h3>
+                <p class="text-muted">Los nuevos pedidos aparecer&aacute;n aqu&iacute; autom&aacute;ticamente</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio para notificación -->
+    <audio id="audio-nuevo-pedido" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp2bi4N9eoGHkJeXlI2Gf3x5fIOLk5iZlpCJgXt4d3uBiZGXmpiUjoeBfHl4eoGIj5WYl5SSjIZ/enl4eoGHjpSXlpOQi4WAfHl4eX+FjJKVlZOQjIiDf3t5eXuAhoyRlJOSkY2Ig4B8enl7f4SLkJOTkpCNiYSAfXt6e36EiY6RkpGQjoqGgoB8e3t9gYaLj5GRkI+NioaDgH18fH6Ch4uOkJCPjo2KhoOAfn19foKGio2PkI+OjYuIhYKAfn5+gYWJjI6Pjo6NjImGg4GAfn+BhIiLjY6OjY2MioeFg4GAgIGEh4qMjY2NjIuKiIaEgoGBgoSHiouMjIyMi4qIhoSDgoKDhYeJi4uLi4uKiomHhoSEg4OEhoiJioqKioqJiYiGhYSEhISFh4iJiYmJiYmIh4aFhYWFhYaHiIiIiIiIiIiHhoaFhYWGhoeHiIiIiIeHh4eGhoaGhoaGhoeHh4eHh4eHh4eHhoaGhoaGhoeHh4eHh4eHh4eHh4aGhoaGhoaGh4eHh4eHh4eHh4eHhoaG" type="audio/wav">
+    </audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-check.js"></script>
+    <script>
+        const API_POS = '/api/pos';
+        let pedidosActuales = [];
+        let ultimoConteo = 0;
+
+        // Actualizar hora
+        function actualizarHora() {
+            const ahora = new Date();
+            document.getElementById('hora-actual').textContent =
+                ahora.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(actualizarHora, 1000);
+        actualizarHora();
+
+        // Cargar pedidos
+        async function cargarPedidos() {
+            console.log('cargarPedidos() llamado');
+            try {
+                // Usar endpoint específico de cocina
+                const response = await fetch(`${API_POS}/cocina/pedidos`);
+                const pedidos = await response.json();
+                console.log('Pedidos recibidos:', pedidos.length, pedidos);
+
+                // Todos los pedidos del endpoint ya son para cocina
+                pedidosActuales = pedidos;
+                console.log('Pedidos para cocina:', pedidosActuales.length);
+
+                // Notificar si hay nuevos pedidos
+                if (pedidosActuales.length > ultimoConteo && ultimoConteo > 0) {
+                    reproducirSonido();
+                }
+                ultimoConteo = pedidosActuales.length;
+
+                renderPedidos();
+                actualizarStats();
+            } catch (error) {
+                console.error('Error cargando pedidos:', error);
+            }
+        }
+
+        function renderPedidos() {
+            const container = document.getElementById('pedidos-container');
+            const emptyState = document.getElementById('empty-state');
+
+            if (pedidosActuales.length === 0) {
+                emptyState.style.display = 'block';
+                container.innerHTML = '';
+                container.appendChild(emptyState);
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            container.innerHTML = pedidosActuales.map(pedido => {
+                const tiempoEspera = calcularTiempoEspera(pedido.created_at);
+                const esUrgente = tiempoEspera > 15;
+
+                return `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="pedido-card p-3 ${esUrgente ? 'urgente' : ''} ${pedido.estado === 'en_cocina' ? 'preparando' : ''}">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <span class="badge bg-primary mesa-badge">${pedido.mesa_numero ? 'Mesa ' + pedido.mesa_numero : (pedido.cliente_nombre || 'Para llevar')}</span>
+                                    <span class="badge bg-secondary ms-2">#${pedido.id}</span>
+                                </div>
+                                <div class="tiempo-espera ${esUrgente ? 'alerta' : ''}">
+                                    <i class="bi bi-clock"></i> ${tiempoEspera} min
+                                </div>
+                            </div>
+
+                            <div class="items-lista mb-3">
+                                ${pedido.items ? pedido.items.map(item => `
+                                    <div class="item-producto d-flex align-items-center">
+                                        <span class="cantidad me-3">${item.cantidad}x</span>
+                                        <div>
+                                            <strong>${item.producto_nombre}</strong>
+                                            ${item.notas ? `<br><small class="text-warning"><i class="bi bi-chat-dots"></i> ${item.notas}</small>` : ''}
+                                        </div>
+                                    </div>
+                                `).join('') : '<p class="text-muted">Sin items</p>'}
+                            </div>
+
+                            ${pedido.notas ? `
+                                <div class="alert alert-warning py-2 mb-3">
+                                    <i class="bi bi-exclamation-triangle"></i> ${pedido.notas}
+                                </div>
+                            ` : ''}
+
+                            <div class="d-grid gap-2">
+                                ${pedido.estado === 'pagado' || pedido.estado === 'en_mesa' ? `
+                                    <button class="btn btn-warning btn-lg" onclick="cambiarEstado(${pedido.id}, 'en_cocina')">
+                                        <i class="bi bi-fire"></i> Empezar a Preparar
+                                    </button>
+                                ` : `
+                                    <button class="btn btn-listo btn-lg text-white" onclick="cambiarEstado(${pedido.id}, 'listo')">
+                                        <i class="bi bi-check-circle"></i> LISTO PARA SERVIR
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function calcularTiempoEspera(fechaCreacion) {
+            const ahora = new Date();
+            const creado = new Date(fechaCreacion);
+            const diff = Math.floor((ahora - creado) / 60000); // minutos
+            return diff > 0 ? diff : 0;
+        }
+
+        async function cambiarEstado(pedidoId, nuevoEstado) {
+            try {
+                const response = await fetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estado: nuevoEstado })
+                });
+
+                if (response.ok) {
+                    cargarPedidos();
+                }
+            } catch (error) {
+                console.error('Error cambiando estado:', error);
+            }
+        }
+
+        async function actualizarStats() {
+            // Pendientes = pagado o en_mesa (esperando que cocina empiece)
+            const pendientes = pedidosActuales.filter(p => p.estado === 'pagado' || p.estado === 'en_mesa').length;
+            // Preparando = en_cocina
+            const preparando = pedidosActuales.filter(p => p.estado === 'en_cocina').length;
+
+            document.getElementById('stat-pendientes').textContent = pendientes;
+            document.getElementById('stat-preparando').textContent = preparando;
+
+            // Obtener listos de hoy
+            try {
+                const response = await fetch(`${API_POS}/pedidos?estado=listo,servido`);
+                const pedidos = await response.json();
+                const hoy = new Date().toDateString();
+                const listosHoy = pedidos.filter(p => new Date(p.created_at).toDateString() === hoy).length;
+                document.getElementById('stat-listos').textContent = listosHoy;
+            } catch (e) {}
+        }
+
+        function reproducirSonido() {
+            try {
+                const audio = document.getElementById('audio-nuevo-pedido');
+                audio.play();
+            } catch (e) {}
+        }
+
+        // Callback para cuando auth-check verifica el usuario
+        window.onAuthVerificado = function(usuario) {
+            // Mostrar enlaces de navegación si es manager
+            if (usuario.rol === 'manager') {
+                const managerNavLinks = document.getElementById('manager-nav-links');
+                if (managerNavLinks) {
+                    managerNavLinks.classList.remove('d-none');
+                }
+            }
+        };
+
+        // Cargar pedidos cada 5 segundos
+        cargarPedidos();
+        setInterval(cargarPedidos, 5000);
+    </script>
+</body>
+</html>

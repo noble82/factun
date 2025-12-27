@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administraci&oacute;n - Inventario y Proveedores</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+        body {
+            background-color: #f8f9fa;
+        }
+        .navbar-admin {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background: white;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+        .sidebar .nav-link {
+            color: #333;
+            padding: 12px 20px;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .nav-link:hover {
+            background: #f8f9fa;
+            border-left-color: var(--secondary-color);
+        }
+        .sidebar .nav-link.active {
+            background: #e3f2fd;
+            border-left-color: var(--secondary-color);
+            font-weight: 600;
+        }
+        .sidebar .nav-link i {
+            width: 24px;
+        }
+        .stat-card {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .stat-card .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+        .stat-card.bg-primary { background: linear-gradient(135deg, #667eea, #764ba2) !important; }
+        .stat-card.bg-success { background: linear-gradient(135deg, #11998e, #38ef7d) !important; }
+        .stat-card.bg-warning { background: linear-gradient(135deg, #f093fb, #f5576c) !important; }
+        .stat-card.bg-info { background: linear-gradient(135deg, #4facfe, #00f2fe) !important; }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            padding: 20px;
+        }
+        .badge-stock-ok { background-color: var(--success-color); }
+        .badge-stock-bajo { background-color: var(--warning-color); }
+        .badge-stock-agotado { background-color: var(--danger-color); }
+
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-admin navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-gear-fill"></i> Panel de Administraci&oacute;n
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <a href="pos.html" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-shop"></i> POS
+                </a>
+                <a href="index.html" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-receipt"></i> Facturaci&oacute;n
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar p-0">
+                <nav class="nav flex-column pt-3">
+                    <a class="nav-link active" href="#" onclick="showSection('dashboard')">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('productos')">
+                        <i class="bi bi-basket"></i> Productos
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('inventario')">
+                        <i class="bi bi-box-seam"></i> Inventario
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('proveedores')">
+                        <i class="bi bi-truck"></i> Proveedores
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('ordenes')">
+                        <i class="bi bi-cart-check"></i> &Oacute;rdenes de Compra
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('movimientos')">
+                        <i class="bi bi-arrow-left-right"></i> Movimientos
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('alertas')">
+                        <i class="bi bi-exclamation-triangle"></i> Alertas Stock
+                    </a>
+                    <hr class="my-2">
+                    <a class="nav-link" href="#" onclick="showSection('clientes')">
+                        <i class="bi bi-person-vcard"></i> Clientes
+                    </a>
+                    <a class="nav-link" href="#" onclick="showSection('usuarios')">
+                        <i class="bi bi-people"></i> Usuarios
+                    </a>
+                    <a class="nav-link text-danger" href="#" onclick="cerrarSesion()">
+                        <i class="bi bi-box-arrow-right"></i> Cerrar Sesi&oacute;n
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Content -->
+            <div class="col-md-10 p-4">
+                <!-- Dashboard -->
+                <div id="section-dashboard" class="content-section active">
+                    <h4 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h4>
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-primary text-white">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-subtitle mb-2">Materias Primas</h6>
+                                        <h3 class="mb-0" id="stat-productos">0</h3>
+                                    </div>
+                                    <i class="bi bi-box stat-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-success text-white">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-subtitle mb-2">Valor Inventario</h6>
+                                        <h3 class="mb-0" id="stat-valor">$0</h3>
+                                    </div>
+                                    <i class="bi bi-cash-stack stat-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-warning text-white">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-subtitle mb-2">Stock Bajo</h6>
+                                        <h3 class="mb-0" id="stat-bajo-stock">0</h3>
+                                    </div>
+                                    <i class="bi bi-exclamation-triangle stat-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-info text-white">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-subtitle mb-2">Proveedores</h6>
+                                        <h3 class="mb-0" id="stat-proveedores">0</h3>
+                                    </div>
+                                    <i class="bi bi-truck stat-icon"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="table-container">
+                                <h6><i class="bi bi-exclamation-circle text-warning"></i> Materias Primas con Stock Bajo</h6>
+                                <div id="dashboard-alertas"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="table-container">
+                                <h6><i class="bi bi-clock-history"></i> &Uacute;ltimos Movimientos</h6>
+                                <div id="dashboard-movimientos"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Productos Terminados -->
+                <div id="section-productos" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-basket"></i> Productos del Men&uacute;</h4>
+                        <div>
+                            <button class="btn btn-outline-primary me-2" onclick="mostrarModalCategoria()">
+                                <i class="bi bi-folder-plus"></i> Nueva Categor&iacute;a
+                            </button>
+                            <button class="btn btn-primary" onclick="mostrarModalProducto()">
+                                <i class="bi bi-plus-circle"></i> Nuevo Producto
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select class="form-select" id="filtro-categoria-prod" onchange="renderProductosTabla()">
+                                    <option value="">Todas las categor&iacute;as</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="filtro-disponible-prod" onchange="renderProductosTabla()">
+                                    <option value="">Todos</option>
+                                    <option value="1">Disponibles</option>
+                                    <option value="0">No disponibles</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" id="buscar-producto" placeholder="Buscar producto..." oninput="renderProductosTabla()">
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-productos">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Descripci&oacute;n</th>
+                                        <th>Categor&iacute;a</th>
+                                        <th>Precio</th>
+                                        <th>Vinculado Inventario</th>
+                                        <th>Disponible</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Categorías -->
+                    <h5 class="mt-4 mb-3"><i class="bi bi-folder"></i> Categor&iacute;as</h5>
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-categorias">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nombre</th>
+                                        <th>Productos</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventario de Materia Prima y Productos -->
+                <div id="section-inventario" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-box-seam"></i> Inventario</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalAjuste()">
+                            <i class="bi bi-plus-circle"></i> Ajuste de Stock
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select class="form-select" id="filtro-tipo-inv" onchange="cargarMateriaPrima()">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="ingrediente">Ingredientes (Materia Prima)</option>
+                                    <option value="producto">Productos de Consumo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="filtro-categoria-inv" onchange="cargarMateriaPrima()">
+                                    <option value="">Todas las categor&iacute;as</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-inventario">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Tipo</th>
+                                        <th>Categor&iacute;a</th>
+                                        <th>Stock Actual</th>
+                                        <th>Stock M&iacute;nimo</th>
+                                        <th>Estado</th>
+                                        <th>Costo Prom.</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proveedores -->
+                <div id="section-proveedores" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-truck"></i> Proveedores</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalProveedor()">
+                            <i class="bi bi-plus-circle"></i> Nuevo Proveedor
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-proveedores">
+                                <thead>
+                                    <tr>
+                                        <th>C&oacute;digo</th>
+                                        <th>Nombre</th>
+                                        <th>Tel&eacute;fono</th>
+                                        <th>Contacto</th>
+                                        <th>Condiciones</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ordenes de Compra -->
+                <div id="section-ordenes" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-cart-check"></i> &Oacute;rdenes de Compra</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalOrden()">
+                            <i class="bi bi-plus-circle"></i> Nueva Orden
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-ordenes">
+                                <thead>
+                                    <tr>
+                                        <th>N&uacute;mero</th>
+                                        <th>Proveedor</th>
+                                        <th>Fecha</th>
+                                        <th>Total</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Movimientos -->
+                <div id="section-movimientos" class="content-section">
+                    <h4 class="mb-4"><i class="bi bi-arrow-left-right"></i> Historial de Movimientos</h4>
+                    <div class="table-container">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select class="form-select" id="filtro-tipo-mov" onchange="cargarMovimientos()">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="entrada">Entradas</option>
+                                    <option value="salida">Salidas</option>
+                                    <option value="ajuste">Ajustes</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-movimientos">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Materia Prima</th>
+                                        <th>Tipo</th>
+                                        <th>Cantidad</th>
+                                        <th>Stock Anterior</th>
+                                        <th>Stock Nuevo</th>
+                                        <th>Motivo</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alertas -->
+                <div id="section-alertas" class="content-section">
+                    <h4 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Alertas de Stock</h4>
+                    <div class="table-container">
+                        <div id="lista-alertas"></div>
+                    </div>
+                </div>
+
+                <!-- Clientes -->
+                <div id="section-clientes" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-person-vcard"></i> Gesti&oacute;n de Clientes</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalCliente()">
+                            <i class="bi bi-person-plus"></i> Nuevo Cliente
+                        </button>
+                    </div>
+
+                    <!-- Estadísticas de clientes -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-clientes-total">0</h5>
+                                    <small>Total Clientes</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-clientes-contribuyentes">0</h5>
+                                    <small>Contribuyentes</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-clientes-consumidores">0</h5>
+                                    <small>Consumidores Finales</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-dark">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-clientes-nuevos">0</h5>
+                                    <small>Nuevos este Mes</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <select class="form-select" id="filtro-tipo-cliente" onchange="cargarClientes()">
+                                <option value="">Todos los tipos</option>
+                                <option value="contribuyente">Contribuyentes</option>
+                                <option value="consumidor_final">Consumidores Finales</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="buscar-cliente"
+                                       placeholder="Buscar por nombre, documento, NRC, tel&eacute;fono..."
+                                       onkeyup="buscarClientes()">
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button class="btn btn-outline-secondary" onclick="exportarClientes()">
+                                <i class="bi bi-download"></i> Exportar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-clientes">
+                                <thead>
+                                    <tr>
+                                        <th>C&oacute;digo</th>
+                                        <th>Nombre</th>
+                                        <th>Documento</th>
+                                        <th>NRC</th>
+                                        <th>Tel&eacute;fono</th>
+                                        <th>Tipo</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usuarios -->
+                <div id="section-usuarios" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-people"></i> Gesti&oacute;n de Usuarios</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalUsuario()">
+                            <i class="bi bi-person-plus"></i> Nuevo Usuario
+                        </button>
+                    </div>
+
+                    <!-- Estadísticas de usuarios -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-2">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-users-total">0</h5>
+                                    <small class="text-muted">Total</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="card bg-purple text-white" style="background: #9b59b6;">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-users-managers">0</h5>
+                                    <small>Managers</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-users-meseros">0</h5>
+                                    <small>Meseros</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-users-cajeros">0</h5>
+                                    <small>Cajeros</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="card bg-warning text-dark">
+                                <div class="card-body text-center py-2">
+                                    <h5 class="mb-0" id="stat-users-cocineros">0</h5>
+                                    <small>Cocineros</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-usuarios">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre</th>
+                                        <th>Rol</th>
+                                        <th>Estado</th>
+                                        <th>&Uacute;ltimo Login</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cliente -->
+    <div class="modal fade" id="modalCliente" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-vcard"></i> <span id="modal-cliente-titulo">Nuevo Cliente</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cliente-id">
+
+                    <!-- Tipo de Cliente -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Cliente *</label>
+                            <select class="form-select" id="cliente-tipo" onchange="toggleCamposContribuyente()">
+                                <option value="consumidor_final">Consumidor Final</option>
+                                <option value="contribuyente">Contribuyente</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Documento</label>
+                            <select class="form-select" id="cliente-tipo-doc">
+                                <option value="DUI">DUI</option>
+                                <option value="NIT">NIT</option>
+                                <option value="Pasaporte">Pasaporte</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Documento y NRC -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">N&uacute;mero de Documento</label>
+                            <input type="text" class="form-control" id="cliente-documento" placeholder="00000000-0">
+                        </div>
+                        <div class="col-md-6" id="campo-nrc">
+                            <label class="form-label">NRC (N&uacute;mero de Registro)</label>
+                            <input type="text" class="form-control" id="cliente-nrc" placeholder="000000-0">
+                        </div>
+                    </div>
+
+                    <!-- Nombre -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre / Raz&oacute;n Social *</label>
+                            <input type="text" class="form-control" id="cliente-nombre" required>
+                        </div>
+                        <div class="col-md-6" id="campo-nombre-comercial">
+                            <label class="form-label">Nombre Comercial</label>
+                            <input type="text" class="form-control" id="cliente-nombre-comercial">
+                        </div>
+                    </div>
+
+                    <!-- Contacto -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tel&eacute;fono</label>
+                            <input type="text" class="form-control" id="cliente-telefono" placeholder="0000-0000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="cliente-email">
+                        </div>
+                    </div>
+
+                    <!-- Dirección -->
+                    <div class="mb-3">
+                        <label class="form-label">Direcci&oacute;n</label>
+                        <input type="text" class="form-control" id="cliente-direccion">
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Departamento</label>
+                            <select class="form-select" id="cliente-departamento">
+                                <option value="">Seleccionar...</option>
+                                <option value="Ahuachapán">Ahuachap&aacute;n</option>
+                                <option value="Cabañas">Caba&ntilde;as</option>
+                                <option value="Chalatenango">Chalatenango</option>
+                                <option value="Cuscatlán">Cuscatl&aacute;n</option>
+                                <option value="La Libertad">La Libertad</option>
+                                <option value="La Paz">La Paz</option>
+                                <option value="La Unión">La Uni&oacute;n</option>
+                                <option value="Morazán">Moraz&aacute;n</option>
+                                <option value="San Miguel">San Miguel</option>
+                                <option value="San Salvador">San Salvador</option>
+                                <option value="San Vicente">San Vicente</option>
+                                <option value="Santa Ana">Santa Ana</option>
+                                <option value="Sonsonate">Sonsonate</option>
+                                <option value="Usulután">Usulut&aacute;n</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Municipio</label>
+                            <input type="text" class="form-control" id="cliente-municipio">
+                        </div>
+                    </div>
+
+                    <!-- Campos solo para Contribuyente -->
+                    <div id="campos-contribuyente" style="display: none;">
+                        <hr>
+                        <h6 class="text-muted mb-3">Datos Fiscales</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">Actividad Econ&oacute;mica</label>
+                                <input type="text" class="form-control" id="cliente-actividad">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Cr&eacute;dito Autorizado ($)</label>
+                                <input type="number" class="form-control" id="cliente-credito" min="0" step="0.01" value="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">D&iacute;as de Cr&eacute;dito</label>
+                                <input type="number" class="form-control" id="cliente-dias-credito" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="cliente-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarCliente()">
+                        <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Usuario -->
+    <div class="modal fade" id="modalUsuario" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person"></i> <span id="modal-usuario-titulo">Nuevo Usuario</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="usuario-id">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre Completo *</label>
+                        <input type="text" class="form-control" id="usuario-nombre" required placeholder="Ej: Juan P&eacute;rez">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Usuario *</label>
+                        <input type="text" class="form-control" id="usuario-username" required placeholder="Ej: jperez">
+                        <small class="text-muted">Solo letras min&uacute;sculas y n&uacute;meros</small>
+                    </div>
+                    <div class="mb-3" id="password-container">
+                        <label class="form-label">Contrase&ntilde;a *</label>
+                        <input type="password" class="form-control" id="usuario-password" placeholder="M&iacute;nimo 4 caracteres">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol *</label>
+                        <select class="form-select" id="usuario-rol" required>
+                            <option value="">Seleccionar rol...</option>
+                            <option value="mesero">Mesero</option>
+                            <option value="cajero">Cajero</option>
+                            <option value="cocinero">Cocinero</option>
+                            <option value="manager">Manager</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="usuario-activo-container" style="display:none;">
+                        <label class="form-label">Estado</label>
+                        <select class="form-select" id="usuario-activo">
+                            <option value="1">Activo</option>
+                            <option value="0">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarUsuario()">
+                        <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reset Password -->
+    <div class="modal fade" id="modalResetPassword" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-key"></i> Restablecer Contrase&ntilde;a</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reset-usuario-id">
+                    <p>Usuario: <strong id="reset-usuario-nombre"></strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">Nueva Contrase&ntilde;a *</label>
+                        <input type="password" class="form-control" id="reset-password" required placeholder="M&iacute;nimo 4 caracteres">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="resetearPassword()">
+                        <i class="bi bi-check-circle"></i> Restablecer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Proveedor -->
+    <div class="modal fade" id="modalProveedor" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-truck"></i> <span id="modal-proveedor-titulo">Nuevo Proveedor</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="proveedor-id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" class="form-control" id="proveedor-nombre" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Nombre Comercial</label>
+                            <input type="text" class="form-control" id="proveedor-nombre-comercial">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">NIT</label>
+                            <input type="text" class="form-control" id="proveedor-nit">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">NRC</label>
+                            <input type="text" class="form-control" id="proveedor-nrc">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Direcci&oacute;n</label>
+                        <input type="text" class="form-control" id="proveedor-direccion">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tel&eacute;fono</label>
+                            <input type="tel" class="form-control" id="proveedor-telefono">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Correo</label>
+                            <input type="email" class="form-control" id="proveedor-correo">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Contacto</label>
+                            <input type="text" class="form-control" id="proveedor-contacto">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tel. Contacto</label>
+                            <input type="tel" class="form-control" id="proveedor-contacto-tel">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Condiciones de Pago</label>
+                            <select class="form-select" id="proveedor-condiciones">
+                                <option value="contado">Contado</option>
+                                <option value="credito">Cr&eacute;dito</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">D&iacute;as de Cr&eacute;dito</label>
+                            <input type="number" class="form-control" id="proveedor-dias-credito" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="proveedor-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarProveedor()">
+                        <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ajuste de Materia Prima -->
+    <div class="modal fade" id="modalAjuste" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title"><i class="bi bi-box-seam"></i> Ajuste de Materia Prima</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Materia Prima *</label>
+                        <select class="form-select" id="ajuste-materia" required></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Movimiento *</label>
+                        <select class="form-select" id="ajuste-tipo" required onchange="toggleCostoField()">
+                            <option value="entrada">Entrada (aumentar stock)</option>
+                            <option value="salida">Salida (reducir stock)</option>
+                            <option value="ajuste">Ajuste (establecer cantidad exacta)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad *</label>
+                        <input type="number" class="form-control" id="ajuste-cantidad" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3" id="ajuste-costo-container">
+                        <label class="form-label">Costo Unitario</label>
+                        <input type="number" class="form-control" id="ajuste-costo" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo</label>
+                        <input type="text" class="form-control" id="ajuste-motivo" placeholder="Ej: Compra directa, Merma, Inventario f&iacute;sico">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="realizarAjuste()">
+                        <i class="bi bi-check-circle"></i> Aplicar Ajuste
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nueva Orden de Compra -->
+    <div class="modal fade" id="modalOrden" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-cart-plus"></i> Nueva Orden de Compra</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Proveedor *</label>
+                            <select class="form-select" id="orden-proveedor" required></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha Esperada de Entrega</label>
+                            <input type="date" class="form-control" id="orden-fecha-esperada">
+                        </div>
+                    </div>
+
+                    <h6>Items de la Orden (Materia Prima)</h6>
+                    <div class="row mb-2">
+                        <div class="col-md-5">
+                            <select class="form-select" id="item-materia">
+                                <option value="">Seleccionar materia prima...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control" id="item-cantidad" placeholder="Cant." min="0.01" step="0.01">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control" id="item-costo" placeholder="Costo" step="0.01" min="0">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100" onclick="agregarItemOrden()">
+                                <i class="bi bi-plus"></i> Agregar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table" id="tabla-items-orden">
+                            <thead>
+                                <tr>
+                                    <th>Materia Prima</th>
+                                    <th>Cantidad</th>
+                                    <th>Costo Unit.</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td id="orden-subtotal">$0.00</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>IVA (13%):</strong></td>
+                                    <td id="orden-iva">$0.00</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>TOTAL:</strong></td>
+                                    <td id="orden-total"><strong>$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" id="orden-notas" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="crearOrdenCompra()">
+                        <i class="bi bi-check-circle"></i> Crear Orden
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recibir Orden -->
+    <div class="modal fade" id="modalRecibir" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-box-arrow-in-down"></i> Recibir Orden de Compra</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="recibir-orden-id">
+                    <div class="table-responsive">
+                        <table class="table" id="tabla-recibir-items">
+                            <thead>
+                                <tr>
+                                    <th>Materia Prima</th>
+                                    <th>Ordenado</th>
+                                    <th>Recibido Prev.</th>
+                                    <th>Recibir Ahora</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info" onclick="procesarRecepcion()">
+                        <i class="bi bi-check-circle"></i> Procesar Recepci&oacute;n
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Producto -->
+    <div class="modal fade" id="modalProducto" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-basket"></i> <span id="modal-producto-titulo">Nuevo Producto</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="producto-id">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Nombre del Producto *</label>
+                            <input type="text" class="form-control" id="producto-nombre" required placeholder="Ej: Pupusa de Queso">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Precio ($) *</label>
+                            <input type="number" class="form-control" id="producto-precio" step="0.01" min="0" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripci&oacute;n</label>
+                        <input type="text" class="form-control" id="producto-descripcion" placeholder="Descripci&oacute;n breve del producto">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Categor&iacute;a *</label>
+                            <select class="form-select" id="producto-categoria" required>
+                                <option value="">Seleccionar categor&iacute;a...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vinculado a Inventario</label>
+                            <select class="form-select" id="producto-materia-prima">
+                                <option value="">Sin vincular (producto preparado)</option>
+                            </select>
+                            <small class="text-muted">Vincula a materia prima para productos de consumo directo (bebidas, etc.)</small>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tiempo Preparaci&oacute;n (min)</label>
+                            <input type="number" class="form-control" id="producto-tiempo" min="0" value="5">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" id="producto-disponible">
+                                <option value="1">Disponible</option>
+                                <option value="0">No disponible</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarProducto()">
+                        <i class="bi bi-check-circle"></i> Guardar Producto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Categoría -->
+    <div class="modal fade" id="modalCategoria" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-folder"></i> <span id="modal-categoria-titulo">Nueva Categor&iacute;a</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="categoria-id">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre de la Categor&iacute;a *</label>
+                        <input type="text" class="form-control" id="categoria-nombre" required placeholder="Ej: Bebidas, Pupusas, Postres">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-info" onclick="guardarCategoria()">
+                        <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="toast-notification" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-bell me-2"></i>
+                <strong class="me-auto" id="toast-title">Notificaci&oacute;n</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message"></div>
+        </div>
+    </div>
+
+    <!-- Modal Historial Cliente -->
+    <div class="modal fade" id="modalHistorialCliente" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-clock-history"></i> Historial de Compras - <span id="historial-cliente-nombre"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Estadísticas del cliente -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white text-center py-2">
+                                <h5 class="mb-0" id="historial-total-pedidos">0</h5>
+                                <small>Total Pedidos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white text-center py-2">
+                                <h5 class="mb-0" id="historial-total-compras">$0.00</h5>
+                                <small>Total Compras</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white text-center py-2">
+                                <h5 class="mb-0" id="historial-promedio">$0.00</h5>
+                                <small>Promedio por Compra</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-secondary text-white text-center py-2">
+                                <h5 class="mb-0" id="historial-ultima-compra">-</h5>
+                                <small>&Uacute;ltima Compra</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Productos favoritos -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <i class="bi bi-star-fill text-warning"></i> Productos Favoritos
+                                </div>
+                                <ul class="list-group list-group-flush" id="historial-productos-favoritos">
+                                    <li class="list-group-item text-muted">Sin datos</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Lista de pedidos -->
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header bg-light d-flex justify-content-between">
+                                    <span><i class="bi bi-receipt"></i> &Uacute;ltimos Pedidos</span>
+                                </div>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Fecha</th>
+                                                <th>Total</th>
+                                                <th>Estado</th>
+                                                <th>Comprobante</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historial-pedidos-tabla">
+                                            <tr><td colspan="5" class="text-center text-muted">Sin pedidos</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cr&eacute;dito Cliente -->
+    <div class="modal fade" id="modalCreditoCliente" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-credit-card"></i> Informaci&oacute;n de Cr&eacute;dito - <span id="credito-cliente-nombre"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Resumen de cr&eacute;dito -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-success text-white text-center py-3">
+                                <h4 class="mb-0" id="credito-autorizado">$0.00</h4>
+                                <small>Cr&eacute;dito Autorizado</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-danger text-white text-center py-3">
+                                <h4 class="mb-0" id="credito-utilizado">$0.00</h4>
+                                <small>Cr&eacute;dito Utilizado</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-info text-white text-center py-3">
+                                <h4 class="mb-0" id="credito-disponible">$0.00</h4>
+                                <small>Cr&eacute;dito Disponible</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de progreso -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Utilizaci&oacute;n de Cr&eacute;dito</span>
+                            <span id="credito-porcentaje">0%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar" id="credito-barra" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Pedidos pendientes de pago -->
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <i class="bi bi-hourglass-split"></i> Pedidos Pendientes de Pago (Cr&eacute;dito)
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pedido #</th>
+                                        <th>Fecha</th>
+                                        <th>Total</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="credito-pedidos-pendientes">
+                                    <tr><td colspan="4" class="text-center text-muted">Sin pedidos pendientes</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="auth-check.js"></script>
+    <script src="admin.js?v=5"></script>
+</body>
+</html>
