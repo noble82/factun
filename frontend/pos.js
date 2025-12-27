@@ -1860,17 +1860,23 @@ document.addEventListener('click', function(e) {
 
 // Toggle del carrito bottom sheet
 function toggleCartSheet() {
+    console.log('toggleCartSheet() llamado');
     const sheet = document.getElementById('cart-sheet');
     const overlay = document.getElementById('cart-sheet-overlay');
+
+    console.log('Sheet encontrado:', !!sheet, 'Overlay encontrado:', !!overlay);
 
     if (sheet && overlay) {
         sheet.classList.toggle('show');
         overlay.classList.toggle('show');
+        console.log('Cart sheet ahora tiene clase show:', sheet.classList.contains('show'));
 
         // Actualizar contenido del carrito móvil
         if (sheet.classList.contains('show')) {
             actualizarCarritoMobile();
         }
+    } else {
+        console.error('No se encontró cart-sheet o cart-sheet-overlay');
     }
 }
 
