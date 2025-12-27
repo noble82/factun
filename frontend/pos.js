@@ -29,6 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tipo-ticket')?.addEventListener('change', toggleDatosCliente);
     document.getElementById('tipo-factura')?.addEventListener('change', toggleDatosCliente);
 
+    // Actualizar botones de crear pedido cuando cambie el nombre del cliente (cajero/mobile)
+    document.getElementById('cliente-nombre-cajero')?.addEventListener('input', () => {
+        renderizarCarritoCajero();
+        actualizarCarritoMobile();
+    });
+    document.getElementById('cliente-nombre-mobile')?.addEventListener('input', () => {
+        actualizarCarritoMobile();
+    });
+
     // Ocultar elementos móviles hasta que se seleccione un rol
     const cartFab = document.getElementById('cart-fab');
     const bottomNav = document.getElementById('bottom-nav');
@@ -84,13 +93,22 @@ window.onAuthVerificado = function(usuario) {
 
 // Activar elementos móviles (FAB, navegación inferior)
 function activarElementosMovil(rol) {
-    console.log('Activando elementos móvil para rol:', rol);
+    console.log('activarElementosMovil() - rol:', rol);
 
-    // Mostrar FAB del carrito para mesero y cajero
+    // Mostrar FAB del carrito para mesero y cajero (forzar display en móvil)
     const cartFab = document.getElementById('cart-fab');
     if (cartFab) {
-        cartFab.style.display = '';
-        console.log('FAB activado');
+        // Verificar si es móvil (ancho <= 768px)
+        const esMobile = window.innerWidth <= 768;
+        if (esMobile && (rol === 'mesero' || rol === 'cajero')) {
+            cartFab.style.display = 'flex';
+            cartFab.style.alignItems = 'center';
+            cartFab.style.justifyContent = 'center';
+            console.log('FAB activado (móvil) - display: flex');
+        } else {
+            cartFab.style.display = '';
+            console.log('FAB en modo desktop o rol no aplica');
+        }
     }
 
     // Actualizar y mostrar navegación inferior
@@ -98,6 +116,10 @@ function activarElementosMovil(rol) {
 
     const bottomNav = document.getElementById('bottom-nav');
     if (bottomNav) {
+        const esMobile = window.innerWidth <= 768;
+        if (esMobile) {
+            bottomNav.style.display = 'block';
+        }
         bottomNav.style.visibility = 'visible';
         console.log('Bottom nav visible');
     }
@@ -133,9 +155,9 @@ function autoSeleccionarRol(user) {
             // Cajero va directo a su panel, sin ver selector
             seleccionarRol('cajero');
             break;
-        case 'cocinero':
-            // Cocinero no tiene acceso a POS, redirigir a cocina
-            window.location.href = 'cocina.html';
+            case 'cocina':
+                // Cocina no tiene acceso a POS, redirigir a cocina
+                window.location.href = 'cocina.html';
             break;
         case 'manager':
             // Manager puede elegir cualquier rol, mostrar selector
@@ -247,14 +269,8 @@ function seleccionarRol(rol) {
             break;
     }
 
-    // Actualizar navegación móvil según el rol
-    actualizarBottomNavPorRol(rol);
-
-    // Mostrar/ocultar FAB del carrito según rol
-    const cartFab = document.getElementById('cart-fab');
-    if (cartFab) {
-        cartFab.style.display = (rol === 'mesero' || rol === 'cajero') ? '' : 'none';
-    }
+    // Activar elementos móviles (FAB y navegación)
+    activarElementosMovil(rol);
 }
 
 function mostrarSelectorRol() {
@@ -867,7 +883,6 @@ function renderizarCarritoCajero() {
 
     if (carritoCajero.length === 0) {
         container.innerHTML = '<p class="text-muted text-center">Selecciona productos del menú</p>';
-        document.getElementById('btn-crear-pedido-cajero').disabled = true;
     } else {
         container.innerHTML = carritoCajero.map(item => `
             <div class="cart-item">
@@ -883,7 +898,10 @@ function renderizarCarritoCajero() {
                 </div>
             </div>
         `).join('');
-        document.getElementById('btn-crear-pedido-cajero').disabled = false;
+        // Habilitar botón crear pedido solo si hay nombre de cliente
+        const btnCrear = document.getElementById('btn-crear-pedido-cajero');
+        const nombreCliente = document.getElementById('cliente-nombre-cajero')?.value?.trim();
+        if (btnCrear) btnCrear.disabled = carritoCajero.length === 0 || !nombreCliente;
     }
 
     // Calcular totales
@@ -2038,7 +2056,15 @@ function actualizarCarritoMobile() {
     if (ivaEl) ivaEl.textContent = `$${iva.toFixed(2)}`;
     if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
 
-    if (btnEnviar) btnEnviar.disabled = false;
+    // Habilitar envío solo si hay items y (si es cajero) existe nombre de cliente
+    let puedeEnviar = carritoActual.length > 0;
+    if (rolActual === 'cajero') {
+        const clienteMobile = document.getElementById('cliente-nombre-mobile')?.value?.trim();
+        const clienteCajero = document.getElementById('cliente-nombre-cajero')?.value?.trim();
+        puedeEnviar = puedeEnviar && (!!clienteMobile || !!clienteCajero);
+    }
+
+    if (btnEnviar) btnEnviar.disabled = !puedeEnviar;
 }
 
 // Modificar cantidad desde móvil
