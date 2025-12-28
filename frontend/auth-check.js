@@ -11,7 +11,8 @@ const ROLES_PERMITIDOS = {
     'index.html': ['manager'],
     'pos.html': ['manager', 'mesero', 'cajero'],
     'cocina.html': ['manager', 'cocinero'],
-    'ticket.html': ['manager', 'cajero']
+    'ticket.html': ['manager', 'cajero'],
+    'reportes.html': ['manager']
 };
 
 // Páginas públicas (no requieren autenticación)
