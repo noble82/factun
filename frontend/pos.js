@@ -468,8 +468,8 @@ function renderizarProductos() {
         <div class="product-card ${!producto.disponible ? 'disabled' : ''}"
              data-producto-id="${producto.id}"
              onclick="window.agregarAlCarrito(${producto.id}); return false;">
-            <div class="fw-bold">${producto.nombre}</div>
-            <small class="text-muted">${producto.descripcion || ''}</small>
+            <div class="fw-bold">${escapeHtml(producto.nombre)}</div>
+            <small class="text-muted">${escapeHtml(producto.descripcion || '')}</small>
             <div class="product-price">$${producto.precio.toFixed(2)}</div>
         </div>
     `).join('');
@@ -703,7 +703,7 @@ function renderizarPedidosServir(pedidos) {
 
     container.innerHTML = pedidos.map(pedido => {
         const esParaLlevar = pedido.tipo_pago === 'anticipado' || !pedido.mesa_id;
-        const nombreCliente = pedido.cliente_nombre || 'Cliente';
+        const nombreCliente = escapeHtml(pedido.cliente_nombre || 'Cliente');
 
         return `
             <div class="pedido-card">
@@ -726,13 +726,13 @@ function renderizarPedidosServir(pedidos) {
                     ` : ''}
                     ${pedido.items.map(item => `
                         <div class="pedido-item">
-                            <span>${item.cantidad}x ${item.producto_nombre}</span>
+                            <span>${item.cantidad}x ${escapeHtml(item.producto_nombre)}</span>
                         </div>
                     `).join('')}
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
                         <strong>Total: $${pedido.total.toFixed(2)}</strong>
-                        <button class="btn btn-info" onclick="marcarServido(${pedido.id}, '${pedido.tipo_pago}')">
+                        <button class="btn btn-info" onclick="marcarServido(${pedido.id}, '${escapeAttribute(pedido.tipo_pago)}')">
                             <i class="bi bi-check2-circle"></i> ${esParaLlevar ? 'Entregar' : 'Marcar Servido'}
                         </button>
                     </div>
@@ -1076,8 +1076,8 @@ async function buscarClienteCredito(texto) {
             resultadosDiv.innerHTML = clientes.slice(0, 5).map(cliente => `
                 <button type="button" class="list-group-item list-group-item-action"
                         onclick="seleccionarClienteCredito(${cliente.id})">
-                    <strong>${cliente.nombre}</strong>
-                    <small class="text-muted d-block">${cliente.numero_documento || 'Sin documento'}</small>
+                    <strong>${escapeHtml(cliente.nombre)}</strong>
+                    <small class="text-muted d-block">${escapeHtml(cliente.numero_documento || 'Sin documento')}</small>
                 </button>
             `).join('');
         } catch (error) {
@@ -2034,11 +2034,11 @@ async function buscarClienteFactura(texto) {
                         onclick="seleccionarClienteFactura(${cliente.id})">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <strong>${cliente.nombre}</strong>
-                            ${cliente.nombre_comercial ? `<br><small class="text-muted">${cliente.nombre_comercial}</small>` : ''}
+                            <strong>${escapeHtml(cliente.nombre)}</strong>
+                            ${cliente.nombre_comercial ? `<br><small class="text-muted">${escapeHtml(cliente.nombre_comercial)}</small>` : ''}
                         </div>
                         <div class="text-end">
-                            <small class="text-muted">${cliente.numero_documento || ''}</small>
+                            <small class="text-muted">${escapeHtml(cliente.numero_documento || '')}</small>
                             <br>
                             <span class="badge ${cliente.tipo_cliente === 'contribuyente' ? 'bg-success' : 'bg-info'} badge-sm">
                                 ${cliente.tipo_cliente === 'contribuyente' ? 'Contrib.' : 'C. Final'}

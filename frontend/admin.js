@@ -282,13 +282,13 @@ function renderProductosTabla() {
 
         return `
             <tr class="${!prod.disponible ? 'table-secondary' : ''}">
-                <td><strong>${prod.nombre}</strong></td>
-                <td><small>${prod.descripcion || '-'}</small></td>
-                <td>${categoria ? categoria.nombre : '-'}</td>
+                <td><strong>${escapeHtml(prod.nombre)}</strong></td>
+                <td><small>${escapeHtml(prod.descripcion || '-')}</small></td>
+                <td>${categoria ? escapeHtml(categoria.nombre) : '-'}</td>
                 <td><strong>$${parseFloat(prod.precio).toFixed(2)}</strong></td>
                 <td>
                     ${materiaPrimaVinculada ?
-                        `<span class="badge bg-info">${materiaPrimaVinculada.nombre}</span>` :
+                        `<span class="badge bg-info">${escapeHtml(materiaPrimaVinculada.nombre)}</span>` :
                         '<span class="text-muted">-</span>'}
                 </td>
                 <td>
@@ -1210,12 +1210,12 @@ function renderAlertas(alertas) {
     container.innerHTML = alertas.map(a => `
         <div class="alert ${a.stock_actual <= 0 ? 'alert-danger' : 'alert-warning'} d-flex justify-content-between align-items-center">
             <div>
-                <strong>${a.nombre}</strong>
+                <strong>${escapeHtml(a.nombre)}</strong>
                 <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'} ms-2">
                     ${a.stock_actual <= 0 ? 'AGOTADO' : 'STOCK BAJO'}
                 </span>
                 <br>
-                <small>Stock actual: ${a.stock_actual} ${a.unidad_medida} | Mínimo: ${a.stock_minimo} ${a.unidad_medida}</small>
+                <small>Stock actual: ${a.stock_actual} ${escapeHtml(a.unidad_medida)} | Mínimo: ${a.stock_minimo} ${escapeHtml(a.unidad_medida)}</small>
             </div>
             <button class="btn btn-sm btn-outline-primary" onclick="ajustarMateria(${a.id})">
                 <i class="bi bi-plus-circle"></i> Reabastecer
