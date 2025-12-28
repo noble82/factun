@@ -94,6 +94,10 @@ def init_db():
             dte_numero_control TEXT,
             dte_json TEXT,
             facturado_at TIMESTAMP,
+            -- Información de pago
+            tipo_comprobante TEXT DEFAULT 'ticket',  -- 'factura' o 'ticket'
+            aplicar_iva BOOLEAN DEFAULT 0,          -- 1 si es factura, 0 si es ticket
+            propina REAL DEFAULT 0,                  -- Propina agregada en pago
             -- Timestamps
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -170,6 +174,18 @@ def init_db():
         cursor.execute('ALTER TABLE pedidos ADD COLUMN facturado_at TIMESTAMP')
     except:
         pass
+    try:
+        cursor.execute('ALTER TABLE pedidos ADD COLUMN tipo_comprobante TEXT DEFAULT "ticket"')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE pedidos ADD COLUMN aplicar_iva BOOLEAN DEFAULT 0')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE pedidos ADD COLUMN propina REAL DEFAULT 0')
+    except:
+        pass
 
     # Tabla de items del pedido
     cursor.execute('''
@@ -195,6 +211,7 @@ def init_db():
             total_ventas REAL DEFAULT 0,
             subtotal_total REAL DEFAULT 0,
             impuesto_total REAL DEFAULT 0,
+            propinas_total REAL DEFAULT 0,
             efectivo REAL DEFAULT 0,
             credito REAL DEFAULT 0,
             cantidad_transacciones INTEGER DEFAULT 0,
@@ -235,6 +252,12 @@ def init_db():
             UNIQUE(fecha_venta, categoria_id)
         )
     ''')
+
+    # Migración: agregar campo propinas_total a ventas_diarias
+    try:
+        cursor.execute('ALTER TABLE ventas_diarias ADD COLUMN propinas_total REAL DEFAULT 0')
+    except:
+        pass
 
     conn.commit()
 
@@ -960,6 +983,63 @@ def actualizar_estado_pedido(id):
 
     return jsonify({'success': True, 'estado': nuevo_estado})
 
+@pos_bp.route('/pedidos/<int:id>/pago', methods=['PUT'])
+@role_required('cajero', 'manager')
+def actualizar_pago_pedido(id):
+    """
+    Actualiza información de pago del pedido
+    Recibe: tipo_comprobante, aplicar_iva, propina
+    """
+    data = request.get_json()
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Obtener pedido actual
+    cursor.execute('SELECT * FROM pedidos WHERE id = ?', (id,))
+    pedido = cursor.fetchone()
+
+    if not pedido:
+        conn.close()
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+
+    tipo_comprobante = data.get('tipo_comprobante', 'ticket')
+    aplicar_iva = data.get('aplicar_iva', 0)
+    propina = data.get('propina', 0)
+
+    # Calcular nuevo total si hay cambios
+    subtotal = pedido['subtotal']
+    impuesto = pedido['impuesto']
+
+    # Si es factura (aplicar_iva=1), agregar IVA (13%) al subtotal
+    # Si es ticket (aplicar_iva=0), solo suma propina al total existente
+    if aplicar_iva and tipo_comprobante == 'factura':
+        impuesto = subtotal * 0.13
+        nuevo_total = subtotal + impuesto + propina
+    else:
+        # Para ticket, el total existente ya no tiene IVA
+        nuevo_total = pedido['total'] + propina
+
+    # Actualizar pedido con información de pago
+    cursor.execute('''
+        UPDATE pedidos
+        SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
+            impuesto = ?, total = ?, updated_at = ?
+        WHERE id = ?
+    ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total,
+          datetime.now().isoformat(), id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'tipo_comprobante': tipo_comprobante,
+        'aplicar_iva': aplicar_iva,
+        'propina': propina,
+        'impuesto': impuesto,
+        'total': nuevo_total
+    })
+
 @pos_bp.route('/pedidos/<int:id>/items', methods=['POST'])
 def agregar_item_pedido(id):
     """Agrega un item a un pedido existente"""
@@ -1211,6 +1291,7 @@ def get_reportes_hoy():
                 COALESCE(SUM(total), 0) as total_ventas,
                 COALESCE(SUM(subtotal), 0) as subtotal_total,
                 COALESCE(SUM(impuesto), 0) as impuesto_total,
+                COALESCE(SUM(propina), 0) as propinas_total,
                 COALESCE(SUM(CASE WHEN tipo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
                 COALESCE(SUM(CASE WHEN tipo_pago = 'credito' THEN total ELSE 0 END), 0) as credito
             FROM pedidos
@@ -1222,8 +1303,9 @@ def get_reportes_hoy():
         total_ventas = float(row[1]) if row[1] else 0.0
         subtotal_total = float(row[2]) if row[2] else 0.0
         impuesto_total = float(row[3]) if row[3] else 0.0
-        efectivo = float(row[4]) if row[4] else 0.0
-        credito = float(row[5]) if row[5] else 0.0
+        propinas_total = float(row[4]) if row[4] else 0.0
+        efectivo = float(row[5]) if row[5] else 0.0
+        credito = float(row[6]) if row[6] else 0.0
 
         pedido_promedio = total_ventas / total_pedidos if total_pedidos > 0 else 0.0
 
@@ -1233,6 +1315,7 @@ def get_reportes_hoy():
             'total_ventas': total_ventas,
             'subtotal_total': subtotal_total,
             'impuesto_total': impuesto_total,
+            'propinas_total': propinas_total,
             'efectivo': efectivo,
             'credito': credito,
             'cantidad_transacciones': total_pedidos,

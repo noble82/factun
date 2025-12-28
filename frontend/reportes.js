@@ -335,6 +335,7 @@ function renderizarTablaDetalleDias(dias) {
                     <th class="text-end">Ventas</th>
                     <th class="text-end">Efectivo</th>
                     <th class="text-end">Crédito</th>
+                    <th class="text-end">Propinas</th>
                     <th class="text-end">Promedio</th>
                 </tr>
             </thead>
@@ -349,6 +350,7 @@ function renderizarTablaDetalleDias(dias) {
                 <td class="text-end font-weight-bold">$${parseFloat(d.total_ventas || 0).toFixed(2)}</td>
                 <td class="text-end">$${parseFloat(d.efectivo || 0).toFixed(2)}</td>
                 <td class="text-end">$${parseFloat(d.credito || 0).toFixed(2)}</td>
+                <td class="text-end"><span class="badge bg-success">$${parseFloat(d.propinas_total || 0).toFixed(2)}</span></td>
                 <td class="text-end">$${parseFloat(d.pedido_promedio || 0).toFixed(2)}</td>
             </tr>
         `;
@@ -378,8 +380,8 @@ function descargarCSV() {
     // Resumen
     const resumen = datosActuales.resumen || {};
     csv += 'RESUMEN GENERAL\n';
-    csv += `Total Pedidos,Total Ventas,Efectivo,Crédito,Promedio Ticket\n`;
-    csv += `${resumen.total_pedidos},$${parseFloat(resumen.total_ventas || 0).toFixed(2)},$${parseFloat(resumen.efectivo || 0).toFixed(2)},$${parseFloat(resumen.credito || 0).toFixed(2)},$${parseFloat(resumen.pedido_promedio_promedio || 0).toFixed(2)}\n\n`;
+    csv += `Total Pedidos,Total Ventas,Efectivo,Crédito,Propinas,Promedio Ticket\n`;
+    csv += `${resumen.total_pedidos},$${parseFloat(resumen.total_ventas || 0).toFixed(2)},$${parseFloat(resumen.efectivo || 0).toFixed(2)},$${parseFloat(resumen.credito || 0).toFixed(2)},$${parseFloat(resumen.propinas_total || 0).toFixed(2)},$${parseFloat(resumen.pedido_promedio || 0).toFixed(2)}\n\n`;
 
     // Top Productos
     csv += 'TOP PRODUCTOS\n';
@@ -399,9 +401,9 @@ function descargarCSV() {
 
     // Detalle Diario
     csv += 'DETALLE DIARIO\n';
-    csv += 'Fecha,Pedidos,Ventas,Efectivo,Crédito,Promedio\n';
+    csv += 'Fecha,Pedidos,Ventas,Efectivo,Crédito,Propinas,Promedio\n';
     (datosActuales.dias || []).forEach(d => {
-        csv += `${d.fecha},${d.total_pedidos},$${parseFloat(d.total_ventas || 0).toFixed(2)},$${parseFloat(d.efectivo || 0).toFixed(2)},$${parseFloat(d.credito || 0).toFixed(2)},$${parseFloat(d.pedido_promedio || 0).toFixed(2)}\n`;
+        csv += `${d.fecha},${d.total_pedidos},$${parseFloat(d.total_ventas || 0).toFixed(2)},$${parseFloat(d.efectivo || 0).toFixed(2)},$${parseFloat(d.credito || 0).toFixed(2)},$${parseFloat(d.propinas_total || 0).toFixed(2)},$${parseFloat(d.pedido_promedio || 0).toFixed(2)}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

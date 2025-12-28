@@ -1289,6 +1289,72 @@ function abrirModalPago(pedidoId, total) {
 
     const modal = new bootstrap.Modal(document.getElementById('modalPago'));
     modal.show();
+
+    // Limpiar propina al abrir modal
+    document.getElementById('propina-monto').value = '';
+    establecerPropina(0);
+
+    // Mostrar/ocultar sección de propina basada en tipo de comprobante
+    toggleSeccionPropina();
+}
+
+// Variable global para almacenar propina actual
+let propinaActual = 0;
+
+function establecerPropina(porcentaje) {
+    const total = pedidoActualPago?.total || 0;
+
+    if (porcentaje === 0) {
+        propinaActual = 0;
+    } else {
+        propinaActual = total * porcentaje;
+    }
+
+    document.getElementById('propina-monto').value = propinaActual.toFixed(2);
+    document.getElementById('propina-display').textContent = `$${propinaActual.toFixed(2)}`;
+    actualizarTotalConPropina();
+}
+
+function actualizarPropinaPersonalizada() {
+    propinaActual = parseFloat(document.getElementById('propina-monto').value) || 0;
+    document.getElementById('propina-display').textContent = `$${propinaActual.toFixed(2)}`;
+    actualizarTotalConPropina();
+}
+
+function actualizarTotalConPropina() {
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value || 'ticket';
+    const total = pedidoActualPago?.total || 0;
+
+    // Si es factura, el IVA se aplicará en el backend
+    // Si es ticket, solo sumamos propina
+    let nuevoTotal = total + propinaActual;
+
+    document.getElementById('detalle-pago').innerHTML = `
+        <h4 class="text-center">Total a cobrar</h4>
+        <p class="text-center text-muted">${tipoComprobante === 'factura' ? 'Factura' : 'Ticket'}</p>
+        <div class="text-center">
+            <small class="text-muted">Subtotal: $${total.toFixed(2)}</small><br>
+            ${tipoComprobante === 'factura' ? `<small class="text-muted">+ IVA 13% (se aplicará)</small><br>` : ''}
+            ${propinaActual > 0 ? `<small class="text-muted">+ Propina: $${propinaActual.toFixed(2)}</small><br>` : ''}
+        </div>
+        <h2 class="text-center text-success mt-2">$${nuevoTotal.toFixed(2)}</h2>
+    `;
+}
+
+function toggleSeccionPropina() {
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value || 'ticket';
+    const seccionPropina = document.getElementById('seccion-propina');
+
+    // Mostrar propina solo si es ticket (no factura)
+    if (tipoComprobante === 'ticket') {
+        seccionPropina.style.display = 'block';
+    } else {
+        seccionPropina.style.display = 'none';
+        propinaActual = 0;
+        document.getElementById('propina-monto').value = '';
+    }
+
+    actualizarTotalConPropina();
 }
 
 function calcularCambio() {
@@ -1316,6 +1382,8 @@ async function confirmarPago() {
     if (!pedidoActualPago) return;
 
     const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value || 'ticket';
+    const aplicarIva = tipoComprobante === 'factura' ? 1 : 0;
 
     if (montoRecibido < pedidoActualPago.total) {
         mostrarNotificacion('Error', 'El monto recibido es insuficiente', 'danger');
@@ -1323,15 +1391,32 @@ async function confirmarPago() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
+        // 1. Actualizar información de pago (propina, tipo_comprobante, IVA)
+        const pagoPut = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/pago`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tipo_comprobante: tipoComprobante,
+                aplicar_iva: aplicarIva,
+                propina: propinaActual
+            })
+        });
+
+        if (!pagoPut.ok) {
+            throw new Error('No se pudo guardar información de pago');
+        }
+
+        // 2. Marcar pedido como pagado
+        const estadoResponse = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ estado: 'pagado' })
         });
 
-        if (response.ok) {
+        if (estadoResponse.ok) {
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
-            mostrarNotificacion('Pago Exitoso', `Pago de $${pedidoActualPago.total.toFixed(2)} procesado correctamente`, 'success');
+            const totalFinal = pedidoActualPago.total + propinaActual;
+            mostrarNotificacion('Pago Exitoso', `Pago de $${totalFinal.toFixed(2)} procesado correctamente`, 'success');
             pedidoActualPago = null;
             cargarPedidosCajero();
             cargarEstadisticas();
@@ -1346,6 +1431,8 @@ async function confirmarPagoSinComprobante() {
     if (!pedidoActualPago) return;
 
     const montoRecibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value || 'ticket';
+    const aplicarIva = 0;  // Sin comprobante = sin IVA
 
     if (montoRecibido < pedidoActualPago.total) {
         mostrarNotificacion('Error', 'El monto recibido es insuficiente', 'danger');
@@ -1353,6 +1440,22 @@ async function confirmarPagoSinComprobante() {
     }
 
     try {
+        // 1. Actualizar información de pago
+        const pagoPut = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/pago`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tipo_comprobante: tipoComprobante,
+                aplicar_iva: aplicarIva,
+                propina: propinaActual
+            })
+        });
+
+        if (!pagoPut.ok) {
+            throw new Error('No se pudo guardar información de pago');
+        }
+
+        // 2. Marcar pedido como pagado
         const response = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1361,7 +1464,8 @@ async function confirmarPagoSinComprobante() {
 
         if (response.ok) {
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
-            mostrarNotificacion('Pago Exitoso', `Pago de $${pedidoActualPago.total.toFixed(2)} procesado sin comprobante`, 'success');
+            const totalFinal = pedidoActualPago.total + propinaActual;
+            mostrarNotificacion('Pago Exitoso', `Pago de $${totalFinal.toFixed(2)} procesado sin comprobante`, 'success');
             limpiarFormularioCliente();
             pedidoActualPago = null;
             cargarPedidosCajero();
@@ -1456,7 +1560,19 @@ async function confirmarPagoConComprobante() {
             }
         }
 
-        // 2. Procesar según método de pago
+        // 2. Actualizar información de pago (propina, tipo_comprobante, IVA)
+        const aplicarIva = tipoComprobante === 'factura' ? 1 : 0;
+        await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/pago`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tipo_comprobante: tipoComprobante,
+                aplicar_iva: aplicarIva,
+                propina: propinaActual
+            })
+        });
+
+        // 3. Procesar según método de pago
         if (esCredito) {
             // Para crédito: el pedido queda como "pendiente_credito" (no pagado aún)
             // Se factura pero no se cierra hasta que paguen
@@ -1486,7 +1602,7 @@ async function confirmarPagoConComprobante() {
             }
         }
 
-        // 3. Generar el comprobante
+        // 4. Generar el comprobante
         const facturaResponse = await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/facturar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1496,7 +1612,7 @@ async function confirmarPagoConComprobante() {
         const facturaResult = await facturaResponse.json();
 
         if (facturaResult.success) {
-            // 4. Cerrar el pedido (para efectivo inmediatamente, para crédito también)
+            // 5. Cerrar el pedido (para efectivo inmediatamente, para crédito también)
             await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },

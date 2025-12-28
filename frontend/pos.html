@@ -1261,16 +1261,41 @@
                         <div class="col-md-6">
                             <h6 class="mb-3"><i class="bi bi-receipt"></i> Tipo de Comprobante</h6>
                             <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked>
+                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked onchange="toggleSeccionPropina()">
                                 <label class="form-check-label" for="tipo-ticket">
                                     <strong>Ticket</strong> - Comprobante simple (no fiscal)
                                 </label>
                             </div>
                             <div class="form-check mb-3">
-                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura">
+                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura" onchange="toggleSeccionPropina()">
                                 <label class="form-check-label" for="tipo-factura">
                                     <strong>Factura Electr&oacute;nica</strong> - DTE (requiere datos)
                                 </label>
+                            </div>
+
+                            <!-- Opción de Propina (solo para ticket/efectivo) -->
+                            <div id="seccion-propina" class="mb-3">
+                                <hr>
+                                <h6 class="mb-2"><i class="bi bi-gift"></i> Propina (Opcional)</h6>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0)">Sin propina</button>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.05)">5%</button>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.10)">10%</button>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.15)">15%</button>
+                                    </div>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="propina-monto" placeholder="Monto personalizado" step="0.01" min="0" onchange="actualizarPropinaPersonalizada()">
+                                </div>
+                                <small class="text-muted d-block mt-1">Propina: <span id="propina-display">$0.00</span></small>
                             </div>
 
                             <!-- Datos del cliente (para factura) -->
