@@ -415,43 +415,143 @@
 
                 <!-- Inventario de Materia Prima y Productos -->
                 <div id="section-inventario" class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4><i class="bi bi-box-seam"></i> Inventario</h4>
-                        <button class="btn btn-primary" onclick="mostrarModalAjuste()">
-                            <i class="bi bi-plus-circle"></i> Ajuste de Stock
-                        </button>
-                    </div>
-                    <div class="table-container">
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <select class="form-select" id="filtro-tipo-inv" onchange="cargarMateriaPrima()">
-                                    <option value="">Todos los tipos</option>
-                                    <option value="ingrediente">Ingredientes (Materia Prima)</option>
-                                    <option value="producto">Productos de Consumo</option>
-                                </select>
+                    <h4 class="mb-4"><i class="bi bi-box-seam"></i> Inventario</h4>
+
+                    <!-- Tabs para Inventario y Extracciones -->
+                    <ul class="nav nav-tabs mb-4" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-materiaprima" data-bs-toggle="tab" data-bs-target="#content-materiaprima" type="button" role="tab">
+                                <i class="bi bi-box"></i> Materia Prima
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-extracciones" data-bs-toggle="tab" data-bs-target="#content-extracciones" type="button" role="tab">
+                                <i class="bi bi-bag-check"></i> Extracciones del Día
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Tab: Materia Prima -->
+                        <div id="content-materiaprima" class="tab-pane fade show active" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5>Gestión de Materia Prima</h5>
+                                <button class="btn btn-primary btn-sm" onclick="mostrarModalAjuste()">
+                                    <i class="bi bi-plus-circle"></i> Ajuste de Stock
+                                </button>
                             </div>
-                            <div class="col-md-3">
-                                <select class="form-select" id="filtro-categoria-inv" onchange="cargarMateriaPrima()">
-                                    <option value="">Todas las categor&iacute;as</option>
-                                </select>
+                            <div class="table-container">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <select class="form-select form-select-sm" id="filtro-tipo-inv" onchange="cargarMateriaPrima()">
+                                            <option value="">Todos los tipos</option>
+                                            <option value="ingrediente">Ingredientes (Materia Prima)</option>
+                                            <option value="producto">Productos de Consumo</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select form-select-sm" id="filtro-categoria-inv" onchange="cargarMateriaPrima()">
+                                            <option value="">Todas las categor&iacute;as</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm" id="tabla-inventario">
+                                        <thead>
+                                            <tr>
+                                                <th>Nombre</th>
+                                                <th>Tipo</th>
+                                                <th>Categor&iacute;a</th>
+                                                <th>Stock Actual</th>
+                                                <th>Stock M&iacute;nimo</th>
+                                                <th>Estado</th>
+                                                <th>Costo Prom.</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="tabla-inventario">
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Tipo</th>
-                                        <th>Categor&iacute;a</th>
-                                        <th>Stock Actual</th>
-                                        <th>Stock M&iacute;nimo</th>
-                                        <th>Estado</th>
-                                        <th>Costo Prom.</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+
+                        <!-- Tab: Extracciones -->
+                        <div id="content-extracciones" class="tab-pane fade" role="tabpanel">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label form-label-sm">Fecha a visualizar:</label>
+                                    <input type="date" id="fechaFiltroExtracciones" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label form-label-sm">&nbsp;</label>
+                                    <button class="btn btn-primary btn-sm w-100" onclick="cargarExtraccionesAdmin()">
+                                        <i class="bi bi-search"></i> Cargar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Formulario de Nueva Extracción -->
+                            <div class="table-container mb-4">
+                                <h5 class="mb-3"><i class="bi bi-plus-circle"></i> Registrar Nueva Extracción</h5>
+                                <form id="formularioExtraccionAdmin" onsubmit="registrarExtraccionAdmin(event)">
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <label class="form-label form-label-sm">Materia Prima *</label>
+                                            <select id="materiaPrimaIdAdmin" class="form-select form-select-sm" required onchange="actualizarPreviewStockAdmin()">
+                                                <option value="">-- Seleccionar --</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label form-label-sm">Cantidad *</label>
+                                            <input type="number" id="cantidadExtraidaAdmin" class="form-control form-control-sm" step="0.01" min="0.01" required onchange="actualizarPreviewStockAdmin()">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label form-label-sm">Unidad</label>
+                                            <input type="text" id="unidadMedidaAdmin" class="form-control form-control-sm" readonly>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label form-label-sm">Motivo *</label>
+                                            <select id="motivoAdmin" class="form-select form-select-sm" required>
+                                                <option value="">-- Seleccionar --</option>
+                                                <option value="Elaboración pupusas">Elaboración pupusas</option>
+                                                <option value="Elaboración bebidas preparadas">Bebidas preparadas</option>
+                                                <option value="Preparación salsas">Preparación salsas</option>
+                                                <option value="Preparación chocolate">Preparación chocolate</option>
+                                                <option value="Ajuste de stock">Ajuste de stock</option>
+                                                <option value="Otra">Otra</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                                <i class="bi bi-check-circle"></i> Registrar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-md-9">
+                                            <label class="form-label form-label-sm">Descripción (opcional)</label>
+                                            <input type="text" id="descripcionAdmin" class="form-control form-control-sm" placeholder="Detalles adicionales...">
+                                        </div>
+                                    </div>
+                                </form>
+
+                                <!-- Stock Preview -->
+                                <div id="stockPreviewAdmin" class="alert alert-info mt-3 d-none" role="alert">
+                                    <div class="row">
+                                        <div class="col-md-4"><strong>Stock Actual:</strong> <span id="stockActualAdmin">-</span></div>
+                                        <div class="col-md-4"><strong>A Extraer:</strong> <span id="aExtraerAdmin">-</span></div>
+                                        <div class="col-md-4"><strong>Stock Después:</strong> <span id="stockDespuesAdmin" class="fw-bold">-</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tabla de Extracciones -->
+                            <div class="table-container">
+                                <h5 class="mb-3"><i class="bi bi-list-check"></i> Extracciones del Día</h5>
+                                <div id="tablaExtraccionesContainer" class="table-responsive">
+                                    <p class="text-muted">Cargando...</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
