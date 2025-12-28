@@ -146,11 +146,7 @@ function showResult(data, targetId, type) {
     `;
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Nota: escapeHtml() está centralizada en utils.js
 
 function showAlert(message, type, targetId) {
     const resultDiv = document.getElementById(targetId);

@@ -3,7 +3,6 @@ Módulo POS para Pupusería
 Sistema de punto de venta con flujos para Mesero, Cajero y Cocina
 """
 
-import sqlite3
 import os
 from datetime import datetime
 from flask import Blueprint, request, jsonify
@@ -11,16 +10,9 @@ from auth import role_required
 import json
 from facturacion import GeneradorDTE, ControlCorrelativo
 from inventario import descontar_stock_pedido, inicializar_inventario_productos
+from database import get_db
 
 pos_bp = Blueprint('pos', __name__)
-
-DB_PATH = os.path.join(os.path.dirname(__file__), 'pos.db')
-
-def get_db():
-    """Obtiene conexión a la base de datos"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def init_db():
     """Inicializa la base de datos con las tablas necesarias"""
@@ -710,6 +702,43 @@ def update_mesa(id):
     conn.close()
     return jsonify({'success': True})
 
+# ============ HELPER FUNCTIONS ============
+
+def _cargar_items_para_pedidos(cursor, pedido_ids):
+    """
+    Carga todos los items para un conjunto de pedidos en una sola query.
+    Evita el problema N+1 usando WHERE IN en lugar de un loop.
+
+    Args:
+        cursor: Cursor de base de datos
+        pedido_ids: Lista de IDs de pedidos
+
+    Returns:
+        Diccionario con estructura {pedido_id: [items]}
+    """
+    if not pedido_ids:
+        return {}
+
+    placeholders = ','.join(['?' for _ in pedido_ids])
+    cursor.execute(f'''
+        SELECT pi.*, pr.nombre as producto_nombre
+        FROM pedido_items pi
+        JOIN productos pr ON pi.producto_id = pr.id
+        WHERE pi.pedido_id IN ({placeholders})
+        ORDER BY pi.pedido_id, pi.id
+    ''', pedido_ids)
+
+    # Agrupar items por pedido_id
+    items_por_pedido = {}
+    for row in cursor.fetchall():
+        row_dict = dict(row)
+        pedido_id = row_dict['pedido_id']
+        if pedido_id not in items_por_pedido:
+            items_por_pedido[pedido_id] = []
+        items_por_pedido[pedido_id].append(row_dict)
+
+    return items_por_pedido
+
 # ============ ENDPOINTS DE PEDIDOS ============
 
 @pos_bp.route('/pedidos', methods=['GET'])
@@ -741,15 +770,13 @@ def get_pedidos():
 
     pedidos = [dict(row) for row in cursor.fetchall()]
 
-    # Agregar items a cada pedido
+    # Cargar todos los items en una sola query (evitar N+1)
+    pedido_ids = [p['id'] for p in pedidos]
+    items_por_pedido = _cargar_items_para_pedidos(cursor, pedido_ids)
+
+    # Asignar items a cada pedido
     for pedido in pedidos:
-        cursor.execute('''
-            SELECT pi.*, pr.nombre as producto_nombre
-            FROM pedido_items pi
-            JOIN productos pr ON pi.producto_id = pr.id
-            WHERE pi.pedido_id = ?
-        ''', (pedido['id'],))
-        pedido['items'] = [dict(row) for row in cursor.fetchall()]
+        pedido['items'] = items_por_pedido.get(pedido['id'], [])
 
     conn.close()
     return jsonify(pedidos)
@@ -1012,14 +1039,13 @@ def get_pedidos_cocina():
 
     pedidos = [dict(row) for row in cursor.fetchall()]
 
+    # Cargar todos los items en una sola query (evitar N+1)
+    pedido_ids = [p['id'] for p in pedidos]
+    items_por_pedido = _cargar_items_para_pedidos(cursor, pedido_ids)
+
+    # Asignar items a cada pedido
     for pedido in pedidos:
-        cursor.execute('''
-            SELECT pi.*, pr.nombre as producto_nombre
-            FROM pedido_items pi
-            JOIN productos pr ON pi.producto_id = pr.id
-            WHERE pi.pedido_id = ?
-        ''', (pedido['id'],))
-        pedido['items'] = [dict(row) for row in cursor.fetchall()]
+        pedido['items'] = items_por_pedido.get(pedido['id'], [])
 
     conn.close()
     return jsonify(pedidos)
@@ -1047,14 +1073,13 @@ def get_pedidos_cajero():
 
     pedidos = [dict(row) for row in cursor.fetchall()]
 
+    # Cargar todos los items en una sola query (evitar N+1)
+    pedido_ids = [p['id'] for p in pedidos]
+    items_por_pedido = _cargar_items_para_pedidos(cursor, pedido_ids)
+
+    # Asignar items a cada pedido
     for pedido in pedidos:
-        cursor.execute('''
-            SELECT pi.*, pr.nombre as producto_nombre
-            FROM pedido_items pi
-            JOIN productos pr ON pi.producto_id = pr.id
-            WHERE pi.pedido_id = ?
-        ''', (pedido['id'],))
-        pedido['items'] = [dict(row) for row in cursor.fetchall()]
+        pedido['items'] = items_por_pedido.get(pedido['id'], [])
 
     conn.close()
     return jsonify(pedidos)
@@ -1076,14 +1101,13 @@ def get_pedidos_mesero():
 
     pedidos = [dict(row) for row in cursor.fetchall()]
 
+    # Cargar todos los items en una sola query (evitar N+1)
+    pedido_ids = [p['id'] for p in pedidos]
+    items_por_pedido = _cargar_items_para_pedidos(cursor, pedido_ids)
+
+    # Asignar items a cada pedido
     for pedido in pedidos:
-        cursor.execute('''
-            SELECT pi.*, pr.nombre as producto_nombre
-            FROM pedido_items pi
-            JOIN productos pr ON pi.producto_id = pr.id
-            WHERE pi.pedido_id = ?
-        ''', (pedido['id'],))
-        pedido['items'] = [dict(row) for row in cursor.fetchall()]
+        pedido['items'] = items_por_pedido.get(pedido['id'], [])
 
     conn.close()
     return jsonify(pedidos)

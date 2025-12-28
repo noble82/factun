@@ -4,18 +4,10 @@ Sistema de Facturación - El Salvador
 """
 
 from flask import Blueprint, request, jsonify
-import sqlite3
 from datetime import datetime
+from database import get_db
 
 clientes_bp = Blueprint('clientes', __name__)
-
-DB_PATH = 'pos.db'
-
-def get_db():
-    """Obtiene conexión a la base de datos"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def init_db():
     """Inicializa la tabla de clientes"""

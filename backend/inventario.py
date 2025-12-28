@@ -3,22 +3,13 @@ Módulo de Inventario de Materia Prima y Proveedores para POS
 Gestión de ingredientes, recetas y órdenes de compra
 """
 
-import sqlite3
 import os
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from auth import role_required
+from database import get_db
 
 inventario_bp = Blueprint('inventario', __name__)
-
-DB_PATH = os.path.join(os.path.dirname(__file__), 'pos.db')
-
-
-def get_db():
-    """Obtiene conexión a la base de datos"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def init_inventario_db():

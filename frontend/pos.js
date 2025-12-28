@@ -1,18 +1,8 @@
 /**
  * POS Pupusería - Sistema de Punto de Venta
  * Maneja los flujos de Mesero, Cajero y Cocina
+ * Nota: Funciones compartidas (escapeHtml, getAuthToken, etc) están en utils.js
  */
-
-// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
 
 const API_BASE = '/api/pos';
 const API_CLIENTES = '/api/clientes';
@@ -1879,24 +1869,7 @@ async function marcarListo(pedidoId) {
 }
 
 // ============ UTILIDADES ============
-
-function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
-    const toast = document.getElementById('toast-notification');
-    const toastTitle = document.getElementById('toast-title');
-    const toastMessage = document.getElementById('toast-message');
-
-    toastTitle.textContent = titulo;
-    toastMessage.textContent = mensaje;
-
-    // Cambiar color según tipo
-    toast.className = 'toast';
-    if (tipo === 'success') toast.classList.add('bg-success', 'text-white');
-    else if (tipo === 'danger') toast.classList.add('bg-danger', 'text-white');
-    else if (tipo === 'warning') toast.classList.add('bg-warning');
-
-    const bsToast = bootstrap.Toast.getOrCreateInstance(toast);
-    bsToast.show();
-}
+// Nota: mostrarNotificacion() está centralizada en utils.js
 
 // Reproducir sonido de notificación (opcional)
 function playNotificationSound() {

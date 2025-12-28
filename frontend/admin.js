@@ -1,18 +1,8 @@
 /**
  * Panel de Administración - Inventario y Proveedores
  * Sistema de Materia Prima para Pupusería
+ * Nota: Funciones compartidas (escapeHtml, mostrarNotificacion, etc) están en utils.js
  */
-
-// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
-function escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
 
 const API_INV = '/api/inventario';
 const API_POS = '/api/pos';
@@ -1236,45 +1226,14 @@ function renderAlertas(alertas) {
 
 // ============ UTILIDADES ============
 
-function formatDateTime(dateStr) {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
-    const toast = document.getElementById('toast-notification');
-    const toastTitle = document.getElementById('toast-title');
-    const toastMessage = document.getElementById('toast-message');
-
-    toastTitle.textContent = titulo;
-    toastMessage.textContent = mensaje;
-
-    toast.className = 'toast';
-    if (tipo === 'success') toast.classList.add('bg-success', 'text-white');
-    else if (tipo === 'danger') toast.classList.add('bg-danger', 'text-white');
-    else if (tipo === 'warning') toast.classList.add('bg-warning');
-
-    const bsToast = bootstrap.Toast.getOrCreateInstance(toast);
-    bsToast.show();
-}
+// Nota: formatDateTime() y mostrarNotificacion() están centralizadas en utils.js
 
 // ============ USUARIOS ============
 
 const API_AUTH = '/api/auth';
 let usuarios = [];
 
-function getAuthToken() {
-    return localStorage.getItem('auth_token');
-}
-
-function getAuthHeaders() {
-    const token = getAuthToken();
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
-    };
-}
+// Nota: getAuthToken() y getAuthHeaders() están en utils.js
 
 async function cargarUsuarios() {
     try {

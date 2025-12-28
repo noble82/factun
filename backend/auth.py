@@ -4,20 +4,13 @@ Maneja usuarios, roles y sesiones
 """
 
 from flask import Blueprint, request, jsonify, session
-import sqlite3
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+from database import get_db_inventory as get_db
 
 auth_bp = Blueprint('auth', __name__)
-
-DATABASE = 'pos_database.db'
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def hash_password(password, salt=None):
     """Hash password with salt"""
