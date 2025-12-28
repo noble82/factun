@@ -4,6 +4,7 @@ Gestión de ingredientes, recetas y órdenes de compra
 """
 
 import os
+import sqlite3
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from auth import role_required
