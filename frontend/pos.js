@@ -3,6 +3,17 @@
  * Maneja los flujos de Mesero, Cajero y Cocina
  */
 
+// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 const API_BASE = '/api/pos';
 const API_CLIENTES = '/api/clientes';
 let rolActual = null;

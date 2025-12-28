@@ -7,105 +7,49 @@ let graficoTendencia = null;
 let graficoMetodos = null;
 
 // Inicializar cuando carga la página
-document.addEventListener('DOMContentLoaded', async () => {
-    await verificarAutenticacion();
-    if (!redirigiendo) {  // Solo continuar si no se está redirigiendo
-        inicializarFiltros();
-        cargarReportes();
-    }
-});
-
-let redirigiendo = false;
-
-// Verificar autenticación y rol
-async function verificarAutenticacion() {
-    try {
-        // Obtener usuario del localStorage directamente
-        const userStr = localStorage.getItem('user');
-        const token = localStorage.getItem('auth_token');
-
-        // Si no hay usuario ni token, ir a login
-        if (!userStr || !token) {
-            window.location.href = 'login.html';
-            redirigiendo = true;
-            return;
-        }
-
-        let user = null;
-        try {
-            user = JSON.parse(userStr);
-        } catch (e) {
-            console.error('Error parsing user from localStorage:', e);
-            window.location.href = 'login.html';
-            redirigiendo = true;
-            return;
-        }
-
-        // Validar que el usuario tenga la estructura esperada
-        if (!user || !user.rol) {
-            // Intentar verificar sesión con el servidor
-            try {
-                const response = await fetch('/api/auth/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    user = await response.json();
-                    localStorage.setItem('user', JSON.stringify(user));
-                } else {
-                    // Token inválido
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user');
-                    window.location.href = 'login.html';
-                    redirigiendo = true;
-                    return;
-                }
-            } catch (error) {
-                console.error('Error verificando sesión:', error);
-                window.location.href = 'login.html';
-                redirigiendo = true;
-                return;
-            }
-        }
-
-        // Solo managers pueden ver reportes detallados
-        if (user.rol !== 'manager') {
-            redirigiendo = true;
-            const container = document.querySelector('.container-fluid');
-            if (container) {
-                container.innerHTML = `
-                    <div style="padding: 3rem; max-width: 600px; margin: 4rem auto;">
-                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                            <h4 class="alert-heading">
-                                <i class="bi bi-lock"></i> Acceso Restringido
-                            </h4>
-                            <p class="mb-0">
-                                Los reportes detallados están disponibles solo para <strong>managers</strong>.
-                            </p>
-                            <hr>
-                            <p>Tu rol actual: <strong class="text-uppercase">${user.rol}</strong></p>
-                            <small class="text-muted">
-                                Si necesitas acceso a reportes, contacta a un administrador para cambiar tu rol.
-                            </small>
-                            <hr>
-                            <p class="mb-0 text-muted">
-                                Serás redirigido a la página principal en 5 segundos...
-                            </p>
-                        </div>
+// auth-check.js ya verifica autenticación, este callback se ejecuta después de esa verificación
+window.onAuthVerificado = function(usuario) {
+    // Verificar que el usuario sea manager (reportes son solo para managers)
+    if (usuario.rol !== 'manager') {
+        const container = document.querySelector('.container-fluid');
+        if (container) {
+            container.innerHTML = `
+                <div style="padding: 3rem; max-width: 600px; margin: 4rem auto;">
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <h4 class="alert-heading">
+                            <i class="bi bi-lock"></i> Acceso Restringido
+                        </h4>
+                        <p class="mb-0">
+                            Los reportes detallados están disponibles solo para <strong>managers</strong>.
+                        </p>
+                        <hr>
+                        <p>Tu rol actual: <strong class="text-uppercase">${usuario.rol}</strong></p>
+                        <small class="text-muted">
+                            Si necesitas acceso a reportes, contacta a un administrador para cambiar tu rol.
+                        </small>
+                        <hr>
+                        <p class="mb-0 text-muted">
+                            Serás redirigido a la página principal en 5 segundos...
+                        </p>
                     </div>
-                `;
-            }
-            setTimeout(() => {
-                window.location.href = 'admin.html';
-            }, 5000);
-            return;
+                </div>
+            `;
         }
-    } catch (error) {
-        console.error('Error en verificarAutenticacion:', error);
-        window.location.href = 'login.html';
-        redirigiendo = true;
+        setTimeout(() => {
+            window.location.href = 'admin.html';
+        }, 5000);
+        return;
     }
-}
+
+    // Si es manager, inicializar la página
+    inicializarFiltros();
+    cargarReportes();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    // La autenticación se verifica en auth-check.js
+    // Este script solo espera el callback onAuthVerificado
+});
 
 // Inicializar filtros con fechas por defecto
 function inicializarFiltros() {

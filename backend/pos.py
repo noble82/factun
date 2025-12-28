@@ -478,6 +478,7 @@ def get_producto(id):
 
 
 @pos_bp.route('/productos/<int:id>', methods=['PUT'])
+@role_required('manager')
 def update_producto(id):
     """Actualiza un producto completo"""
     data = request.get_json()
@@ -517,6 +518,7 @@ def update_producto(id):
 
 
 @pos_bp.route('/productos', methods=['POST'])
+@role_required('manager')
 def crear_producto():
     """Crea un nuevo producto"""
     data = request.get_json()
@@ -555,6 +557,7 @@ def crear_producto():
 
 
 @pos_bp.route('/productos/<int:id>', methods=['DELETE'])
+@role_required('manager')
 def eliminar_producto(id):
     """Elimina un producto (o lo marca como no disponible)"""
     conn = get_db()
@@ -599,6 +602,7 @@ def get_categorias():
 
 
 @pos_bp.route('/categorias', methods=['POST'])
+@role_required('manager')
 def crear_categoria():
     """Crea una nueva categoría"""
     data = request.get_json()
@@ -652,6 +656,7 @@ def actualizar_categoria(id):
 
 
 @pos_bp.route('/categorias/<int:id>', methods=['DELETE'])
+@role_required('manager')
 def eliminar_categoria(id):
     """Elimina una categoría si no tiene productos"""
     conn = get_db()
@@ -675,6 +680,7 @@ def eliminar_categoria(id):
 # ============ ENDPOINTS DE MESAS ============
 
 @pos_bp.route('/mesas', methods=['GET'])
+@role_required('mesero', 'cajero', 'manager')
 def get_mesas():
     """Obtiene todas las mesas con su estado"""
     conn = get_db()
@@ -690,6 +696,7 @@ def get_mesas():
     return jsonify(mesas)
 
 @pos_bp.route('/mesas/<int:id>', methods=['PUT'])
+@role_required('manager')
 def update_mesa(id):
     """Actualiza estado de una mesa"""
     data = request.get_json()
@@ -706,6 +713,7 @@ def update_mesa(id):
 # ============ ENDPOINTS DE PEDIDOS ============
 
 @pos_bp.route('/pedidos', methods=['GET'])
+@role_required('manager', 'mesero', 'cocinero')
 def get_pedidos():
     """Obtiene pedidos filtrados por estado"""
     estado = request.args.get('estado')
@@ -747,6 +755,7 @@ def get_pedidos():
     return jsonify(pedidos)
 
 @pos_bp.route('/pedidos/<int:id>', methods=['GET'])
+@role_required('manager', 'mesero', 'cocinero')
 def get_pedido(id):
     """Obtiene un pedido específico con sus items"""
     conn = get_db()
@@ -778,6 +787,7 @@ def get_pedido(id):
     return jsonify(pedido)
 
 @pos_bp.route('/pedidos', methods=['POST'])
+@role_required('mesero', 'cajero', 'manager')
 def crear_pedido():
     """
     Crea un nuevo pedido
@@ -852,6 +862,7 @@ def crear_pedido():
     })
 
 @pos_bp.route('/pedidos/<int:id>/estado', methods=['PUT'])
+@role_required('mesero', 'cocinero', 'cajero', 'manager')
 def actualizar_estado_pedido(id):
     """
     Actualiza el estado de un pedido
@@ -979,6 +990,7 @@ def agregar_item_pedido(id):
 # ============ ENDPOINTS ESPECÍFICOS POR ROL ============
 
 @pos_bp.route('/cocina/pedidos', methods=['GET'])
+@role_required('cocinero', 'manager')
 def get_pedidos_cocina():
     """Obtiene pedidos para la cocina (pagados, en_mesa o en_cocina)"""
     conn = get_db()
@@ -1013,6 +1025,7 @@ def get_pedidos_cocina():
     return jsonify(pedidos)
 
 @pos_bp.route('/cajero/pedidos', methods=['GET'])
+@role_required('cajero', 'manager')
 def get_pedidos_cajero():
     """Obtiene pedidos pendientes de pago:
     - pendiente_pago: pedidos anticipados esperando pago antes de cocina
@@ -1047,6 +1060,7 @@ def get_pedidos_cajero():
     return jsonify(pedidos)
 
 @pos_bp.route('/mesero/pedidos', methods=['GET'])
+@role_required('mesero', 'manager')
 def get_pedidos_mesero():
     """Obtiene pedidos listos para servir"""
     conn = get_db()
@@ -1077,6 +1091,7 @@ def get_pedidos_mesero():
 # ============ ESTADÍSTICAS ============
 
 @pos_bp.route('/estadisticas/hoy', methods=['GET'])
+@role_required('manager', 'cajero')
 def get_estadisticas_hoy():
     """Obtiene estadísticas del día"""
     conn = get_db()

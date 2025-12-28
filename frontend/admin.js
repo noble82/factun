@@ -3,6 +3,17 @@
  * Sistema de Materia Prima para Pupusería
  */
 
+// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 const API_INV = '/api/inventario';
 const API_POS = '/api/pos';
 
@@ -157,10 +168,10 @@ function renderDashboardAlertas(alertas) {
             <tbody>
                 ${alertas.map(a => `
                     <tr>
-                        <td>${a.nombre}</td>
+                        <td>${escapeHtml(a.nombre)}</td>
                         <td>
                             <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'}">
-                                ${a.stock_actual} ${a.unidad_medida} / ${a.stock_minimo}
+                                ${escapeHtml(String(a.stock_actual))} ${escapeHtml(a.unidad_medida)} / ${escapeHtml(String(a.stock_minimo))}
                             </span>
                         </td>
                     </tr>
@@ -183,11 +194,11 @@ function renderDashboardMovimientos(movimientos) {
             <tbody>
                 ${movimientos.map(m => `
                     <tr>
-                        <td><small>${formatDateTime(m.created_at)}</small></td>
-                        <td>${m.materia_nombre}</td>
+                        <td><small>${escapeHtml(formatDateTime(m.created_at))}</small></td>
+                        <td>${escapeHtml(m.materia_nombre)}</td>
                         <td>
                             <span class="badge ${m.tipo === 'entrada' ? 'bg-success' : m.tipo === 'salida' ? 'bg-danger' : 'bg-secondary'}">
-                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${m.cantidad}
+                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${escapeHtml(String(m.cantidad))}
                             </span>
                         </td>
                     </tr>
