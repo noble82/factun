@@ -34,17 +34,30 @@ async function verificarAutenticacion() {
         const container = document.querySelector('.container-fluid');
         if (container) {
             container.innerHTML = `
-                <div class="alert alert-danger" role="alert" style="margin: 2rem;">
-                    <h4 class="alert-heading">Acceso Denegado</h4>
-                    <p>Solo los managers pueden acceder a los reportes detallados.</p>
-                    <hr>
-                    <p class="mb-0">Tu rol es: <strong>${user.rol}</strong></p>
+                <div style="padding: 3rem; max-width: 600px; margin: 4rem auto;">
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <h4 class="alert-heading">
+                            <i class="bi bi-lock"></i> Acceso Restringido
+                        </h4>
+                        <p class="mb-0">
+                            Los reportes detallados están disponibles solo para <strong>managers</strong>.
+                        </p>
+                        <hr>
+                        <p>Tu rol actual: <strong class="text-uppercase">${user.rol}</strong></p>
+                        <small class="text-muted">
+                            Si necesitas acceso a reportes, contacta a un administrador para cambiar tu rol.
+                        </small>
+                        <hr>
+                        <p class="mb-0 text-muted">
+                            Serás redirigido a la página principal en 5 segundos...
+                        </p>
+                    </div>
                 </div>
             `;
         }
         setTimeout(() => {
             window.location.href = 'admin.html';
-        }, 3000);
+        }, 5000);
         return;
     }
 }

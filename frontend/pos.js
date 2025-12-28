@@ -768,6 +768,9 @@ let carritoCajero = [];
 let categoriaActivaCajero = null;
 
 async function cargarDatosCajero() {
+    // Verificar si el usuario es manager para mostrar botón de reportes detallados
+    verificarPermisosReportes();
+
     await Promise.all([
         cargarPedidosCajero(),
         cargarEstadisticas(),
@@ -776,6 +779,21 @@ async function cargarDatosCajero() {
         cargarCreditosPendientes(),
         cargarReportesRapidos()
     ]);
+}
+
+// Mostrar botón de reportes detallados solo si es manager
+function verificarPermisosReportes() {
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    const botonReportes = document.getElementById('boton-reportes-detallados');
+    if (!botonReportes) return;
+
+    if (user && user.rol === 'manager') {
+        botonReportes.style.display = 'block';
+    } else {
+        botonReportes.style.display = 'none';
+    }
 }
 
 // Cargar categorías para el cajero
