@@ -88,6 +88,7 @@ window.onAuthVerificado = function(usuario) {
             console.error('Error cargando datos cajero:', err);
         });
         iniciarActualizacionCajero();
+        iniciarActualizacionReportes();
 
         // Activar navegación móvil y FAB inmediatamente
         activarElementosMovil('cajero');
@@ -287,6 +288,7 @@ function seleccionarRol(rol) {
         case 'cajero':
             cargarDatosCajero();
             iniciarActualizacionCajero();
+            iniciarActualizacionReportes();
             break;
         case 'cocina':
             cargarDatosCocina();
@@ -771,7 +773,8 @@ async function cargarDatosCajero() {
         cargarEstadisticas(),
         cargarProductosCajero(),
         cargarCategoriasCajero(),
-        cargarCreditosPendientes()
+        cargarCreditosPendientes(),
+        cargarReportesRapidos()
     ]);
 }
 
@@ -1591,6 +1594,126 @@ async function cargarEstadisticas() {
     } catch (error) {
         console.error('Error cargando estadísticas:', error);
     }
+}
+
+// ============ FUNCIONES DE REPORTES RÁPIDOS ============
+
+let periodoReportesActual = 'hoy';
+
+async function cargarReportesRapidos(periodo = 'hoy') {
+    try {
+        let endpoint = `${API_BASE}/reportes/hoy`;
+
+        if (periodo === '7d') {
+            const hoy = new Date();
+            const hace7d = new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const inicio = hace7d.toISOString().split('T')[0];
+            const fin = hoy.toISOString().split('T')[0];
+            endpoint = `${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`;
+        } else if (periodo === '30d') {
+            const hoy = new Date();
+            const hace30d = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const inicio = hace30d.toISOString().split('T')[0];
+            const fin = hoy.toISOString().split('T')[0];
+            endpoint = `${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`;
+        }
+
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        renderizarMetricasReportes(data);
+    } catch (error) {
+        console.error('Error cargando reportes rápidos:', error);
+        mostrarNotificacion('Error', 'No se pudieron cargar los reportes', 'danger');
+    }
+}
+
+function cambiarPeriodoReportes(periodo) {
+    periodoReportesActual = periodo;
+    cargarReportesRapidos(periodo);
+}
+
+function renderizarMetricasReportes(data) {
+    // Obtener datos según si es hoy o período
+    const resumen = data.resumen || data;
+    const productos = data.productos || [];
+    const categorias = data.categorias || [];
+
+    // Actualizar métricas principales
+    const totalVentas = parseFloat(resumen.total_ventas || 0).toFixed(2);
+    const totalPedidos = resumen.total_pedidos || 0;
+    const ticketPromedio = totalPedidos > 0 ? (totalVentas / totalPedidos).toFixed(2) : '0.00';
+    const efectivo = parseFloat(resumen.efectivo || 0).toFixed(2);
+    const credito = parseFloat(resumen.credito || 0).toFixed(2);
+
+    document.getElementById('metrica-total-ventas').textContent = `$${totalVentas}`;
+    document.getElementById('metrica-total-pedidos').textContent = totalPedidos;
+    document.getElementById('metrica-ticket-promedio').textContent = `$${ticketPromedio}`;
+    document.getElementById('metrica-efectivo').textContent = `$${efectivo}`;
+    document.getElementById('metrica-credito').textContent = `$${credito}`;
+
+    // Renderizar tabla de top productos
+    const tablProductos = document.getElementById('tabla-top-productos');
+    if (productos.length > 0) {
+        tablProductos.innerHTML = `
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th class="text-end">Cantidad</th>
+                        <th class="text-end">Venta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productos.map(p => `
+                        <tr>
+                            <td>${p.producto_nombre || 'N/A'}</td>
+                            <td class="text-end">${p.cantidad_vendida || p.total_cantidad || 0}</td>
+                            <td class="text-end">$${parseFloat(p.subtotal || 0).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } else {
+        tablProductos.innerHTML = '<p class="text-muted text-center">Sin datos</p>';
+    }
+
+    // Renderizar tabla de categorías
+    const tablCategorias = document.getElementById('tabla-categorias');
+    if (categorias.length > 0) {
+        tablCategorias.innerHTML = `
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Categoría</th>
+                        <th class="text-end">Cantidad</th>
+                        <th class="text-end">Venta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${categorias.map(c => `
+                        <tr>
+                            <td>${c.categoria_nombre || 'N/A'}</td>
+                            <td class="text-end">${c.cantidad_vendida || c.total_cantidad || 0}</td>
+                            <td class="text-end">$${parseFloat(c.subtotal || c.total_subtotal || 0).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } else {
+        tablCategorias.innerHTML = '<p class="text-muted text-center">Sin datos</p>';
+    }
+}
+
+function iniciarActualizacionReportes() {
+    // Actualizar reportes cada 30 segundos mientras estén en la pestaña
+    setInterval(() => {
+        const tabActiva = document.querySelector('#cajeroTabs .nav-link.active');
+        if (tabActiva && tabActiva.getAttribute('data-bs-target') === '#cajero-reportes-tab') {
+            cargarReportesRapidos(periodoReportesActual);
+        }
+    }, 30000);
 }
 
 // ============ FUNCIONES DE COCINA ============

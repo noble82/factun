@@ -194,6 +194,56 @@ def init_db():
         )
     ''')
 
+    # Tabla de ventas diarias consolidadas
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ventas_diarias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha DATE UNIQUE NOT NULL,
+            total_pedidos INTEGER DEFAULT 0,
+            total_ventas REAL DEFAULT 0,
+            subtotal_total REAL DEFAULT 0,
+            impuesto_total REAL DEFAULT 0,
+            efectivo REAL DEFAULT 0,
+            credito REAL DEFAULT 0,
+            cantidad_transacciones INTEGER DEFAULT 0,
+            pedido_promedio REAL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Tabla de desglose de ventas por producto
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ventas_diarias_productos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha_venta DATE NOT NULL,
+            producto_id INTEGER NOT NULL,
+            producto_nombre TEXT NOT NULL,
+            categoria_id INTEGER,
+            categoria_nombre TEXT,
+            cantidad_vendida INTEGER DEFAULT 0,
+            subtotal REAL DEFAULT 0,
+            FOREIGN KEY (fecha_venta) REFERENCES ventas_diarias(fecha),
+            FOREIGN KEY (producto_id) REFERENCES productos(id),
+            UNIQUE(fecha_venta, producto_id)
+        )
+    ''')
+
+    # Tabla de desglose de ventas por categoría
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ventas_diarias_categorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha_venta DATE NOT NULL,
+            categoria_id INTEGER NOT NULL,
+            categoria_nombre TEXT NOT NULL,
+            cantidad_vendida INTEGER DEFAULT 0,
+            subtotal REAL DEFAULT 0,
+            FOREIGN KEY (fecha_venta) REFERENCES ventas_diarias(fecha),
+            FOREIGN KEY (categoria_id) REFERENCES categorias(id),
+            UNIQUE(fecha_venta, categoria_id)
+        )
+    ''')
+
     conn.commit()
 
     # Insertar datos iniciales si no existen
@@ -255,6 +305,139 @@ def insertar_datos_iniciales(conn):
 init_db()
 # Inicializar inventario para los productos
 inicializar_inventario_productos()
+
+# ============ FUNCIONES DE REPORTES ============
+
+def consolidar_ventas_diarias(fecha_str=None):
+    """
+    Consolida las ventas del día en las tablas de resumen.
+    Se ejecuta automáticamente nightly (23:55) o manualmente.
+
+    Args:
+        fecha_str: Fecha a consolidar en formato 'YYYY-MM-DD'.
+                   Si es None, usa la fecha actual.
+    """
+    from datetime import datetime, timedelta
+
+    if fecha_str is None:
+        # Si no se especifica, consolida el día anterior (el día completo ya pasó)
+        fecha_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # 1. Obtener pedidos cerrados del día
+        cursor.execute('''
+            SELECT
+                COUNT(*) as total_pedidos,
+                COALESCE(SUM(total), 0) as total_ventas,
+                COALESCE(SUM(subtotal), 0) as subtotal_total,
+                COALESCE(SUM(impuesto), 0) as impuesto_total,
+                COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
+                COALESCE(SUM(CASE WHEN metodo_pago = 'credito' THEN total ELSE 0 END), 0) as credito
+            FROM pedidos
+            WHERE DATE(created_at) = ? AND estado = 'cerrado'
+        ''', (fecha_str,))
+
+        stats = cursor.fetchone()
+        total_pedidos = stats[0] if stats[0] else 0
+        total_ventas = stats[1] if stats[1] else 0
+        subtotal_total = stats[2] if stats[2] else 0
+        impuesto_total = stats[3] if stats[3] else 0
+        efectivo = stats[4] if stats[4] else 0
+        credito = stats[5] if stats[5] else 0
+
+        # Calcular promedio por pedido
+        pedido_promedio = total_ventas / total_pedidos if total_pedidos > 0 else 0
+
+        # 2. Insertar o actualizar registro en ventas_diarias
+        cursor.execute('''
+            INSERT OR REPLACE INTO ventas_diarias
+            (fecha, total_pedidos, total_ventas, subtotal_total, impuesto_total,
+             efectivo, credito, cantidad_transacciones, pedido_promedio, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (fecha_str, total_pedidos, total_ventas, subtotal_total, impuesto_total,
+              efectivo, credito, total_pedidos, pedido_promedio))
+
+        # 3. Desglose por producto
+        cursor.execute('''
+            SELECT
+                pi.producto_id,
+                pr.nombre as producto_nombre,
+                pr.categoria_id,
+                c.nombre as categoria_nombre,
+                SUM(pi.cantidad) as cantidad_vendida,
+                COALESCE(SUM(pi.subtotal), 0) as subtotal
+            FROM pedido_items pi
+            JOIN productos pr ON pi.producto_id = pr.id
+            JOIN pedidos p ON pi.pedido_id = p.id
+            LEFT JOIN categorias c ON pr.categoria_id = c.id
+            WHERE DATE(p.created_at) = ? AND p.estado = 'cerrado'
+            GROUP BY pi.producto_id
+        ''', (fecha_str,))
+
+        productos = cursor.fetchall()
+
+        # Limpiar registros anteriores de ese día
+        cursor.execute('DELETE FROM ventas_diarias_productos WHERE fecha_venta = ?', (fecha_str,))
+
+        # Insertar desglose por producto
+        for prod in productos:
+            cursor.execute('''
+                INSERT INTO ventas_diarias_productos
+                (fecha_venta, producto_id, producto_nombre, categoria_id, categoria_nombre,
+                 cantidad_vendida, subtotal)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (fecha_str, prod[0], prod[1], prod[2], prod[3], prod[4], prod[5]))
+
+        # 4. Desglose por categoría
+        cursor.execute('''
+            SELECT
+                c.id,
+                c.nombre as categoria_nombre,
+                SUM(pi.cantidad) as cantidad_vendida,
+                COALESCE(SUM(pi.subtotal), 0) as subtotal
+            FROM pedido_items pi
+            JOIN productos pr ON pi.producto_id = pr.id
+            JOIN categorias c ON pr.categoria_id = c.id
+            JOIN pedidos p ON pi.pedido_id = p.id
+            WHERE DATE(p.created_at) = ? AND p.estado = 'cerrado'
+            GROUP BY c.id
+        ''', (fecha_str,))
+
+        categorias = cursor.fetchall()
+
+        # Limpiar registros anteriores de ese día
+        cursor.execute('DELETE FROM ventas_diarias_categorias WHERE fecha_venta = ?', (fecha_str,))
+
+        # Insertar desglose por categoría
+        for cat in categorias:
+            cursor.execute('''
+                INSERT INTO ventas_diarias_categorias
+                (fecha_venta, categoria_id, categoria_nombre, cantidad_vendida, subtotal)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (fecha_str, cat[0], cat[1], cat[2], cat[3]))
+
+        conn.commit()
+        print(f"Consolidación de ventas diarias completada para {fecha_str}")
+        return {
+            'success': True,
+            'fecha': fecha_str,
+            'total_pedidos': total_pedidos,
+            'total_ventas': total_ventas
+        }
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error consolidando ventas diarias para {fecha_str}: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+    finally:
+        conn.close()
 
 # ============ ENDPOINTS DE PRODUCTOS ============
 
@@ -940,6 +1123,230 @@ def get_estadisticas_hoy():
         'pedidos_activos': activos,
         'top_productos': top_productos
     })
+
+# ============ ENDPOINTS DE REPORTES ============
+
+@pos_bp.route('/reportes/hoy', methods=['GET'])
+def get_reportes_hoy():
+    """Obtiene reporte completo del día actual desde tabla ventas_diarias"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    hoy = datetime.now().strftime('%Y-%m-%d')
+
+    # Obtener resumen general del día
+    cursor.execute('''
+        SELECT * FROM ventas_diarias WHERE fecha = ?
+    ''', (hoy,))
+
+    resumen = cursor.fetchone()
+    if not resumen:
+        # Si no existe registro, retornar datos vacíos
+        resumen_dict = {
+            'fecha': hoy,
+            'total_pedidos': 0,
+            'total_ventas': 0,
+            'subtotal_total': 0,
+            'impuesto_total': 0,
+            'efectivo': 0,
+            'credito': 0,
+            'cantidad_transacciones': 0,
+            'pedido_promedio': 0
+        }
+    else:
+        resumen_dict = dict(resumen)
+
+    # Obtener desglose por producto
+    cursor.execute('''
+        SELECT * FROM ventas_diarias_productos WHERE fecha_venta = ?
+        ORDER BY cantidad_vendida DESC LIMIT 10
+    ''', (hoy,))
+    productos = [dict(row) for row in cursor.fetchall()]
+
+    # Obtener desglose por categoría
+    cursor.execute('''
+        SELECT * FROM ventas_diarias_categorias WHERE fecha_venta = ?
+        ORDER BY subtotal DESC
+    ''', (hoy,))
+    categorias = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+
+    return jsonify({
+        'resumen': resumen_dict,
+        'productos': productos,
+        'categorias': categorias
+    })
+
+@pos_bp.route('/reportes/periodo', methods=['GET'])
+def get_reportes_periodo():
+    """
+    Obtiene reporte para un período determinado
+    Parámetros: inicio (YYYY-MM-DD), fin (YYYY-MM-DD)
+    """
+    inicio = request.args.get('inicio')
+    fin = request.args.get('fin')
+
+    if not inicio or not fin:
+        return jsonify({'error': 'Se requieren parámetros inicio y fin'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # Validar formato de fechas
+        from datetime import datetime as dt
+        dt.strptime(inicio, '%Y-%m-%d')
+        dt.strptime(fin, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'error': 'Formato de fecha inválido. Use YYYY-MM-DD'}), 400
+
+    # Obtener resumen agregado del período
+    cursor.execute('''
+        SELECT
+            COUNT(*) as dias,
+            SUM(total_pedidos) as total_pedidos,
+            SUM(total_ventas) as total_ventas,
+            SUM(subtotal_total) as subtotal_total,
+            SUM(impuesto_total) as impuesto_total,
+            SUM(efectivo) as efectivo,
+            SUM(credito) as credito,
+            AVG(pedido_promedio) as pedido_promedio_promedio
+        FROM ventas_diarias
+        WHERE fecha BETWEEN ? AND ?
+    ''', (inicio, fin))
+
+    resumen_periodo = dict(cursor.fetchone())
+
+    # Obtener desglose diario
+    cursor.execute('''
+        SELECT * FROM ventas_diarias
+        WHERE fecha BETWEEN ? AND ?
+        ORDER BY fecha DESC
+    ''', (inicio, fin))
+
+    dias = [dict(row) for row in cursor.fetchall()]
+
+    # Obtener top productos del período
+    cursor.execute('''
+        SELECT
+            producto_id,
+            producto_nombre,
+            categoria_nombre,
+            SUM(cantidad_vendida) as total_cantidad,
+            SUM(subtotal) as total_subtotal
+        FROM ventas_diarias_productos
+        WHERE fecha_venta BETWEEN ? AND ?
+        GROUP BY producto_id
+        ORDER BY total_cantidad DESC
+        LIMIT 10
+    ''', (inicio, fin))
+
+    top_productos = [dict(row) for row in cursor.fetchall()]
+
+    # Obtener desglose por categoría del período
+    cursor.execute('''
+        SELECT
+            categoria_id,
+            categoria_nombre,
+            SUM(cantidad_vendida) as total_cantidad,
+            SUM(subtotal) as total_subtotal
+        FROM ventas_diarias_categorias
+        WHERE fecha_venta BETWEEN ? AND ?
+        GROUP BY categoria_id
+        ORDER BY total_subtotal DESC
+    ''', (inicio, fin))
+
+    categorias = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+
+    return jsonify({
+        'periodo': {
+            'inicio': inicio,
+            'fin': fin
+        },
+        'resumen': resumen_periodo,
+        'dias': dias,
+        'top_productos': top_productos,
+        'categorias': categorias
+    })
+
+@pos_bp.route('/reportes/comparativa', methods=['GET'])
+def get_reportes_comparativa():
+    """
+    Compara dos fechas específicas
+    Parámetros: fecha1 (YYYY-MM-DD), fecha2 (YYYY-MM-DD)
+    """
+    fecha1 = request.args.get('fecha1')
+    fecha2 = request.args.get('fecha2')
+
+    if not fecha1 or not fecha2:
+        return jsonify({'error': 'Se requieren parámetros fecha1 y fecha2'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        from datetime import datetime as dt
+        dt.strptime(fecha1, '%Y-%m-%d')
+        dt.strptime(fecha2, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'error': 'Formato de fecha inválido. Use YYYY-MM-DD'}), 400
+
+    # Obtener datos de ambas fechas
+    cursor.execute('SELECT * FROM ventas_diarias WHERE fecha = ?', (fecha1,))
+    data1 = dict(cursor.fetchone()) if cursor.fetchone() else None
+
+    cursor.execute('SELECT * FROM ventas_diarias WHERE fecha = ?', (fecha2,))
+    data2 = dict(cursor.fetchone()) if cursor.fetchone() else None
+
+    conn.close()
+
+    # Calcular variaciones
+    comparativa = {
+        'fecha1': fecha1,
+        'fecha2': fecha2,
+        'datos_fecha1': data1 if data1 else {},
+        'datos_fecha2': data2 if data2 else {},
+        'variacion': {}
+    }
+
+    if data1 and data2:
+        for key in data1.keys():
+            if key in ['total_pedidos', 'total_ventas', 'efectivo', 'credito', 'pedido_promedio']:
+                val1 = float(data1[key]) if data1[key] else 0
+                val2 = float(data2[key]) if data2[key] else 0
+                if val1 > 0:
+                    porcentaje = ((val2 - val1) / val1) * 100
+                else:
+                    porcentaje = 0 if val2 == 0 else 100
+                comparativa['variacion'][key] = {
+                    'fecha1': val1,
+                    'fecha2': val2,
+                    'diferencia': val2 - val1,
+                    'porcentaje': round(porcentaje, 2)
+                }
+
+    return jsonify(comparativa)
+
+@pos_bp.route('/reportes/consolidar', methods=['POST'])
+@role_required('manager')
+def consolidar_ventas_endpoint():
+    """
+    Ejecuta consolidación manual de ventas diarias.
+    Requiere rol de manager.
+    Parámetros opcionales: fecha (YYYY-MM-DD)
+    """
+    data = request.get_json() if request.is_json else {}
+    fecha = data.get('fecha') if data else None
+
+    resultado = consolidar_ventas_diarias(fecha)
+
+    if resultado['success']:
+        return jsonify(resultado), 200
+    else:
+        return jsonify(resultado), 400
 
 # ============ ENDPOINTS DE FACTURACIÓN ============
 

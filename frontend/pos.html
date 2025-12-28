@@ -910,6 +910,11 @@
                         <i class="bi bi-credit-card-2-front"></i> Gestión Créditos
                     </button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-reportes-tab">
+                        <i class="bi bi-graph-up"></i> Reportes Rápidos
+                    </button>
+                </li>
             </ul>
 
             <div class="tab-content">
@@ -1045,6 +1050,110 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Reportes Rápidos -->
+                <div class="tab-pane fade" id="cajero-reportes-tab">
+                    <!-- Selector de período rápido -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-hoy" value="hoy" checked onchange="cambiarPeriodoReportes('hoy')">
+                                <label class="btn btn-outline-primary" for="periodo-hoy">
+                                    <i class="bi bi-calendar-day"></i> Hoy
+                                </label>
+                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-7d" value="7d" onchange="cambiarPeriodoReportes('7d')">
+                                <label class="btn btn-outline-primary" for="periodo-7d">
+                                    <i class="bi bi-calendar-week"></i> Últimos 7 días
+                                </label>
+                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-30d" value="30d" onchange="cambiarPeriodoReportes('30d')">
+                                <label class="btn btn-outline-primary" for="periodo-30d">
+                                    <i class="bi bi-calendar-month"></i> Último mes
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjetas de Métricas -->
+                    <div class="row" id="metricas-reportes">
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">Total Vendido</h6>
+                                    <h3 class="mb-0" id="metrica-total-ventas">$0.00</h3>
+                                    <small id="metrica-variacion-ventas" class="text-success"></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">Total Pedidos</h6>
+                                    <h3 class="mb-0" id="metrica-total-pedidos">0</h3>
+                                    <small id="metrica-variacion-pedidos" class="text-success"></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">Ticket Promedio</h6>
+                                    <h3 class="mb-0" id="metrica-ticket-promedio">$0.00</h3>
+                                    <small id="metrica-variacion-promedio" class="text-success"></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted">Efectivo vs Crédito</h6>
+                                    <div class="d-flex justify-content-between">
+                                        <small><strong>Efectivo:</strong> <span id="metrica-efectivo">$0.00</span></small>
+                                        <small><strong>Crédito:</strong> <span id="metrica-credito">$0.00</span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Productos del período -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Top Productos</h6>
+                                </div>
+                                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="tabla-top-productos">
+                                        <p class="text-muted text-center">Cargando...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Desglose por Categoría -->
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-tag"></i> Ventas por Categoría</h6>
+                                </div>
+                                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="tabla-categorias">
+                                        <p class="text-muted text-center">Cargando...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botón para acceder a reportes detallados -->
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <a href="reportes.html" class="btn btn-primary w-100" target="_blank">
+                                <i class="bi bi-file-earmark-text"></i> Ver Reportes Detallados
+                            </a>
                         </div>
                     </div>
                 </div>
