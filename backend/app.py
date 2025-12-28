@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import requests
 import os
 from datetime import datetime
@@ -14,9 +16,20 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'pupuseria-secret-key-2024')
 CORS(app, supports_credentials=True)
 
+# Inicializar rate limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 # Registrar Blueprint de Autenticación
-from auth import auth_bp, init_auth_db, role_required
+from auth import auth_bp, init_auth_db, role_required, set_limiter
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
+
+# Pasar el limiter a auth.py para rate limiting en login
+set_limiter(limiter)
 
 # Registrar Blueprint del POS
 from pos import pos_bp

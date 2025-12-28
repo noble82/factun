@@ -6,6 +6,10 @@ Sistema de Facturación - El Salvador
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from database import get_db
+from validators import (
+    validar_email, validar_telefono, validar_nit, validar_nrc,
+    validar_numero_positivo
+)
 
 clientes_bp = Blueprint('clientes', __name__)
 
@@ -45,6 +49,9 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_nrc ON clientes(nrc)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_nombre ON clientes(nombre)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_codigo ON clientes(codigo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_email ON clientes(email)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_activo ON clientes(activo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_clientes_tipo_cliente ON clientes(tipo_cliente)')
 
     # Insertar cliente genérico si no existe
     cursor.execute('SELECT COUNT(*) FROM clientes')
@@ -176,6 +183,55 @@ def crear_cliente():
         if not data.get('nombre'):
             return jsonify({'error': 'El nombre es requerido'}), 400
 
+        # Validar email si se proporciona
+        if data.get('email'):
+            es_valido, msg_error = validar_email(data['email'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar teléfono si se proporciona
+        if data.get('telefono'):
+            es_valido, msg_error = validar_telefono(data['telefono'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar NIT/DUI si se proporciona
+        if data.get('numero_documento'):
+            tipo_doc = data.get('tipo_documento', 'DUI')
+            if tipo_doc == 'NIT':
+                es_valido, msg_error = validar_nit(data['numero_documento'])
+            else:  # DUI
+                es_valido, msg_error = validar_nit(data['numero_documento'])  # Usar mismo validador
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar NRC si se proporciona
+        if data.get('nrc'):
+            es_valido, msg_error = validar_nrc(data['nrc'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar crédito autorizado si se proporciona
+        if data.get('credito_autorizado'):
+            es_valido, valor, msg_error = validar_numero_positivo(
+                data['credito_autorizado'],
+                'crédito autorizado',
+                minimo=0
+            )
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar días de crédito si se proporciona
+        if data.get('dias_credito'):
+            es_valido, valor, msg_error = validar_numero_positivo(
+                data['dias_credito'],
+                'días de crédito',
+                minimo=0,
+                maximo=365
+            )
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
         # Validar documento único si se proporciona
         conn = get_db()
         cursor = conn.cursor()
@@ -247,6 +303,52 @@ def actualizar_cliente(id):
     """Actualiza un cliente existente (actualización parcial permitida)"""
     try:
         data = request.get_json()
+
+        # Validar email si se proporciona
+        if 'email' in data and data.get('email'):
+            es_valido, msg_error = validar_email(data['email'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar teléfono si se proporciona
+        if 'telefono' in data and data.get('telefono'):
+            es_valido, msg_error = validar_telefono(data['telefono'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar NIT/DUI si se proporciona
+        if 'numero_documento' in data and data.get('numero_documento'):
+            tipo_doc = data.get('tipo_documento', 'DUI')
+            es_valido, msg_error = validar_nit(data['numero_documento'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar NRC si se proporciona
+        if 'nrc' in data and data.get('nrc'):
+            es_valido, msg_error = validar_nrc(data['nrc'])
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar crédito autorizado si se proporciona
+        if 'credito_autorizado' in data and data.get('credito_autorizado'):
+            es_valido, valor, msg_error = validar_numero_positivo(
+                data['credito_autorizado'],
+                'crédito autorizado',
+                minimo=0
+            )
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
+
+        # Validar días de crédito si se proporciona
+        if 'dias_credito' in data and data.get('dias_credito'):
+            es_valido, valor, msg_error = validar_numero_positivo(
+                data['dias_credito'],
+                'días de crédito',
+                minimo=0,
+                maximo=365
+            )
+            if not es_valido:
+                return jsonify({'error': msg_error}), 400
 
         conn = get_db()
         cursor = conn.cursor()

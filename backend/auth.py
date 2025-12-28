@@ -12,6 +12,26 @@ from database import get_db_inventory as get_db
 
 auth_bp = Blueprint('auth', __name__)
 
+# El limiter se inyecta desde app.py después de la inicialización
+limiter = None
+
+def set_limiter(limiter_instance):
+    """Configura el limiter de rate limiting"""
+    global limiter
+    limiter = limiter_instance
+
+def rate_limit_login(f):
+    """Decorator que aplica rate limiting al login"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    # Si el limiter está disponible, aplicar limit al decorated
+    if limiter:
+        decorated = limiter.limit("5 per 15 minutes")(decorated)
+
+    return decorated
+
 def hash_password(password, salt=None):
     """Hash password with salt"""
     if salt is None:
@@ -25,8 +45,39 @@ def verify_password(password, stored_hash):
         salt, hash_value = stored_hash.split(':')
         new_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
         return new_hash.hex() == hash_value
-    except:
+    except (ValueError, AttributeError, TypeError):
         return False
+
+def validar_contrasena(password):
+    """
+    Valida que la contraseña cumpla con requisitos de seguridad
+    - Mínimo 8 caracteres
+    - Al menos 1 mayúscula
+    - Al menos 1 minúscula
+    - Al menos 1 número
+    - Al menos 1 carácter especial
+
+    Retorna: (es_válida, mensaje_error)
+    """
+    if not password:
+        return False, "La contraseña no puede estar vacía"
+
+    if len(password) < 8:
+        return False, "La contraseña debe tener al menos 8 caracteres"
+
+    if not any(c.isupper() for c in password):
+        return False, "La contraseña debe contener al menos una mayúscula"
+
+    if not any(c.islower() for c in password):
+        return False, "La contraseña debe contener al menos una minúscula"
+
+    if not any(c.isdigit() for c in password):
+        return False, "La contraseña debe contener al menos un número"
+
+    if not any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+        return False, "La contraseña debe contener al menos un carácter especial (!@#$%^&* etc)"
+
+    return True, ""
 
 def init_auth_db():
     """Inicializa las tablas de autenticación"""
@@ -62,15 +113,35 @@ def init_auth_db():
         )
     ''')
 
+    # ============ ÍNDICES PARA OPTIMIZAR CONSULTAS ============
+    # Índices en usuarios
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usuarios_activo ON usuarios(activo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_usuarios_rol ON usuarios(rol)')
+
+    # Índices en sesiones
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sesiones_usuario_id ON sesiones(usuario_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sesiones_token ON sesiones(token)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_sesiones_expires_at ON sesiones(expires_at)')
+
     # Crear usuario manager por defecto si no existe
     cursor.execute('SELECT COUNT(*) FROM usuarios WHERE rol = "manager"')
     if cursor.fetchone()[0] == 0:
-        password_hash = hash_password('admin123')
+        # Generar una contraseña temporal segura
+        temp_password = secrets.token_urlsafe(12)  # 12 caracteres aleatorios seguros
+        password_hash = hash_password(temp_password)
         cursor.execute('''
             INSERT INTO usuarios (username, password_hash, nombre, rol)
             VALUES (?, ?, ?, ?)
-        ''', ('admin', password_hash, 'Administrador', 'manager'))
-        print("Usuario manager creado: admin / admin123")
+        ''', ('admin', password_hash, 'Administrador del Sistema', 'manager'))
+        print("=" * 70)
+        print("⚠️  USUARIO MANAGER CREADO - CREDENCIALES INICIALES")
+        print("=" * 70)
+        print(f"Usuario:     admin")
+        print(f"Contraseña:  {temp_password}")
+        print("=" * 70)
+        print("⚠️  IMPORTANTE: Cambia esta contraseña inmediatamente después del login")
+        print("=" * 70)
 
     conn.commit()
     conn.close()
@@ -118,6 +189,7 @@ def role_required(*roles):
 # ============ ENDPOINTS DE AUTENTICACIÓN ============
 
 @auth_bp.route('/login', methods=['POST'])
+@rate_limit_login
 def login():
     """Iniciar sesión"""
     data = request.get_json()
@@ -210,8 +282,10 @@ def cambiar_password():
     if not password_actual or not password_nueva:
         return jsonify({'error': 'Contraseña actual y nueva son requeridas'}), 400
 
-    if len(password_nueva) < 4:
-        return jsonify({'error': 'La contraseña debe tener al menos 4 caracteres'}), 400
+    # Validar que la nueva contraseña cumpla con requisitos de seguridad
+    es_valida, msg_error = validar_contrasena(password_nueva)
+    if not es_valida:
+        return jsonify({'error': msg_error}), 400
 
     conn = get_db()
     cursor = conn.cursor()
@@ -289,8 +363,10 @@ def crear_usuario():
     if rol not in ['mesero', 'cajero', 'cocinero', 'manager']:
         return jsonify({'error': 'Rol inválido'}), 400
 
-    if len(password) < 4:
-        return jsonify({'error': 'La contraseña debe tener al menos 4 caracteres'}), 400
+    # Validar que la contraseña cumpla con requisitos de seguridad
+    es_valida, msg_error = validar_contrasena(password)
+    if not es_valida:
+        return jsonify({'error': msg_error}), 400
 
     conn = get_db()
     cursor = conn.cursor()
@@ -366,8 +442,10 @@ def reset_password(id):
     data = request.get_json()
     nueva_password = data.get('password', '')
 
-    if not nueva_password or len(nueva_password) < 4:
-        return jsonify({'error': 'La contraseña debe tener al menos 4 caracteres'}), 400
+    # Validar que la nueva contraseña cumpla con requisitos de seguridad
+    es_valida, msg_error = validar_contrasena(nueva_password)
+    if not es_valida:
+        return jsonify({'error': msg_error}), 400
 
     conn = get_db()
     cursor = conn.cursor()

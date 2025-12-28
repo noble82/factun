@@ -51,7 +51,7 @@ def init_db():
     except sqlite3.OperationalError:
         try:
             cursor.execute("ALTER TABLE productos ADD COLUMN materia_prima_id INTEGER")
-        except:
+        except sqlite3.OperationalError:
             pass
 
     # Tabla de mesas
@@ -258,6 +258,38 @@ def init_db():
         cursor.execute('ALTER TABLE ventas_diarias ADD COLUMN propinas_total REAL DEFAULT 0')
     except:
         pass
+
+    # ============ ÍNDICES PARA OPTIMIZAR CONSULTAS ============
+    # Índices en pedidos (tabla más consultada)
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_mesa_id ON pedidos(mesa_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_id ON pedidos(cliente_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_estado ON pedidos(estado)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_created_at ON pedidos(created_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_facturado_at ON pedidos(facturado_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_pagado_at ON pedidos(pagado_at)')
+
+    # Índices en items_pedido (tabla de relación pedido-producto)
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_items_pedido_pedido_id ON items_pedido(pedido_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_items_pedido_producto_id ON items_pedido(producto_id)')
+
+    # Índices en productos
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_productos_categoria_id ON productos(categoria_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_productos_disponible ON productos(disponible)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_productos_nombre ON productos(nombre)')
+
+    # Índices en mesas
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_mesas_estado ON mesas(estado)')
+
+    # Índices en ventas_diarias
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ventas_diarias_fecha ON ventas_diarias(fecha)')
+
+    # Índices en ventas_diarias_productos
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ventas_diarias_productos_fecha ON ventas_diarias_productos(fecha_venta)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ventas_diarias_productos_producto_id ON ventas_diarias_productos(producto_id)')
+
+    # Índices en ventas_diarias_categorias
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ventas_diarias_categorias_fecha ON ventas_diarias_categorias(fecha_venta)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ventas_diarias_categorias_categoria_id ON ventas_diarias_categorias(categoria_id)')
 
     conn.commit()
 
@@ -1541,6 +1573,7 @@ def consolidar_ventas_endpoint():
 # ============ ENDPOINTS DE FACTURACIÓN ============
 
 @pos_bp.route('/pedidos/<int:id>/cliente', methods=['PUT'])
+@role_required('cajero', 'manager')
 def actualizar_cliente_pedido(id):
     """
     Actualiza información del cliente para facturación
@@ -1738,6 +1771,7 @@ def procesar_pago_credito(id):
 
 
 @pos_bp.route('/pedidos/<int:id>/facturar', methods=['POST'])
+@role_required('cajero', 'manager')
 def facturar_pedido(id):
     """
     Genera una factura electrónica (DTE) para el pedido
@@ -1877,6 +1911,7 @@ def facturar_pedido(id):
 
 
 @pos_bp.route('/pedidos/<int:id>/comprobante', methods=['GET'])
+@role_required('cajero', 'manager')
 def get_comprobante_pedido(id):
     """
     Obtiene el comprobante (factura o ticket) de un pedido

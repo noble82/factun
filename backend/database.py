@@ -24,6 +24,8 @@ def get_db(db_file='pos.db'):
     db_path = os.path.join(os.path.dirname(__file__), db_file)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    # Habilitar foreign key constraints
+    conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
 

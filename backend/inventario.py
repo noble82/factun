@@ -188,6 +188,46 @@ def init_inventario_db():
         )
     ''')
 
+    # ============ ÍNDICES PARA OPTIMIZAR CONSULTAS ============
+    # Índices en proveedores
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_proveedores_codigo ON proveedores(codigo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_proveedores_activo ON proveedores(activo)')
+
+    # Índices en materia_prima
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_prima_codigo ON materia_prima(codigo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_prima_nombre ON materia_prima(nombre)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_prima_categoria ON materia_prima(categoria)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_prima_activo ON materia_prima(activo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_prima_proveedor ON materia_prima(proveedor_principal_id)')
+
+    # Índices en recetas
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_recetas_producto_id ON recetas(producto_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_recetas_materia_prima_id ON recetas(materia_prima_id)')
+
+    # Índices en movimientos_inventario
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_materia_prima_id ON movimientos_inventario(materia_prima_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_tipo ON movimientos_inventario(tipo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_created_at ON movimientos_inventario(created_at)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_referencia ON movimientos_inventario(referencia_tipo, referencia_id)')
+
+    # Índices en ordenes_compra
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ordenes_compra_numero ON ordenes_compra(numero)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ordenes_compra_proveedor_id ON ordenes_compra(proveedor_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ordenes_compra_estado ON ordenes_compra(estado)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_ordenes_compra_fecha_orden ON ordenes_compra(fecha_orden)')
+
+    # Índices en orden_compra_items
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_orden_compra_items_orden_id ON orden_compra_items(orden_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_orden_compra_items_materia_prima_id ON orden_compra_items(materia_prima_id)')
+
+    # Índices en materia_proveedor
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_proveedor_materia_prima_id ON materia_proveedor(materia_prima_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_materia_proveedor_proveedor_id ON materia_proveedor(proveedor_id)')
+
+    # Índices en extracciones_materia_prima
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_extracciones_materia_prima_fecha ON extracciones_materia_prima(fecha)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_extracciones_materia_prima_materia_prima_id ON extracciones_materia_prima(materia_prima_id)')
+
     conn.commit()
     conn.close()
 
