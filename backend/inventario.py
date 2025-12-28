@@ -1235,18 +1235,70 @@ def crear_extraccion():
             'message': 'Cantidad inválida'
         }), 400
 
-    result = registrar_extraccion_materia_prima(
-        fecha=fecha,
-        materia_prima_id=materia_prima_id,
-        cantidad_extraida=cantidad_extraida,
-        unidad_medida=unidad_medida,
-        motivo=motivo,
-        descripcion=descripcion,
-        usuario=usuario
-    )
+    conn = get_db()
+    cursor = conn.cursor()
 
-    status_code = 201 if result['success'] else 400
-    return jsonify(result), status_code
+    try:
+        # Obtener información de la materia prima para la unidad
+        cursor.execute('SELECT unidad_medida FROM materia_prima WHERE id = ?', (materia_prima_id,))
+        mp_row = cursor.fetchone()
+        if not mp_row:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Materia prima no encontrada'}), 404
+
+        unidad = unidad_medida or mp_row['unidad_medida']
+
+        # Registrar la extracción en la tabla extracciones_materia_prima
+        cursor.execute('''
+            INSERT INTO extracciones_materia_prima (
+                fecha, hora, materia_prima_id, cantidad_extraida, unidad_medida,
+                motivo, descripcion, usuario, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            fecha,
+            datetime.now().time().isoformat(),
+            materia_prima_id,
+            cantidad_extraida,
+            unidad,
+            motivo,
+            descripcion,
+            usuario,
+            datetime.now().isoformat()
+        ))
+
+        extraccion_id = cursor.lastrowid
+
+        # Usar función interna para actualizar stock
+        result = _actualizar_stock_y_movimiento(
+            conn, cursor,
+            materia_prima_id,
+            cantidad_extraida,
+            'extraccion',
+            'extraccion',
+            extraccion_id,
+            motivo or 'Extracción de materia prima',
+            usuario
+        )
+
+        if 'error' in result:
+            conn.close()
+            return jsonify({'success': False, 'message': result['error']}), 400
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'id': extraccion_id,
+            'materia_prima': result['materia_prima'],
+            'stock_anterior': result['stock_anterior'],
+            'stock_nuevo': result['stock_nuevo'],
+            'message': f'Extracción registrada: {cantidad_extraida} {unidad} de {result["materia_prima"]}'
+        }), 201
+
+    except Exception as e:
+        conn.close()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 400
 
 
 @inventario_bp.route('/extracciones', methods=['GET'])
@@ -1314,7 +1366,7 @@ def listar_extracciones():
 @inventario_bp.route('/extracciones/<int:id>', methods=['PUT'])
 @role_required('manager')
 def actualizar_extraccion(id):
-    """Actualiza una extracción de materia prima (solo si es del mismo día)"""
+    """Actualiza una extracción de materia prima"""
     data = request.get_json()
 
     conn = get_db()
@@ -1327,11 +1379,9 @@ def actualizar_extraccion(id):
         conn.close()
         return jsonify({'success': False, 'message': 'Extracción no encontrada'}), 404
 
-    # Obtener datos actuales
     cantidad_anterior = extraccion['cantidad_extraida']
     materia_prima_id = extraccion['materia_prima_id']
 
-    # Nuevos datos
     cantidad_nueva = data.get('cantidad_extraida', cantidad_anterior)
     motivo = data.get('motivo', extraccion['motivo'])
     descripcion = data.get('descripcion', extraccion['descripcion'])
@@ -1339,58 +1389,44 @@ def actualizar_extraccion(id):
     try:
         cantidad_nueva = float(cantidad_nueva)
         if cantidad_nueva <= 0:
+            conn.close()
             return jsonify({'success': False, 'message': 'Cantidad debe ser > 0'}), 400
     except ValueError:
+        conn.close()
         return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
 
-    # Calcular diferencia
     diferencia = cantidad_nueva - cantidad_anterior
 
-    # Actualizar stock de materia prima
-    cursor.execute('SELECT stock_actual FROM materia_prima WHERE id = ?', (materia_prima_id,))
-    mp = cursor.fetchone()
+    # Actualizar extracción
+    cursor.execute('''
+        UPDATE extracciones_materia_prima
+        SET cantidad_extraida = ?, motivo = ?, descripcion = ?
+        WHERE id = ?
+    ''', (cantidad_nueva, motivo, descripcion, id))
 
-    if mp:
-        stock_anterior = mp['stock_actual']
-        stock_nuevo = stock_anterior - diferencia
+    # Registrar movimiento de ajuste si hay diferencia usando función interna
+    if diferencia != 0:
+        result = _actualizar_stock_y_movimiento(
+            conn, cursor,
+            materia_prima_id,
+            diferencia,
+            'ajuste_extraccion',
+            'extraccion',
+            id,
+            f'Ajuste de extracción: {motivo}',
+            data.get('usuario', 'Sistema')
+        )
 
-        cursor.execute('''
-            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
-            WHERE id = ?
-        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
-
-        # Actualizar extracción
-        cursor.execute('''
-            UPDATE extracciones_materia_prima
-            SET cantidad_extraida = ?, motivo = ?, descripcion = ?
-            WHERE id = ?
-        ''', (cantidad_nueva, motivo, descripcion, id))
-
-        # Registrar movimiento de ajuste si hay diferencia
-        if diferencia != 0:
-            cursor.execute('''
-                INSERT INTO movimientos_inventario (
-                    materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
-                    referencia_tipo, referencia_id, motivo, usuario
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                materia_prima_id,
-                'ajuste_extraccion',
-                diferencia,
-                stock_anterior,
-                stock_nuevo,
-                'extraccion',
-                id,
-                f'Ajuste de extracción: {motivo}',
-                data.get('usuario', 'Sistema')
-            ))
+        if 'error' in result:
+            conn.close()
+            return jsonify({'success': False, 'message': result['error']}), 400
 
     conn.commit()
     conn.close()
 
     return jsonify({
         'success': True,
-        'message': f'Extracción actualizada',
+        'message': 'Extracción actualizada',
         'extraccion_id': id
     })
 
@@ -1412,36 +1448,21 @@ def eliminar_extraccion(id):
     materia_prima_id = extraccion['materia_prima_id']
     cantidad_extraida = extraccion['cantidad_extraida']
 
-    # Revertir el stock (sumar la cantidad que se había restado)
-    cursor.execute('SELECT stock_actual FROM materia_prima WHERE id = ?', (materia_prima_id,))
-    mp = cursor.fetchone()
+    # Revertir stock usando función interna (pasar cantidad negativa para sumar)
+    result = _actualizar_stock_y_movimiento(
+        conn, cursor,
+        materia_prima_id,
+        -cantidad_extraida,  # Negativo para revertir (sumar stock)
+        'reversal_extraccion',
+        'extraccion',
+        id,
+        'Reversión de extracción eliminada',
+        'Sistema'
+    )
 
-    if mp:
-        stock_anterior = mp['stock_actual']
-        stock_nuevo = stock_anterior + cantidad_extraida
-
-        cursor.execute('''
-            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
-            WHERE id = ?
-        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
-
-        # Registrar movimiento de reversión
-        cursor.execute('''
-            INSERT INTO movimientos_inventario (
-                materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
-                referencia_tipo, referencia_id, motivo, usuario
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            materia_prima_id,
-            'reversal_extraccion',
-            -cantidad_extraida,
-            stock_anterior,
-            stock_nuevo,
-            'extraccion',
-            id,
-            f'Reversión de extracción eliminada',
-            'Sistema'
-        ))
+    if 'error' in result:
+        conn.close()
+        return jsonify({'success': False, 'message': result['error']}), 400
 
     # Eliminar la extracción
     cursor.execute('DELETE FROM extracciones_materia_prima WHERE id = ?', (id,))
@@ -1514,106 +1535,65 @@ def descontar_stock_pedido(pedido_id):
     conn.close()
 
 
-# ============ FUNCIÓN PARA REGISTRAR EXTRACCIONES DE MATERIA PRIMA ============
+# ============ FUNCIÓN INTERNA PARA ACTUALIZAR STOCK ============
 
-def registrar_extraccion_materia_prima(fecha, materia_prima_id, cantidad_extraida,
-                                      unidad_medida=None, motivo=None, descripcion=None, usuario=None):
+def _actualizar_stock_y_movimiento(conn, cursor, materia_prima_id, cantidad, tipo_movimiento,
+                                   referencia_tipo, referencia_id, motivo, usuario):
     """
-    Registra una extracción de materia prima (libras/kg extraídas en una jornada)
-    Actualiza el stock_actual y crea un movimiento de inventario
+    Función interna para actualizar stock y registrar movimiento
+    Evita redundancia entre ajustar_materia_prima y extracciones
 
     Args:
-        fecha: DATE (YYYY-MM-DD)
+        conn, cursor: Conexión y cursor a BD
         materia_prima_id: ID de la materia prima
-        cantidad_extraida: REAL (cantidad extraída)
-        unidad_medida: TEXT (lb, kg, lt, etc) - opcional, se usa la de materia_prima
-        motivo: TEXT (ej: "Elaboración pupusas", "Elaboración bebidas")
-        descripcion: TEXT (detalles adicionales)
-        usuario: TEXT (quién registró)
+        cantidad: Cantidad a restar del stock (positive = salida, negative = entrada)
+        tipo_movimiento: 'extraccion', 'ajuste_extraccion', 'salida', etc
+        referencia_tipo: 'extraccion', 'pedido', etc
+        referencia_id: ID de la referencia
+        motivo: Motivo del movimiento
+        usuario: Usuario que realiza la acción
 
     Returns:
-        dict con {'success': bool, 'id': id_extraccion, 'message': str}
+        dict con stock_anterior, stock_nuevo, materia_prima o error
     """
-    conn = get_db()
-    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id, nombre, stock_actual FROM materia_prima WHERE id = ?
+    ''', (materia_prima_id,))
 
-    try:
-        # Obtener información de la materia prima
-        cursor.execute('''
-            SELECT id, nombre, unidad_medida, stock_actual FROM materia_prima WHERE id = ?
-        ''', (materia_prima_id,))
+    mp = cursor.fetchone()
+    if not mp:
+        return {'error': f'Materia prima con ID {materia_prima_id} no existe'}
 
-        mp = cursor.fetchone()
-        if not mp:
-            return {
-                'success': False,
-                'message': f'Materia prima con ID {materia_prima_id} no existe'
-            }
+    stock_anterior = mp['stock_actual']
+    stock_nuevo = stock_anterior - cantidad
 
-        # Usar unidad de medida del registro o de la materia prima
-        unidad = unidad_medida or mp['unidad_medida']
-        stock_anterior = mp['stock_actual']
-        stock_nuevo = stock_anterior - cantidad_extraida
+    # Actualizar stock
+    cursor.execute('''
+        UPDATE materia_prima SET stock_actual = ?, updated_at = ?
+        WHERE id = ?
+    ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
 
-        # Registrar la extracción
-        cursor.execute('''
-            INSERT INTO extracciones_materia_prima (
-                fecha, hora, materia_prima_id, cantidad_extraida, unidad_medida,
-                motivo, descripcion, usuario, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            fecha,
-            datetime.now().time().isoformat(),
-            materia_prima_id,
-            cantidad_extraida,
-            unidad,
-            motivo,
-            descripcion,
-            usuario or 'POS',
-            datetime.now().isoformat()
-        ))
+    # Registrar movimiento
+    cursor.execute('''
+        INSERT INTO movimientos_inventario (
+            materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
+            referencia_tipo, referencia_id, motivo, usuario
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        materia_prima_id,
+        tipo_movimiento,
+        cantidad,
+        stock_anterior,
+        stock_nuevo,
+        referencia_tipo,
+        referencia_id,
+        motivo,
+        usuario or 'Sistema'
+    ))
 
-        extraccion_id = cursor.lastrowid
-
-        # Actualizar stock de materia prima
-        cursor.execute('''
-            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
-            WHERE id = ?
-        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
-
-        # Registrar movimiento en historial
-        cursor.execute('''
-            INSERT INTO movimientos_inventario (
-                materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
-                referencia_tipo, referencia_id, motivo, usuario
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            materia_prima_id,
-            'extraccion',
-            cantidad_extraida,
-            stock_anterior,
-            stock_nuevo,
-            'extraccion',
-            extraccion_id,
-            motivo or 'Extracción de materia prima',
-            usuario or 'POS'
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return {
-            'success': True,
-            'id': extraccion_id,
-            'materia_prima': mp['nombre'],
-            'stock_anterior': stock_anterior,
-            'stock_nuevo': stock_nuevo,
-            'message': f'Extracción registrada: {cantidad_extraida} {unidad} de {mp["nombre"]}'
-        }
-
-    except Exception as e:
-        conn.close()
-        return {
-            'success': False,
-            'message': f'Error al registrar extracción: {str(e)}'
-        }
+    return {
+        'success': True,
+        'materia_prima': mp['nombre'],
+        'stock_anterior': stock_anterior,
+        'stock_nuevo': stock_nuevo
+    }
