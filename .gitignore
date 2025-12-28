@@ -7,3 +7,4 @@ venv/
 nginx.conf
 deploy-cert.sh
 docker-compose.yml
+backend/*.db
