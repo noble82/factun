@@ -379,6 +379,10 @@ async function cargarMesas() {
     console.log('cargarMesas() llamado');
     try {
         const response = await fetch(`${API_BASE}/mesas`);
+        if (!response.ok) {
+            console.error(`Error cargando mesas: ${response.status}`);
+            return;
+        }
         const mesas = await response.json();
         console.log('Mesas recibidas:', mesas.length);
         renderizarMesas(mesas);
@@ -417,6 +421,10 @@ function seleccionarMesa(id, numero, estado) {
 async function cargarCategorias() {
     try {
         const response = await fetch(`${API_BASE}/categorias`);
+        if (!response.ok) {
+            console.error(`Error cargando categorías: ${response.status}`);
+            return;
+        }
         categorias = await response.json();
         renderizarCategorias();
     } catch (error) {
@@ -444,6 +452,10 @@ async function cargarProductos() {
     console.log('cargarProductos() llamado');
     try {
         const response = await fetch(`${API_BASE}/productos`);
+        if (!response.ok) {
+            console.error(`Error cargando productos: ${response.status}`);
+            return;
+        }
         productos = await response.json();
         console.log('Productos recibidos:', productos.length);
         renderizarProductos();
@@ -1216,6 +1228,10 @@ function iniciarActualizacionCajero() {
 async function cargarPedidosCajero() {
     try {
         const response = await fetch(`${API_BASE}/cajero/pedidos`);
+        if (!response.ok) {
+            console.error(`Error cargando pedidos cajero: ${response.status}`);
+            return;
+        }
         const pedidos = await response.json();
         renderizarPedidosCajero(pedidos);
     } catch (error) {
@@ -1885,6 +1901,10 @@ function iniciarActualizacionCocina() {
 async function cargarPedidosCocina() {
     try {
         const response = await fetch(`${API_BASE}/cocina/pedidos`);
+        if (!response.ok) {
+            console.error(`Error cargando pedidos cocina: ${response.status}`);
+            return;
+        }
         const pedidos = await response.json();
         renderizarPedidosCocina(pedidos);
     } catch (error) {

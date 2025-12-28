@@ -122,6 +122,10 @@ function showSection(section) {
 async function cargarEstadisticas() {
     try {
         const response = await fetch(`${API_INV}/estadisticas`);
+        if (!response.ok) {
+            console.error(`Error cargando estadísticas: ${response.status}`);
+            return;
+        }
         const stats = await response.json();
 
         document.getElementById('stat-productos').textContent = stats.total_materias || 0;
@@ -131,11 +135,19 @@ async function cargarEstadisticas() {
 
         // Cargar alertas para dashboard
         const alertasResp = await fetch(`${API_INV}/alertas`);
+        if (!alertasResp.ok) {
+            console.error(`Error cargando alertas: ${alertasResp.status}`);
+            return;
+        }
         const alertas = await alertasResp.json();
         renderDashboardAlertas(alertas.slice(0, 5));
 
         // Cargar últimos movimientos para dashboard
         const movResp = await fetch(`${API_INV}/movimientos?limit=5`);
+        if (!movResp.ok) {
+            console.error(`Error cargando movimientos: ${movResp.status}`);
+            return;
+        }
         const movimientos = await movResp.json();
         renderDashboardMovimientos(movimientos);
 
