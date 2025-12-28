@@ -1127,6 +1127,7 @@ def get_estadisticas_hoy():
 # ============ ENDPOINTS DE REPORTES ============
 
 @pos_bp.route('/reportes/hoy', methods=['GET'])
+@role_required('manager')
 def get_reportes_hoy():
     """Obtiene reporte completo del día actual desde tabla ventas_diarias"""
     conn = get_db()
@@ -1179,6 +1180,7 @@ def get_reportes_hoy():
     })
 
 @pos_bp.route('/reportes/periodo', methods=['GET'])
+@role_required('manager')
 def get_reportes_periodo():
     """
     Obtiene reporte para un período determinado
@@ -1273,6 +1275,7 @@ def get_reportes_periodo():
     })
 
 @pos_bp.route('/reportes/comparativa', methods=['GET'])
+@role_required('manager')
 def get_reportes_comparativa():
     """
     Compara dos fechas específicas
