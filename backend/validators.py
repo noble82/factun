@@ -116,8 +116,14 @@ def validar_numero_entero(valor, nombre_campo="valor", minimo=None, maximo=None)
     """
     try:
         if isinstance(valor, str):
+            # Verificar si el string contiene punto decimal
+            if '.' in valor.strip():
+                return False, None, f"El {nombre_campo} debe ser un número entero válido"
             valor = int(valor.strip())
         else:
+            # Verificar si el número tiene decimales
+            if isinstance(valor, float) and valor % 1 != 0:
+                return False, None, f"El {nombre_campo} debe ser un número entero válido"
             valor = int(valor)
     except (ValueError, TypeError, AttributeError):
         return False, None, f"El {nombre_campo} debe ser un número entero válido"
