@@ -171,8 +171,132 @@ function limpiarSesion() {
     try {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
+        sessionStorage.removeItem('csrf_token');
     } catch (e) {
         console.error('Error limpiando sesión:', e);
+    }
+}
+
+// ============ CSRF PROTECTION ============
+
+/**
+ * Obtiene el token CSRF almacenado en sesión
+ * @returns {string|null} Token CSRF si existe, null caso contrario
+ */
+function getCsrfToken() {
+    try {
+        return sessionStorage.getItem('csrf_token');
+    } catch (e) {
+        console.error('Error accediendo CSRF token:', e);
+        return null;
+    }
+}
+
+/**
+ * Guarda el token CSRF de forma segura en sessionStorage
+ * @param {string} token - Token CSRF a guardar
+ */
+function saveCsrfToken(token) {
+    try {
+        if (token) {
+            sessionStorage.setItem('csrf_token', token);
+        } else {
+            sessionStorage.removeItem('csrf_token');
+        }
+    } catch (e) {
+        console.error('Error guardando CSRF token:', e);
+    }
+}
+
+/**
+ * Obtiene headers con autenticación y CSRF token
+ * Reemplaza getAuthHeaders - esta es la versión mejorada
+ * @param {string} contentType - Content-Type del request
+ * @returns {object} Headers con autenticación y CSRF
+ */
+function getSecureHeaders(contentType = 'application/json') {
+    const token = getAuthToken();
+    const csrfToken = getCsrfToken();
+    const headers = {
+        'Content-Type': contentType
+    };
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    return headers;
+}
+
+/**
+ * Actualiza el CSRF token desde la respuesta (header o body)
+ * Debe llamarse después de cada request para obtener un nuevo token válido
+ * @param {Response} response - Respuesta del fetch
+ */
+function updateCsrfTokenFromResponse(response) {
+    // Intentar obtener token del header
+    const tokenFromHeader = response.headers.get('X-CSRF-Token');
+    if (tokenFromHeader) {
+        saveCsrfToken(tokenFromHeader);
+        return;
+    }
+
+    // Intentar obtener token del body si es JSON
+    if (response.headers.get('content-type')?.includes('application/json')) {
+        try {
+            response.clone().json().then(data => {
+                if (data._csrf_token) {
+                    saveCsrfToken(data._csrf_token);
+                }
+            }).catch(() => {
+                // Ignorar errores de parseo
+            });
+        } catch (e) {
+            console.error('Error obteniendo CSRF token de respuesta:', e);
+        }
+    }
+}
+
+/**
+ * Wrapper para fetch que automáticamente incluye autenticación y CSRF tokens
+ * @param {string} url - URL del endpoint
+ * @param {object} options - Opciones de fetch (method, body, etc)
+ * @returns {Promise<Response>} Respuesta del fetch
+ */
+async function apiFetch(url, options = {}) {
+    // Obtener headers seguros (con auth y CSRF tokens)
+    const headers = getSecureHeaders(
+        options.headers?.['Content-Type'] || 'application/json'
+    );
+
+    // Mergear con headers adicionales de opciones
+    const mergedOptions = {
+        ...options,
+        headers: { ...headers, ...(options.headers || {}) }
+    };
+
+    try {
+        const response = await fetch(url, mergedOptions);
+
+        // Actualizar CSRF token desde respuesta
+        updateCsrfTokenFromResponse(response);
+
+        // Si la respuesta es 401, posiblemente el token de auth expiró
+        if (response.status === 401) {
+            console.warn('Autenticación expirada');
+            limpiarSesion();
+            window.location.href = '/login.html';
+            return null;
+        }
+
+        return response;
+    } catch (error) {
+        console.error(`Error en apiFetch(${url}):`, error);
+        throw error;
     }
 }
 
@@ -449,4 +573,203 @@ function deshabilitarFormulario(formId, disabled = true) {
     form.querySelectorAll('input, select, textarea, button').forEach(elem => {
         elem.disabled = disabled;
     });
+}
+
+// ============ CONSTANTES Y CONFIGURACIÓN ============
+
+/**
+ * Constantes para rates, timings y configuración general
+ */
+const CONFIG = {
+    // Tasas fiscales
+    IVA_RATE: 0.13,  // 13% IVA El Salvador
+
+    // Polling intervals (ms)
+    POLLING_INTERVALS: {
+        MESERO: 5000,      // Update mesas and orders
+        CAJERO: 5000,      // Update orders and stats
+        REPORTS: 5000,     // Update sales reports
+        COCINA: 3000,      // Faster kitchen updates
+        CLOCK: 1000,       // Real-time clock
+        DEBOUNCE: 300      // Search debounce
+    },
+
+    // Colors for status badges
+    ESTADO_COLORES: {
+        'borrador': 'bg-secondary',
+        'enviada': 'bg-primary',
+        'parcial': 'bg-warning',
+        'recibida': 'bg-success',
+        'cancelada': 'bg-danger',
+        'pagado': 'bg-success',
+        'pendiente_pago': 'bg-warning',
+        'credito': 'bg-info',
+        'cerrado': 'bg-success',
+        'servido': 'bg-info',
+        'listo': 'bg-success',
+        'en_cocina': 'bg-warning'
+    },
+
+    // Validation rules
+    VALIDATION: {
+        MIN_PASSWORD_LENGTH: 8,
+        MAX_SEARCH_LENGTH: 100,
+        MIN_SEARCH_LENGTH: 2
+    }
+};
+
+// ============ OPTIMIZACIÓN - Consolidación de Funciones ============
+
+/**
+ * Renderiza una lista genérica de items
+ * @param {HTMLElement|string} container - Contenedor o su ID
+ * @param {Array} items - Items a renderizar
+ * @param {Function} template - Función que retorna HTML para cada item
+ * @param {string} emptyMsg - Mensaje cuando no hay items
+ */
+function renderItems(container, items, template, emptyMsg = 'No hay datos') {
+    const elem = typeof container === 'string'
+        ? document.getElementById(container)
+        : container;
+
+    if (!elem) return;
+
+    if (!items || items.length === 0) {
+        elem.innerHTML = `<div class="alert alert-info">${escapeHtml(emptyMsg)}</div>`;
+        return;
+    }
+
+    elem.innerHTML = items.map(item => template(item)).join('');
+}
+
+/**
+ * Factory para crear funciones de búsqueda con debounce
+ * @param {Function} searchFn - Función que realiza la búsqueda
+ * @param {number} debounceMs - Millisegundos de debounce
+ * @returns {Function} Función de búsqueda con debounce
+ */
+function createDebouncedFunction(searchFn, debounceMs = CONFIG.POLLING_INTERVALS.DEBOUNCE) {
+    let timeout = null;
+
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            searchFn(...args);
+        }, debounceMs);
+    };
+}
+
+/**
+ * Muestra o esconde un modal Bootstrap de forma segura
+ * @param {string} modalId - ID del modal
+ * @param {boolean} show - True para mostrar, false para esconder
+ */
+function toggleModal(modalId, show = true) {
+    const modalEl = document.getElementById(modalId);
+    if (!modalEl) {
+        console.warn(`Modal ${modalId} not found`);
+        return null;
+    }
+
+    try {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        if (show) {
+            modal.show();
+        } else {
+            modal.hide();
+        }
+        return modal;
+    } catch (error) {
+        console.error(`Error toggling modal ${modalId}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Calcula el IVA basado en un subtotal
+ * @param {number} subtotal - Subtotal sin IVA
+ * @param {number} rate - Tasa IVA (default 0.13)
+ * @returns {number} Monto de IVA
+ */
+function calculateIVA(subtotal, rate = CONFIG.IVA_RATE) {
+    if (!validarNumeroPositivo(subtotal)) return 0;
+    return parseFloat((subtotal * rate).toFixed(2));
+}
+
+/**
+ * Calcula el total incluyendo IVA
+ * @param {number} subtotal - Subtotal
+ * @param {boolean} includeIVA - Si incluir IVA
+ * @returns {number} Total con IVA si aplica
+ */
+function calculateTotal(subtotal, includeIVA = false) {
+    if (!validarNumeroPositivo(subtotal)) return 0;
+
+    if (!includeIVA) return parseFloat(subtotal).toFixed(2);
+
+    const iva = calculateIVA(subtotal);
+    return parseFloat((subtotal + iva).toFixed(2));
+}
+
+/**
+ * Obtiene la clase de color para un estado
+ * @param {string} estado - Estado a colorear
+ * @returns {string} Clase Bootstrap de color
+ */
+function getEstadoColor(estado) {
+    return CONFIG.ESTADO_COLORES[estado] || 'bg-secondary';
+}
+
+/**
+ * Limpia listeners y timers cuando cambia de rol
+ * Evita memory leaks y comportamiento duplicado
+ */
+function limpiarListeners() {
+    // Limpiar todos los timeouts pendientes
+    let maxTimeout = setTimeout(() => {}, 0);
+    for (let i = 1; i <= maxTimeout; i++) {
+        clearTimeout(i);
+    }
+}
+
+/**
+ * Obtiene el texto de un elemento de forma segura
+ * @param {string} elementId - ID del elemento
+ * @returns {string} Texto limpio del elemento
+ */
+function getElementText(elementId) {
+    const elem = document.getElementById(elementId);
+    return elem ? elem.textContent.trim() : '';
+}
+
+/**
+ * Establece el texto de un elemento de forma segura (contra XSS)
+ * @param {string} elementId - ID del elemento
+ * @param {string} text - Texto a establecer
+ */
+function setElementText(elementId, text) {
+    const elem = document.getElementById(elementId);
+    if (elem) {
+        elem.textContent = text;  // textContent es seguro contra XSS
+    }
+}
+
+/**
+ * Realiza una acción después de que se completa una transición CSS
+ * Útil para esperar a que se cierre un modal antes de recargar datos
+ * @param {HTMLElement} element - Elemento con transición
+ * @param {Function} callback - Función a ejecutar después
+ */
+function afterTransition(element, callback) {
+    if (!element) {
+        callback();
+        return;
+    }
+
+    const handler = () => {
+        element.removeEventListener('transitionend', handler);
+        callback();
+    };
+
+    element.addEventListener('transitionend', handler);
 }

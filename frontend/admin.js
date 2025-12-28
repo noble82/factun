@@ -1001,8 +1001,8 @@ function renderItemsOrden() {
 
     // Calcular totales
     const subtotal = itemsOrden.reduce((sum, i) => sum + i.subtotal, 0);
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = calculateIVA(subtotal);
+    const total = calculateTotal(subtotal);
 
     document.getElementById('orden-subtotal').textContent = `$${subtotal.toFixed(2)}`;
     document.getElementById('orden-iva').textContent = `$${iva.toFixed(2)}`;

@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -9,6 +9,7 @@ import base64
 import json
 from io import BytesIO
 from dotenv import load_dotenv
+from csrf import generate_csrf_token, validate_csrf_token
 
 load_dotenv()
 
@@ -30,6 +31,61 @@ app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 # Pasar el limiter a auth.py para rate limiting en login
 set_limiter(limiter)
+
+# ============ CSRF PROTECTION ============
+
+@app.before_request
+def csrf_protect():
+    """
+    Validates CSRF token for state-changing requests (POST, PUT, DELETE).
+    Generates a new token for each response.
+    """
+    # Skip CSRF validation for GET requests and health checks
+    if request.method in ['GET', 'HEAD', 'OPTIONS']:
+        return
+
+    # Skip CSRF validation for specific endpoints (auth login, health)
+    skip_paths = ['/api/auth/login', '/health', '/healthz', '/api/auth/test']
+    if any(request.path.startswith(path) for path in skip_paths):
+        return
+
+    # Validate CSRF token for POST, PUT, DELETE requests
+    if request.method in ['POST', 'PUT', 'DELETE']:
+        # Get token from header or form data
+        token = request.headers.get('X-CSRF-Token') or request.form.get('csrf_token')
+
+        if not token:
+            return jsonify({"error": "CSRF token missing"}), 403
+
+        is_valid, message = validate_csrf_token(token)
+        if not is_valid:
+            return jsonify({"error": f"CSRF validation failed: {message}"}), 403
+
+
+@app.after_request
+def add_csrf_token(response):
+    """
+    Adds a new CSRF token to every response.
+    Token is included in response header and JSON body if applicable.
+    """
+    # Generate a new CSRF token
+    token = generate_csrf_token()
+
+    # Add token to response header
+    response.headers['X-CSRF-Token'] = token
+
+    # If response is JSON, try to include token in body
+    if response.content_type and 'application/json' in response.content_type:
+        try:
+            data = json.loads(response.get_data(as_text=True))
+            if isinstance(data, dict):
+                data['_csrf_token'] = token
+                response.set_data(json.dumps(data))
+        except Exception:
+            # If response is not valid JSON, just use header
+            pass
+
+    return response
 
 # Registrar Blueprint del POS
 from pos import pos_bp

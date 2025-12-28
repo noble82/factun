@@ -21,7 +21,7 @@ let updateInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     actualizarReloj();
-    setInterval(actualizarReloj, 1000);
+    setInterval(actualizarReloj, CONFIG.POLLING_INTERVALS.CLOCK);
 
     // Event listener para calcular cambio
     document.getElementById('monto-recibido')?.addEventListener('input', calcularCambio);
@@ -372,7 +372,7 @@ function iniciarActualizacionMesero() {
     updateInterval = setInterval(() => {
         cargarMesas();
         cargarPedidosParaServir();
-    }, 5000);
+    }, CONFIG.POLLING_INTERVALS.MESERO);
 }
 
 async function cargarMesas() {
@@ -582,8 +582,8 @@ function renderizarCarrito() {
 
     // Calcular totales
     const subtotal = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = calculateIVA(subtotal);
+    const total = calculateTotal(subtotal);
 
     if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
     if (ivaEl) ivaEl.textContent = `$${iva.toFixed(2)}`;
@@ -973,8 +973,8 @@ function renderizarCarritoCajero() {
 
     // Calcular totales
     const subtotal = carritoCajero.reduce((sum, item) => sum + item.subtotal, 0);
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = calculateIVA(subtotal);
+    const total = calculateTotal(subtotal);
 
     document.getElementById('cart-subtotal-cajero').textContent = `$${subtotal.toFixed(2)}`;
     document.getElementById('cart-iva-cajero').textContent = `$${iva.toFixed(2)}`;
@@ -1210,7 +1210,7 @@ function iniciarActualizacionCajero() {
     updateInterval = setInterval(() => {
         cargarPedidosCajero();
         cargarEstadisticas();
-    }, 5000);
+    }, CONFIG.POLLING_INTERVALS.CAJERO);
 }
 
 async function cargarPedidosCajero() {
@@ -1869,7 +1869,7 @@ function iniciarActualizacionReportes() {
         if (tabActiva && tabActiva.getAttribute('data-bs-target') === '#cajero-reportes-tab') {
             cargarReportesRapidos(periodoReportesActual);
         }
-    }, 5000);  // 5 segundos en lugar de 30
+    }, CONFIG.POLLING_INTERVALS.REPORTS);  // 5 segundos en lugar de 30
 }
 
 // ============ FUNCIONES DE COCINA ============
@@ -1879,7 +1879,7 @@ async function cargarDatosCocina() {
 }
 
 function iniciarActualizacionCocina() {
-    updateInterval = setInterval(cargarPedidosCocina, 3000);
+    updateInterval = setInterval(cargarPedidosCocina, CONFIG.POLLING_INTERVALS.COCINA);
 }
 
 async function cargarPedidosCocina() {
@@ -2338,8 +2338,8 @@ function actualizarCarritoMobile() {
 
     // Calcular totales
     const subtotal = carritoActual.reduce((sum, item) => sum + item.subtotal, 0);
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
+    const iva = calculateIVA(subtotal);
+    const total = calculateTotal(subtotal);
 
     const subtotalEl = document.getElementById('cart-sheet-subtotal');
     const ivaEl = document.getElementById('cart-sheet-iva');
