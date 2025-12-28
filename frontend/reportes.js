@@ -7,36 +7,67 @@ let graficoTendencia = null;
 let graficoMetodos = null;
 
 // Inicializar cuando carga la página
-document.addEventListener('DOMContentLoaded', () => {
-    verificarAutenticacion();
+document.addEventListener('DOMContentLoaded', async () => {
+    await verificarAutenticacion();
     inicializarFiltros();
     cargarReportes();
 });
 
 // Verificar autenticación y rol
 async function verificarAutenticacion() {
-    const token = localStorage.getItem('token');
-    const rol = localStorage.getItem('rol');
+    // Intentar obtener usuario actual y verificar sesión
+    let user = getUsuarioActual();
 
-    if (!token) {
+    if (!user) {
+        // Si no hay usuario en localStorage, verificar con el servidor
+        user = await verificarSesion();
+    }
+
+    // Si no hay usuario después de verificar, ir a login
+    if (!user) {
         window.location.href = 'login.html';
         return;
     }
 
     // Solo managers pueden ver reportes detallados
-    if (rol !== 'manager') {
-        mostrarMensajeError('Acceso denegado', 'Solo los managers pueden ver reportes detallados');
-        setTimeout(() => window.location.href = 'index.html', 2000);
+    if (user.rol !== 'manager') {
+        const container = document.querySelector('.container-fluid');
+        if (container) {
+            container.innerHTML = `
+                <div class="alert alert-danger" role="alert" style="margin: 2rem;">
+                    <h4 class="alert-heading">Acceso Denegado</h4>
+                    <p>Solo los managers pueden acceder a los reportes detallados.</p>
+                    <hr>
+                    <p class="mb-0">Tu rol es: <strong>${user.rol}</strong></p>
+                </div>
+            `;
+        }
+        setTimeout(() => {
+            window.location.href = 'admin.html';
+        }, 3000);
+        return;
     }
 }
 
 // Inicializar filtros con fechas por defecto
 function inicializarFiltros() {
-    const hoy = new Date();
-    const hace30d = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+    try {
+        const fechaInicio = document.getElementById('fecha-inicio');
+        const fechaFin = document.getElementById('fecha-fin');
 
-    document.getElementById('fecha-fin').valueAsDate = hoy;
-    document.getElementById('fecha-inicio').valueAsDate = hace30d;
+        if (!fechaInicio || !fechaFin) {
+            console.warn('Elementos de filtro de fechas no encontrados');
+            return;
+        }
+
+        const hoy = new Date();
+        const hace30d = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        fechaInicio.valueAsDate = hace30d;
+        fechaFin.valueAsDate = hoy;
+    } catch (error) {
+        console.error('Error inicializando filtros:', error);
+    }
 }
 
 // Cargar reportes con las fechas actuales
@@ -55,14 +86,26 @@ async function cargarReportes() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`);
-        if (!response.ok) throw new Error('Error cargando reportes');
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = 'login.html';
+                return;
+            }
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
 
         datosActuales = await response.json();
         renderizarReportes();
     } catch (error) {
         console.error('Error:', error);
-        mostrarMensajeError('Error', 'No se pudieron cargar los reportes');
+        mostrarMensajeError('Error', 'No se pudieron cargar los reportes. Verifica tu conexión y permisos.');
     }
 }
 
