@@ -268,9 +268,9 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_facturado_at ON pedidos(facturado_at)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_pagado_at ON pedidos(pagado_at)')
 
-    # Índices en items_pedido (tabla de relación pedido-producto)
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_items_pedido_pedido_id ON items_pedido(pedido_id)')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_items_pedido_producto_id ON items_pedido(producto_id)')
+    # Índices en pedido_items (tabla de relación pedido-producto)
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedido_items_pedido_id ON pedido_items(pedido_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedido_items_producto_id ON pedido_items(producto_id)')
 
     # Índices en productos
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_productos_categoria_id ON productos(categoria_id)')
