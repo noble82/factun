@@ -7,6 +7,7 @@ import sqlite3
 import os
 from datetime import datetime
 from flask import Blueprint, request, jsonify
+from auth import role_required
 
 inventario_bp = Blueprint('inventario', __name__)
 
@@ -176,6 +177,23 @@ def init_inventario_db():
             FOREIGN KEY (materia_prima_id) REFERENCES materia_prima(id),
             FOREIGN KEY (proveedor_id) REFERENCES proveedores(id),
             UNIQUE(materia_prima_id, proveedor_id)
+        )
+    ''')
+
+    # Tabla de extracciones de materia prima (control manual de libras/kg extraídas por jornada)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS extracciones_materia_prima (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha DATE NOT NULL,
+            hora TIME,
+            materia_prima_id INTEGER NOT NULL,
+            cantidad_extraida REAL NOT NULL,
+            unidad_medida TEXT,
+            motivo TEXT,
+            descripcion TEXT,
+            usuario TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (materia_prima_id) REFERENCES materia_prima(id)
         )
     ''')
 
@@ -1182,6 +1200,261 @@ def recibir_orden_compra(id):
     })
 
 
+# ============ ENDPOINTS PARA EXTRACCIONES DE MATERIA PRIMA ============
+
+@inventario_bp.route('/extracciones', methods=['POST'])
+@role_required('manager')
+def crear_extraccion():
+    """Registra una nueva extracción de materia prima"""
+    data = request.get_json()
+
+    fecha = data.get('fecha')
+    materia_prima_id = data.get('materia_prima_id')
+    cantidad_extraida = data.get('cantidad_extraida')
+    unidad_medida = data.get('unidad_medida')
+    motivo = data.get('motivo')
+    descripcion = data.get('descripcion')
+    usuario = data.get('usuario', 'Sistema')
+
+    if not fecha or not materia_prima_id or not cantidad_extraida:
+        return jsonify({
+            'success': False,
+            'message': 'Campos requeridos faltando: fecha, materia_prima_id, cantidad_extraida'
+        }), 400
+
+    try:
+        cantidad_extraida = float(cantidad_extraida)
+        if cantidad_extraida <= 0:
+            return jsonify({
+                'success': False,
+                'message': 'La cantidad debe ser mayor a 0'
+            }), 400
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'message': 'Cantidad inválida'
+        }), 400
+
+    result = registrar_extraccion_materia_prima(
+        fecha=fecha,
+        materia_prima_id=materia_prima_id,
+        cantidad_extraida=cantidad_extraida,
+        unidad_medida=unidad_medida,
+        motivo=motivo,
+        descripcion=descripcion,
+        usuario=usuario
+    )
+
+    status_code = 201 if result['success'] else 400
+    return jsonify(result), status_code
+
+
+@inventario_bp.route('/extracciones', methods=['GET'])
+@role_required('manager')
+def listar_extracciones():
+    """Lista extracciones de materia prima con filtros opcionales"""
+    fecha = request.args.get('fecha')  # YYYY-MM-DD
+    materia_prima_id = request.args.get('materia_prima_id')
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT e.id, e.fecha, e.hora, e.materia_prima_id, e.cantidad_extraida,
+               e.unidad_medida, e.motivo, e.descripcion, e.usuario, e.created_at,
+               mp.nombre as materia_prima_nombre, mp.stock_actual
+        FROM extracciones_materia_prima e
+        JOIN materia_prima mp ON e.materia_prima_id = mp.id
+        WHERE 1=1
+    '''
+    params = []
+
+    if fecha:
+        query += ' AND DATE(e.fecha) = ?'
+        params.append(fecha)
+
+    if materia_prima_id:
+        query += ' AND e.materia_prima_id = ?'
+        params.append(materia_prima_id)
+
+    query += ' ORDER BY e.fecha DESC, e.hora DESC LIMIT ? OFFSET ?'
+    params.extend([limit, offset])
+
+    cursor.execute(query, params)
+    extracciones = cursor.fetchall()
+
+    # Obtener total
+    count_query = '''
+        SELECT COUNT(*) as total FROM extracciones_materia_prima e WHERE 1=1
+    '''
+    count_params = []
+    if fecha:
+        count_query += ' AND DATE(e.fecha) = ?'
+        count_params.append(fecha)
+    if materia_prima_id:
+        count_query += ' AND e.materia_prima_id = ?'
+        count_params.append(materia_prima_id)
+
+    cursor.execute(count_query, count_params)
+    total = cursor.fetchone()['total']
+
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'extracciones': [dict(row) for row in extracciones],
+        'total': total,
+        'limit': limit,
+        'offset': offset
+    })
+
+
+@inventario_bp.route('/extracciones/<int:id>', methods=['PUT'])
+@role_required('manager')
+def actualizar_extraccion(id):
+    """Actualiza una extracción de materia prima (solo si es del mismo día)"""
+    data = request.get_json()
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM extracciones_materia_prima WHERE id = ?', (id,))
+    extraccion = cursor.fetchone()
+
+    if not extraccion:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Extracción no encontrada'}), 404
+
+    # Obtener datos actuales
+    cantidad_anterior = extraccion['cantidad_extraida']
+    materia_prima_id = extraccion['materia_prima_id']
+
+    # Nuevos datos
+    cantidad_nueva = data.get('cantidad_extraida', cantidad_anterior)
+    motivo = data.get('motivo', extraccion['motivo'])
+    descripcion = data.get('descripcion', extraccion['descripcion'])
+
+    try:
+        cantidad_nueva = float(cantidad_nueva)
+        if cantidad_nueva <= 0:
+            return jsonify({'success': False, 'message': 'Cantidad debe ser > 0'}), 400
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Cantidad inválida'}), 400
+
+    # Calcular diferencia
+    diferencia = cantidad_nueva - cantidad_anterior
+
+    # Actualizar stock de materia prima
+    cursor.execute('SELECT stock_actual FROM materia_prima WHERE id = ?', (materia_prima_id,))
+    mp = cursor.fetchone()
+
+    if mp:
+        stock_anterior = mp['stock_actual']
+        stock_nuevo = stock_anterior - diferencia
+
+        cursor.execute('''
+            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
+            WHERE id = ?
+        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
+
+        # Actualizar extracción
+        cursor.execute('''
+            UPDATE extracciones_materia_prima
+            SET cantidad_extraida = ?, motivo = ?, descripcion = ?
+            WHERE id = ?
+        ''', (cantidad_nueva, motivo, descripcion, id))
+
+        # Registrar movimiento de ajuste si hay diferencia
+        if diferencia != 0:
+            cursor.execute('''
+                INSERT INTO movimientos_inventario (
+                    materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
+                    referencia_tipo, referencia_id, motivo, usuario
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                materia_prima_id,
+                'ajuste_extraccion',
+                diferencia,
+                stock_anterior,
+                stock_nuevo,
+                'extraccion',
+                id,
+                f'Ajuste de extracción: {motivo}',
+                data.get('usuario', 'Sistema')
+            ))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'message': f'Extracción actualizada',
+        'extraccion_id': id
+    })
+
+
+@inventario_bp.route('/extracciones/<int:id>', methods=['DELETE'])
+@role_required('manager')
+def eliminar_extraccion(id):
+    """Elimina una extracción y revierte el descuento de stock"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM extracciones_materia_prima WHERE id = ?', (id,))
+    extraccion = cursor.fetchone()
+
+    if not extraccion:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Extracción no encontrada'}), 404
+
+    materia_prima_id = extraccion['materia_prima_id']
+    cantidad_extraida = extraccion['cantidad_extraida']
+
+    # Revertir el stock (sumar la cantidad que se había restado)
+    cursor.execute('SELECT stock_actual FROM materia_prima WHERE id = ?', (materia_prima_id,))
+    mp = cursor.fetchone()
+
+    if mp:
+        stock_anterior = mp['stock_actual']
+        stock_nuevo = stock_anterior + cantidad_extraida
+
+        cursor.execute('''
+            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
+            WHERE id = ?
+        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
+
+        # Registrar movimiento de reversión
+        cursor.execute('''
+            INSERT INTO movimientos_inventario (
+                materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
+                referencia_tipo, referencia_id, motivo, usuario
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            materia_prima_id,
+            'reversal_extraccion',
+            -cantidad_extraida,
+            stock_anterior,
+            stock_nuevo,
+            'extraccion',
+            id,
+            f'Reversión de extracción eliminada',
+            'Sistema'
+        ))
+
+    # Eliminar la extracción
+    cursor.execute('DELETE FROM extracciones_materia_prima WHERE id = ?', (id,))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        'success': True,
+        'message': 'Extracción eliminada y stock revertido'
+    })
+
+
 # ============ FUNCIÓN PARA DESCONTAR STOCK POR VENTA ============
 
 def descontar_stock_pedido(pedido_id):
@@ -1204,7 +1477,7 @@ def descontar_stock_pedido(pedido_id):
 
     for item in items:
         # CASO 1: Producto de consumo directo (tiene materia_prima_id)
-        # Se descuenta 1:1 del inventario
+        # Se descuenta 1:1 del inventario (bebidas embotelladas, cervezas, etc.)
         if item['materia_prima_id']:
             cursor.execute('''
                 SELECT id, nombre, stock_actual FROM materia_prima WHERE id = ?
@@ -1234,42 +1507,113 @@ def descontar_stock_pedido(pedido_id):
                     f"Venta: {item['cantidad']}x {item['producto_nombre']}", 'POS'
                 ))
 
-        # CASO 2: Producto preparado (tiene receta)
-        # Se descuenta según la receta de ingredientes
-        else:
-            cursor.execute('''
-                SELECT r.materia_prima_id, r.cantidad as cantidad_por_unidad,
-                       mp.nombre as materia_nombre, mp.stock_actual
-                FROM recetas r
-                JOIN materia_prima mp ON r.materia_prima_id = mp.id
-                WHERE r.producto_id = ?
-            ''', (item['producto_id'],))
-
-            ingredientes = cursor.fetchall()
-
-            for ing in ingredientes:
-                # Calcular cantidad a descontar
-                cantidad_descontar = ing['cantidad_por_unidad'] * item['cantidad']
-                stock_anterior = ing['stock_actual']
-                stock_nuevo = stock_anterior - cantidad_descontar
-
-                # Actualizar stock (permitir negativo para alertar)
-                cursor.execute('''
-                    UPDATE materia_prima SET stock_actual = ?, updated_at = ?
-                    WHERE id = ?
-                ''', (stock_nuevo, datetime.now().isoformat(), ing['materia_prima_id']))
-
-                # Registrar movimiento
-                cursor.execute('''
-                    INSERT INTO movimientos_inventario (
-                        materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
-                        referencia_tipo, referencia_id, motivo, usuario
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    ing['materia_prima_id'], 'salida', cantidad_descontar,
-                    stock_anterior, stock_nuevo, 'pedido', pedido_id,
-                    f"Venta: {item['cantidad']}x {item['producto_nombre']}", 'POS'
-                ))
+        # NOTA: Productos preparados (pupusas, chocolate, café, etc.) NO descuentan automáticamente
+        # El descuento de materia prima se registra manualmente mediante "extracciones" en el módulo de inventario
 
     conn.commit()
     conn.close()
+
+
+# ============ FUNCIÓN PARA REGISTRAR EXTRACCIONES DE MATERIA PRIMA ============
+
+def registrar_extraccion_materia_prima(fecha, materia_prima_id, cantidad_extraida,
+                                      unidad_medida=None, motivo=None, descripcion=None, usuario=None):
+    """
+    Registra una extracción de materia prima (libras/kg extraídas en una jornada)
+    Actualiza el stock_actual y crea un movimiento de inventario
+
+    Args:
+        fecha: DATE (YYYY-MM-DD)
+        materia_prima_id: ID de la materia prima
+        cantidad_extraida: REAL (cantidad extraída)
+        unidad_medida: TEXT (lb, kg, lt, etc) - opcional, se usa la de materia_prima
+        motivo: TEXT (ej: "Elaboración pupusas", "Elaboración bebidas")
+        descripcion: TEXT (detalles adicionales)
+        usuario: TEXT (quién registró)
+
+    Returns:
+        dict con {'success': bool, 'id': id_extraccion, 'message': str}
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # Obtener información de la materia prima
+        cursor.execute('''
+            SELECT id, nombre, unidad_medida, stock_actual FROM materia_prima WHERE id = ?
+        ''', (materia_prima_id,))
+
+        mp = cursor.fetchone()
+        if not mp:
+            return {
+                'success': False,
+                'message': f'Materia prima con ID {materia_prima_id} no existe'
+            }
+
+        # Usar unidad de medida del registro o de la materia prima
+        unidad = unidad_medida or mp['unidad_medida']
+        stock_anterior = mp['stock_actual']
+        stock_nuevo = stock_anterior - cantidad_extraida
+
+        # Registrar la extracción
+        cursor.execute('''
+            INSERT INTO extracciones_materia_prima (
+                fecha, hora, materia_prima_id, cantidad_extraida, unidad_medida,
+                motivo, descripcion, usuario, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            fecha,
+            datetime.now().time().isoformat(),
+            materia_prima_id,
+            cantidad_extraida,
+            unidad,
+            motivo,
+            descripcion,
+            usuario or 'POS',
+            datetime.now().isoformat()
+        ))
+
+        extraccion_id = cursor.lastrowid
+
+        # Actualizar stock de materia prima
+        cursor.execute('''
+            UPDATE materia_prima SET stock_actual = ?, updated_at = ?
+            WHERE id = ?
+        ''', (stock_nuevo, datetime.now().isoformat(), materia_prima_id))
+
+        # Registrar movimiento en historial
+        cursor.execute('''
+            INSERT INTO movimientos_inventario (
+                materia_prima_id, tipo, cantidad, stock_anterior, stock_nuevo,
+                referencia_tipo, referencia_id, motivo, usuario
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            materia_prima_id,
+            'extraccion',
+            cantidad_extraida,
+            stock_anterior,
+            stock_nuevo,
+            'extraccion',
+            extraccion_id,
+            motivo or 'Extracción de materia prima',
+            usuario or 'POS'
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return {
+            'success': True,
+            'id': extraccion_id,
+            'materia_prima': mp['nombre'],
+            'stock_anterior': stock_anterior,
+            'stock_nuevo': stock_nuevo,
+            'message': f'Extracción registrada: {cantidad_extraida} {unidad} de {mp["nombre"]}'
+        }
+
+    except Exception as e:
+        conn.close()
+        return {
+            'success': False,
+            'message': f'Error al registrar extracción: {str(e)}'
+        }
