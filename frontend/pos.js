@@ -112,12 +112,16 @@ window.onAuthVerificado = function(usuario) {
 
     } else if (usuario.rol === 'manager') {
         console.log('Manager: selector de roles visible');
-        // Mostrar enlaces de navegación para manager
+        // Mostrar enlaces de navegación para manager (desktop)
         const managerNavLinks = document.getElementById('manager-nav-links');
         if (managerNavLinks) {
             managerNavLinks.classList.remove('d-none');
             console.log('Enlaces de manager mostrados');
         }
+        // Mostrar items de navegación en dropdown (móvil)
+        document.getElementById('li-cambiar-rol').classList.remove('d-none');
+        document.getElementById('li-admin').classList.remove('d-none');
+        document.getElementById('li-factura').classList.remove('d-none');
     }
 
     console.log('=== Fin onAuthVerificado ===');
@@ -275,13 +279,23 @@ function seleccionarRol(rol) {
 
     // Solo mostrar botón de cambiar rol y enlaces de navegación para managers
     if (user.rol === 'manager') {
+        // Desktop buttons
         document.getElementById('btn-cambiar-rol').classList.remove('d-none');
         const managerNavLinks = document.getElementById('manager-nav-links');
         if (managerNavLinks) managerNavLinks.classList.remove('d-none');
+        // Mobile dropdown items
+        document.getElementById('li-cambiar-rol').classList.remove('d-none');
+        document.getElementById('li-admin').classList.remove('d-none');
+        document.getElementById('li-factura').classList.remove('d-none');
     } else {
+        // Desktop buttons
         document.getElementById('btn-cambiar-rol').classList.add('d-none');
         const managerNavLinks = document.getElementById('manager-nav-links');
         if (managerNavLinks) managerNavLinks.classList.add('d-none');
+        // Mobile dropdown items
+        document.getElementById('li-cambiar-rol').classList.add('d-none');
+        document.getElementById('li-admin').classList.add('d-none');
+        document.getElementById('li-factura').classList.add('d-none');
     }
 
     // Ocultar todos los paneles

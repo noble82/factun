@@ -745,28 +745,59 @@
             <span class="navbar-brand mb-0 h1">
                 <i class="bi bi-shop"></i> POS Pupusería
             </span>
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
                 <span id="current-role" class="badge bg-light text-dark d-none"></span>
-                <span class="text-white d-none" id="usuario-info">
+                <span class="text-white d-none d-md-inline" id="usuario-info">
                     <i class="bi bi-person-circle"></i>
                     <span id="usuario-nombre-display"></span>
                 </span>
-                <span id="current-time" class="text-white"></span>
-                <!-- Enlaces solo para Manager -->
-                <div id="manager-nav-links" class="d-none">
-                    <a href="index.html" class="btn btn-outline-light btn-sm me-1">
-                        <i class="bi bi-receipt"></i> Facturación
-                    </a>
-                    <a href="admin.html" class="btn btn-outline-light btn-sm me-1">
-                        <i class="bi bi-gear"></i> Administración
-                    </a>
+                <span id="current-time" class="text-white d-none d-md-inline"></span>
+
+                <!-- Menú desplegable para navegación (responsive) -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="navDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-list"></i> <span class="d-md-none">Menú</span><span class="d-none d-md-inline">Opciones</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navDropdown" style="min-width: 180px;">
+                        <!-- Cambiar Rol - Solo para Manager -->
+                        <li id="li-cambiar-rol" class="d-none">
+                            <button class="dropdown-item" onclick="mostrarSelectorRol()">
+                                <i class="bi bi-arrow-repeat"></i> Cambiar Rol
+                            </button>
+                        </li>
+                        <!-- Administración - Solo para Manager -->
+                        <li id="li-admin" class="d-none">
+                            <a class="dropdown-item" href="admin.html">
+                                <i class="bi bi-gear"></i> Administración
+                            </a>
+                        </li>
+                        <!-- Facturación - Solo para Manager -->
+                        <li id="li-factura" class="d-none">
+                            <a class="dropdown-item" href="index.html">
+                                <i class="bi bi-receipt"></i> Facturación
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item" onclick="logout()">
+                                <i class="bi bi-box-arrow-right"></i> Salir
+                            </button>
+                        </li>
+                    </ul>
                 </div>
-                <button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none" onclick="mostrarSelectorRol()">
-                    <i class="bi bi-arrow-repeat"></i> Cambiar Rol
-                </button>
-                <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                    <i class="bi bi-box-arrow-right"></i> Salir
-                </button>
+
+                <!-- Botones en desktop (ocultos en móvil) -->
+                <div id="manager-nav-links" class="d-none d-lg-flex gap-2">
+                    <a href="index.html" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-receipt"></i> <span class="d-none d-xl-inline">Facturación</span>
+                    </a>
+                    <a href="admin.html" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-gear"></i> <span class="d-none d-xl-inline">Administración</span>
+                    </a>
+                    <button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none">
+                        <i class="bi bi-arrow-repeat"></i> <span class="d-none d-xl-inline">Cambiar Rol</span>
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
