@@ -1508,6 +1508,9 @@ async function confirmarPagoConComprobante() {
             cargarPedidosCajero();
             cargarEstadisticas();
             cargarMesas();
+
+            // Actualizar reportes rápidos inmediatamente para ver cambios en tiempo real
+            cargarReportesRapidos(periodoReportesActual || 'hoy');
         } else {
             // Hubo error en facturación pero la transacción continúa
             await fetch(`${API_BASE}/pedidos/${pedidoActualPago.id}/estado`, {
@@ -1526,6 +1529,9 @@ async function confirmarPagoConComprobante() {
             pedidoActualPago = null;
             cargarPedidosCajero();
             cargarMesas();
+
+            // Actualizar reportes rápidos incluso con error en comprobante
+            cargarReportesRapidos(periodoReportesActual || 'hoy');
         }
     } catch (error) {
         console.error('Error procesando pago con comprobante:', error);
@@ -1725,13 +1731,14 @@ function renderizarMetricasReportes(data) {
 }
 
 function iniciarActualizacionReportes() {
-    // Actualizar reportes cada 30 segundos mientras estén en la pestaña
+    // Actualizar reportes cada 5 segundos mientras estén en la pestaña
+    // (para ver datos en tiempo real conforme se procesan pagos)
     setInterval(() => {
         const tabActiva = document.querySelector('#cajeroTabs .nav-link.active');
         if (tabActiva && tabActiva.getAttribute('data-bs-target') === '#cajero-reportes-tab') {
             cargarReportesRapidos(periodoReportesActual);
         }
-    }, 30000);
+    }, 5000);  // 5 segundos en lugar de 30
 }
 
 // ============ FUNCIONES DE COCINA ============

@@ -1127,49 +1127,114 @@ def get_estadisticas_hoy():
 # ============ ENDPOINTS DE REPORTES ============
 
 @pos_bp.route('/reportes/hoy', methods=['GET'])
-@role_required('manager')
+@role_required('manager', 'cajero')
 def get_reportes_hoy():
-    """Obtiene reporte completo del día actual desde tabla ventas_diarias"""
+    """
+    Obtiene reporte completo del día actual.
+    Si hay consolidación diaria, usa datos consolidados.
+    Si no, calcula en vivo desde pedidos cerrados del día (para datos en tiempo real).
+    """
     conn = get_db()
     cursor = conn.cursor()
 
     hoy = datetime.now().strftime('%Y-%m-%d')
 
-    # Obtener resumen general del día
+    # Primero intentar obtener datos consolidados
     cursor.execute('''
         SELECT * FROM ventas_diarias WHERE fecha = ?
     ''', (hoy,))
 
     resumen = cursor.fetchone()
-    if not resumen:
-        # Si no existe registro, retornar datos vacíos
-        resumen_dict = {
-            'fecha': hoy,
-            'total_pedidos': 0,
-            'total_ventas': 0,
-            'subtotal_total': 0,
-            'impuesto_total': 0,
-            'efectivo': 0,
-            'credito': 0,
-            'cantidad_transacciones': 0,
-            'pedido_promedio': 0
-        }
-    else:
+
+    if resumen:
+        # Usar datos consolidados si existen
         resumen_dict = dict(resumen)
 
-    # Obtener desglose por producto
-    cursor.execute('''
-        SELECT * FROM ventas_diarias_productos WHERE fecha_venta = ?
-        ORDER BY cantidad_vendida DESC LIMIT 10
-    ''', (hoy,))
-    productos = [dict(row) for row in cursor.fetchall()]
+        # Obtener desglose por producto desde consolidados
+        cursor.execute('''
+            SELECT * FROM ventas_diarias_productos WHERE fecha_venta = ?
+            ORDER BY cantidad_vendida DESC LIMIT 10
+        ''', (hoy,))
+        productos = [dict(row) for row in cursor.fetchall()]
 
-    # Obtener desglose por categoría
-    cursor.execute('''
-        SELECT * FROM ventas_diarias_categorias WHERE fecha_venta = ?
-        ORDER BY subtotal DESC
-    ''', (hoy,))
-    categorias = [dict(row) for row in cursor.fetchall()]
+        # Obtener desglose por categoría desde consolidados
+        cursor.execute('''
+            SELECT * FROM ventas_diarias_categorias WHERE fecha_venta = ?
+            ORDER BY subtotal DESC
+        ''', (hoy,))
+        categorias = [dict(row) for row in cursor.fetchall()]
+    else:
+        # Calcular en vivo desde pedidos cerrados del día
+        # Esto asegura que los cajeros vean los datos en tiempo real
+        cursor.execute('''
+            SELECT
+                COUNT(*) as total_pedidos,
+                COALESCE(SUM(total), 0) as total_ventas,
+                COALESCE(SUM(subtotal), 0) as subtotal_total,
+                COALESCE(SUM(impuesto), 0) as impuesto_total,
+                COALESCE(SUM(CASE WHEN tipo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
+                COALESCE(SUM(CASE WHEN tipo_pago = 'credito' THEN total ELSE 0 END), 0) as credito
+            FROM pedidos
+            WHERE DATE(created_at) = ? AND estado = 'cerrado'
+        ''', (hoy,))
+
+        row = cursor.fetchone()
+        total_pedidos = row[0] if row[0] else 0
+        total_ventas = float(row[1]) if row[1] else 0.0
+        subtotal_total = float(row[2]) if row[2] else 0.0
+        impuesto_total = float(row[3]) if row[3] else 0.0
+        efectivo = float(row[4]) if row[4] else 0.0
+        credito = float(row[5]) if row[5] else 0.0
+
+        pedido_promedio = total_ventas / total_pedidos if total_pedidos > 0 else 0.0
+
+        resumen_dict = {
+            'fecha': hoy,
+            'total_pedidos': total_pedidos,
+            'total_ventas': total_ventas,
+            'subtotal_total': subtotal_total,
+            'impuesto_total': impuesto_total,
+            'efectivo': efectivo,
+            'credito': credito,
+            'cantidad_transacciones': total_pedidos,
+            'pedido_promedio': pedido_promedio
+        }
+
+        # Obtener top 10 productos del día
+        cursor.execute('''
+            SELECT
+                p.nombre as producto_nombre,
+                COALESCE(c.nombre, 'Sin categoría') as categoria,
+                SUM(pi.cantidad) as cantidad_vendida,
+                SUM(pi.subtotal) as subtotal
+            FROM pedido_items pi
+            JOIN pedidos ped ON pi.pedido_id = ped.id
+            JOIN productos p ON pi.producto_id = p.id
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            WHERE DATE(ped.created_at) = ? AND ped.estado = 'cerrado'
+            GROUP BY pi.producto_id, p.nombre, c.nombre
+            ORDER BY cantidad_vendida DESC
+            LIMIT 10
+        ''', (hoy,))
+        productos = [dict(zip(['producto_nombre', 'categoria', 'cantidad_vendida', 'subtotal'], row))
+                    for row in cursor.fetchall()]
+
+        # Obtener ventas por categoría del día
+        cursor.execute('''
+            SELECT
+                COALESCE(c.nombre, 'Sin categoría') as categoria_nombre,
+                SUM(pi.cantidad) as cantidad_vendida,
+                SUM(pi.subtotal) as subtotal
+            FROM pedido_items pi
+            JOIN pedidos ped ON pi.pedido_id = ped.id
+            JOIN productos p ON pi.producto_id = p.id
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            WHERE DATE(ped.created_at) = ? AND ped.estado = 'cerrado'
+            GROUP BY c.id, c.nombre
+            ORDER BY subtotal DESC
+        ''', (hoy,))
+        categorias = [dict(zip(['categoria_nombre', 'cantidad_vendida', 'subtotal'], row))
+                     for row in cursor.fetchall()]
 
     conn.close()
 
