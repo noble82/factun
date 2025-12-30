@@ -281,7 +281,7 @@ function updateCsrfTokenFromResponse(response) {
  * @param {object} options - Opciones de fetch (method, body, etc.).
  * @returns {Promise<Response|null>} Respuesta del fetch o null si hubo un error manejado.
  */
-function apiFetch(url, options) {
+function fetch(url, options) {
     if (!options) options = {};
 
     // 1. Obtener el token CSRF FRESCO justo antes de construir las cabeceras.
