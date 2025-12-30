@@ -1,1459 +1,1460 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#e65100">
-    <title>POS Pupusería - Sistema de Pedidos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="styles-responsive.css">
-    <style>
-        :root {
-            --primary-color: #e65100;
-            --secondary-color: #ff9800;
-            --success-color: #4caf50;
-            --warning-color: #ffc107;
-            --danger-color: #f44336;
-            --info-color: #2196f3;
-        }
-        body {
-            background-color: #f5f5f5;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .navbar-pos {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        }
-        .role-selector {
-            background: white;
-            border-radius: 15px;
-            padding: 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .role-card {
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-            border-radius: 15px;
-        }
-        .role-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .role-card.selected {
-            border-color: var(--primary-color);
-            background-color: #fff3e0;
-        }
-        .role-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-        .role-mesero { color: var(--info-color); }
-        .role-cajero { color: var(--success-color); }
-        .role-cocina { color: var(--danger-color); }
-
-        /* Panel de trabajo */
-        .work-panel {
-            display: none;
-        }
-        .work-panel.active {
-            display: block;
-        }
-
-        /* Menú de productos */
-        .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1rem;
-        }
-        .product-card {
-            background: white;
-            border-radius: 10px;
-            padding: 1rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid #eee;
-            touch-action: manipulation;
-            -webkit-tap-highlight-color: rgba(230, 81, 0, 0.2);
-            user-select: none;
-        }
-        .product-card:hover, .product-card:active {
-            border-color: var(--primary-color);
-            transform: scale(1.02);
-            background: #fff5e6;
-        }
-        .product-card.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        .product-price {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-
-        /* Carrito */
-        .cart-panel {
-            background: white;
-            border-radius: 15px;
-            height: calc(100vh - 180px);
-            display: flex;
-            flex-direction: column;
-        }
-        .cart-items {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-        .cart-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            border-bottom: 1px solid #eee;
-        }
-        .cart-total {
-            background: #f5f5f5;
-            padding: 1rem;
-            border-radius: 0 0 15px 15px;
-        }
-
-        /* Mesas */
-        .mesa-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 1rem;
-        }
-        .mesa-card {
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: bold;
-        }
-        .mesa-libre {
-            background: #e8f5e9;
-            border: 2px solid var(--success-color);
-            color: var(--success-color);
-        }
-        .mesa-ocupada {
-            background: #ffebee;
-            border: 2px solid var(--danger-color);
-            color: var(--danger-color);
-        }
-        .mesa-card:hover {
-            transform: scale(1.05);
-        }
-
-        /* Pedidos */
-        .pedido-card {
-            background: white;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .pedido-header {
-            padding: 1rem;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .pedido-header.pendiente_pago { background: var(--warning-color); color: #333; }
-        .pedido-header.pagado { background: var(--success-color); }
-        .pedido-header.en_cocina { background: var(--danger-color); }
-        .pedido-header.listo { background: var(--info-color); }
-        .pedido-header.en_mesa { background: #9c27b0; }
-        .pedido-body {
-            padding: 1rem;
-        }
-        .pedido-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.25rem 0;
-        }
-
-        /* Categorías */
-        .categoria-tabs {
-            display: flex;
-            gap: 0.5rem;
-            overflow-x: auto;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        .categoria-tab {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            background: white;
-            border: 2px solid #ddd;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.2s;
-        }
-        .categoria-tab.active {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-        }
-
-        /* Animaciones */
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        .pedido-nuevo {
-            animation: pulse 0.5s ease-in-out 3;
-        }
-
-        /* Notificaciones de sonido visual */
-        .notification-badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--danger-color);
-            color: white;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-        }
-
-        /* ============ ESTILOS RESPONSIVOS POS ============ */
-
-        /* Tablet */
-        @media (max-width: 992px) {
-            .mesa-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 0.75rem;
-            }
-            .cart-panel {
-                height: auto;
-                max-height: 50vh;
-            }
-        }
-
-        /* Mobile */
-        @media (max-width: 768px) {
-            body {
-                padding-top: 0;
-            }
-
-            /* Navbar móvil compacto */
-            .navbar-pos {
-                padding: 0.4rem 0.5rem;
-                position: sticky;
-                top: 0;
-                z-index: 1030;
-            }
-            .navbar-brand {
-                font-size: 0.9rem;
-            }
-            .navbar-pos .gap-3 {
-                gap: 0.5rem !important;
-            }
-            #current-time {
-                display: none;
-            }
-            #manager-nav-links {
-                display: none !important;
-            }
-            #usuario-info {
-                display: none !important;
-            }
-
-            /* Container sin márgenes en móvil */
-            .container-fluid {
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
-            }
-            .container-fluid.mt-4 {
-                margin-top: 0.75rem !important;
-            }
-
-            /* Tabs de navegación compactos */
-            .nav-tabs {
-                border: none;
-                background: white;
-                border-radius: 10px;
-                padding: 0.25rem;
-                margin-bottom: 0.75rem !important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-            .nav-tabs .nav-link {
-                border: none;
-                border-radius: 8px;
-                padding: 0.5rem 0.75rem;
-                font-size: 0.8rem;
-                color: #666;
-            }
-            .nav-tabs .nav-link.active {
-                background: var(--primary-color);
-                color: white;
-            }
-            .nav-tabs .nav-link i {
-                font-size: 1rem;
-            }
-            .nav-tabs .nav-item {
-                flex: 1;
-                text-align: center;
-            }
-
-
-            /* Mesas grid móvil */
-            .mesa-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 0.5rem;
-            }
-            .mesa-card {
-                font-size: 0.8rem;
-                padding: 0.75rem 0.5rem;
-                min-height: 70px;
-            }
-            .mesa-card i {
-                font-size: 1.5rem;
-            }
-
-            /* Productos grid móvil */
-            .menu-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.5rem;
-                padding-bottom: 100px;
-            }
-            .product-card {
-                padding: 0.75rem 0.5rem;
-                min-height: 80px;
-            }
-            .product-card .fw-bold {
-                font-size: 0.8rem;
-                line-height: 1.2;
-                margin-bottom: 0.25rem;
-            }
-            .product-card small {
-                display: none;
-            }
-            .product-price {
-                font-size: 1.1rem;
-            }
-
-            /* Categorías scroll horizontal */
-            .categoria-tabs {
-                padding: 0.5rem 0;
-                margin-bottom: 0.5rem;
-                gap: 0.4rem;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-            }
-            .categoria-tabs::-webkit-scrollbar {
-                display: none;
-            }
-            .categoria-tab {
-                padding: 0.5rem 1rem;
-                font-size: 0.85rem;
-                border-radius: 25px;
-                min-height: 38px;
-            }
-
-            /* Ocultar carrito lateral en móvil */
-            #panel-mesero > .row > .col-lg-4,
-            #cajero-pedido-tab > .row > .col-lg-4 {
-                display: none;
-            }
-            #panel-mesero > .row > .col-lg-8,
-            #cajero-pedido-tab > .row > .col-lg-8 {
-                width: 100%;
-                max-width: 100%;
-                flex: 0 0 100%;
-            }
-
-            /* Pedidos cards móvil */
-            .pedido-card {
-                margin-bottom: 0.5rem;
-                border-radius: 12px;
-            }
-            .pedido-header {
-                padding: 0.75rem;
-                border-radius: 12px 12px 0 0;
-            }
-            .pedido-body {
-                padding: 0.75rem;
-            }
-
-            /* Role selector móvil */
-            .role-selector {
-                padding: 1rem;
-                border-radius: 15px;
-                margin: 0 !important;
-            }
-            .role-selector h3 {
-                font-size: 1.2rem;
-                margin-bottom: 1rem !important;
-            }
-            .role-card {
-                padding: 1rem !important;
-                margin-bottom: 0.5rem;
-            }
-            .role-icon {
-                font-size: 2.5rem;
-                margin-bottom: 0.5rem;
-            }
-            .role-card h4 {
-                font-size: 1.1rem;
-                margin-bottom: 0.25rem;
-            }
-            .role-card p {
-                font-size: 0.8rem;
-                margin-bottom: 0;
-            }
-
-            /* Alertas compactas */
-            .alert {
-                padding: 0.75rem;
-                font-size: 0.85rem;
-                border-radius: 10px;
-            }
-
-            /* Cards compactas */
-            .card {
-                border-radius: 12px;
-                margin-bottom: 0.75rem;
-            }
-            .card-header {
-                padding: 0.75rem;
-                border-radius: 12px 12px 0 0 !important;
-            }
-            .card-header h5 {
-                font-size: 0.95rem;
-            }
-            .card-body {
-                padding: 0.75rem;
-            }
-        }
-
-        /* Mobile pequeño */
-        @media (max-width: 576px) {
-            .mesa-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .menu-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .product-card .fw-bold {
-                font-size: 0.75rem;
-            }
-            .role-selector .row {
-                flex-direction: column;
-            }
-            .role-selector .col-md-4 {
-                width: 100%;
-            }
-        }
-
-        /* ============ CARRITO FLOTANTE MÓVIL ============ */
-        .cart-fab {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            right: 15px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            box-shadow: 0 4px 15px rgba(230, 81, 0, 0.4);
-            z-index: 1040;
-            font-size: 1.5rem;
-            transition: transform 0.2s;
-        }
-        .cart-fab:active {
-            transform: scale(0.95);
-        }
-        .cart-fab .badge {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--danger-color);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .cart-fab.pulse {
-            animation: pulse-animation 0.3s ease;
-        }
-        @keyframes pulse-animation {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-
-        @media (max-width: 768px) {
-            .cart-fab {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-        }
-
-        /* Clases para forzar visibilidad en móvil (JS las agrega/remueve) */
-        .cart-fab.mobile-active {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-        .cart-fab.mobile-hidden {
-            display: none !important;
-        }
-        .bottom-nav.mobile-active {
-            display: block !important;
-            visibility: visible !important;
-        }
-        .bottom-nav.mobile-hidden {
-            display: none !important;
-        }
-
-        /* ============ BOTTOM SHEET CARRITO ============ */
-        .cart-sheet {
-            display: none;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-radius: 20px 20px 0 0;
-            box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
-            z-index: 1050;
-            max-height: 85vh;
-            overflow: hidden;
-            transform: translateY(100%);
-            transition: transform 0.3s ease-out;
-        }
-        .cart-sheet.show {
-            display: block;
-            transform: translateY(0);
-        }
-        .cart-sheet-header {
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f8f9fa;
-            border-radius: 20px 20px 0 0;
-        }
-        .cart-sheet-header .drag-handle {
-            width: 40px;
-            height: 4px;
-            background: #ddd;
-            border-radius: 2px;
-            position: absolute;
-            top: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .cart-sheet-body {
-            max-height: 30vh;
-            overflow-y: auto;
-            padding: 0.5rem 0.75rem;
-        }
-        .cart-sheet-footer {
-            padding: 0.75rem;
-            background: #f8f9fa;
-            border-top: 1px solid #eee;
-        }
-        .cart-sheet-footer .mb-2 {
-            margin-bottom: 0.4rem !important;
-        }
-        .cart-sheet-footer .form-control,
-        .cart-sheet-footer .form-select {
-            padding: 0.4rem 0.75rem;
-            font-size: 0.9rem;
-        }
-        .cart-sheet-footer .btn-lg {
-            padding: 0.6rem 1rem;
-            font-size: 1rem;
-        }
-        .cart-sheet-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1045;
-        }
-        .cart-sheet-overlay.show {
-            display: block;
-        }
-
-        /* ============ BOTTOM NAVIGATION ============ */
-        .bottom-nav {
-            display: none;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            z-index: 1030;
-            padding: 0.5rem 0;
-            padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-        }
-        .bottom-nav-items {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-        }
-        .bottom-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 0.25rem 1rem;
-            color: #666;
-            text-decoration: none;
-            font-size: 0.7rem;
-            border: none;
-            background: none;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .bottom-nav-item i {
-            font-size: 1.3rem;
-            margin-bottom: 0.15rem;
-        }
-        .bottom-nav-item.active {
-            color: var(--primary-color);
-        }
-        .bottom-nav-item:active {
-            transform: scale(0.95);
-        }
-
-        /* Bottom nav deshabilitado - las opciones están en los tabs superiores */
-        /*
-        @media (max-width: 768px) {
-            .bottom-nav {
-                display: block;
-            }
-        }
-        */
-
-        /* ============ MODAL FULLSCREEN MÓVIL ============ */
-        @media (max-width: 768px) {
-            .modal-dialog {
-                margin: 0;
-                max-width: 100%;
-                min-height: 100vh;
-            }
-            .modal-content {
-                border: none;
-                border-radius: 0;
-                min-height: 100vh;
-            }
-            .modal-header {
-                border-radius: 0;
-            }
-            .modal-body {
-                padding: 1rem;
-                overflow-y: auto;
-            }
-            .modal-body .row {
-                flex-direction: column;
-            }
-            .modal-body .col-md-6 {
-                width: 100%;
-                margin-bottom: 1rem;
-            }
-            .modal-footer {
-                flex-direction: column;
-                gap: 0.5rem;
-                padding: 1rem;
-                padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-            }
-            .modal-footer .btn {
-                width: 100%;
-                min-height: 48px;
-            }
-        }
-
-        /* ============ MEJORAS TÁCTILES ============ */
-        .mesa-card:active,
-        .product-card:active,
-        .categoria-tab:active,
-        .btn:active {
-            transform: scale(0.97);
-            opacity: 0.9;
-        }
-
-        .btn {
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Inputs más grandes en móvil */
-        @media (max-width: 768px) {
-            .form-control, .form-select {
-                min-height: 48px;
-                font-size: 16px !important;
-            }
-            .form-control-sm, .form-select-sm {
-                min-height: 44px;
-            }
-            .btn {
-                min-height: 44px;
-            }
-            .btn-lg {
-                min-height: 52px;
-            }
-        }
-
-        /* Scroll suave */
-        .categoria-tabs,
-        .cart-sheet-body,
-        #pedidos-cajero-container,
-        #pedidos-cocina-container {
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Ocultar scrollbar pero mantener funcionalidad */
-        .categoria-tabs::-webkit-scrollbar {
-            display: none;
-        }
-        .categoria-tabs {
-            scrollbar-width: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#e65100">
+<title>POS Pupusería - Sistema de Pedidos</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+<link rel="stylesheet" href="styles-responsive.css">
+<style>
+:root {
+--primary-color: #e65100;
+--secondary-color: #ff9800;
+--success-color: #4caf50;
+--warning-color: #ffc107;
+--danger-color: #f44336;
+--info-color: #2196f3;
+}
+body {
+background-color: #f5f5f5;
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.navbar-pos {
+background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+.role-selector {
+background: white;
+border-radius: 15px;
+padding: 2rem;
+box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.role-card {
+cursor: pointer;
+transition: all 0.3s ease;
+border: 2px solid transparent;
+border-radius: 15px;
+}
+.role-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+.role-card.selected {
+border-color: var(--primary-color);
+background-color: #fff3e0;
+}
+.role-icon {
+font-size: 3rem;
+margin-bottom: 1rem;
+}
+.role-mesero { color: var(--info-color); }
+.role-cajero { color: var(--success-color); }
+.role-cocina { color: var(--danger-color); }
+/* Panel de trabajo */
+.work-panel {
+display: none;
+}
+.work-panel.active {
+display: block;
+}
+/* Menú de productos */
+.menu-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+gap: 1rem;
+}
+.product-card {
+background: white;
+border-radius: 10px;
+padding: 1rem;
+text-align: center;
+cursor: pointer;
+transition: all 0.2s;
+border: 2px solid #eee;
+touch-action: manipulation;
+-webkit-tap-highlight-color: rgba(230, 81, 0, 0.2);
+user-select: none;
+}
+.product-card:hover, .product-card:active {
+border-color: var(--primary-color);
+transform: scale(1.02);
+background: #fff5e6;
+}
+.product-card.disabled {
+opacity: 0.5;
+pointer-events: none;
+}
+.product-price {
+font-size: 1.2rem;
+font-weight: bold;
+color: var(--primary-color);
+}
+/* Carrito */
+.cart-panel {
+background: white;
+border-radius: 15px;
+height: calc(100vh - 180px);
+display: flex;
+flex-direction: column;
+}
+.cart-items {
+flex: 1;
+overflow-y: auto;
+padding: 1rem;
+}
+.cart-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 0.5rem;
+border-bottom: 1px solid #eee;
+}
+.cart-total {
+background: #f5f5f5;
+padding: 1rem;
+border-radius: 0 0 15px 15px;
+}
+/* Mesas */
+.mesa-grid {
+display: grid;
+grid-template-columns: repeat(5, 1fr);
+gap: 1rem;
+}
+.mesa-card {
+aspect-ratio: 1;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+border-radius: 10px;
+cursor: pointer;
+transition: all 0.2s;
+font-weight: bold;
+}
+.mesa-libre {
+background: #e8f5e9;
+border: 2px solid var(--success-color);
+color: var(--success-color);
+}
+.mesa-ocupada {
+background: #ffebee;
+border: 2px solid var(--danger-color);
+color: var(--danger-color);
+}
+.mesa-card:hover {
+transform: scale(1.05);
+}
+/* Pedidos */
+.pedido-card {
+background: white;
+border-radius: 10px;
+margin-bottom: 1rem;
+overflow: hidden;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.pedido-header {
+padding: 1rem;
+color: white;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.pedido-header.pendiente_pago { background: var(--warning-color); color: #333; }
+.pedido-header.pagado { background: var(--success-color); }
+.pedido-header.en_cocina { background: var(--danger-color); }
+.pedido-header.listo { background: var(--info-color); }
+.pedido-header.en_mesa { background: #9c27b0; }
+.pedido-body {
+padding: 1rem;
+}
+.pedido-item {
+display: flex;
+justify-content: space-between;
+padding: 0.25rem 0;
+}
+/* Categorías */
+.categoria-tabs {
+display: flex;
+gap: 0.5rem;
+overflow-x: auto;
+padding-bottom: 0.5rem;
+margin-bottom: 1rem;
+}
+.categoria-tab {
+padding: 0.5rem 1rem;
+border-radius: 20px;
+background: white;
+border: 2px solid #ddd;
+cursor: pointer;
+white-space: nowrap;
+transition: all 0.2s;
+}
+.categoria-tab.active {
+background: var(--primary-color);
+border-color: var(--primary-color);
+color: white;
+}
+/* Animaciones */
+@keyframes pulse {
+0%, 100% { transform: scale(1); }
+50% { transform: scale(1.05); }
+}
+.pedido-nuevo {
+animation: pulse 0.5s ease-in-out 3;
+}
+/* Notificaciones de sonido visual */
+.notification-badge {
+position: absolute;
+top: -5px;
+right: -5px;
+background: var(--danger-color);
+color: white;
+border-radius: 50%;
+width: 24px;
+height: 24px;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 0.75rem;
+font-weight: bold;
+}
+/* ============ ESTILOS RESPONSIVOS POS ============ */
+/* Tablet */
+@media (max-width: 992px) {
+.mesa-grid {
+grid-template-columns: repeat(4, 1fr);
+gap: 0.75rem;
+}
+.cart-panel {
+height: auto;
+max-height: 50vh;
+}
+}
+/* Mobile */
+@media (max-width: 768px) {
+body {
+padding-top: 0;
+}
+/* Navbar móvil compacto */
+.navbar-pos {
+padding: 0.4rem 0.5rem;
+position: sticky;
+top: 0;
+z-index: 1030;
+}
+.navbar-brand {
+font-size: 0.9rem;
+}
+.navbar-pos .gap-3 {
+gap: 0.5rem !important;
+}
+#current-time {
+display: none;
+}
+#manager-nav-links {
+display: none !important;
+}
+#usuario-info {
+display: none !important;
+}
+/* Container sin márgenes en móvil */
+.container-fluid {
+padding-left: 0.5rem;
+padding-right: 0.5rem;
+}
+.container-fluid.mt-4 {
+margin-top: 0.75rem !important;
+}
+/* Tabs de navegación compactos */
+.nav-tabs {
+border: none;
+background: white;
+border-radius: 10px;
+padding: 0.25rem;
+margin-bottom: 0.75rem !important;
+box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.nav-tabs .nav-link {
+border: none;
+border-radius: 8px;
+padding: 0.5rem 0.75rem;
+font-size: 0.8rem;
+color: #666;
+}
+.nav-tabs .nav-link.active {
+background: var(--primary-color);
+color: white;
+}
+.nav-tabs .nav-link i {
+font-size: 1rem;
+}
+.nav-tabs .nav-item {
+flex: 1;
+text-align: center;
+}
+/* Mesas grid móvil */
+.mesa-grid {
+grid-template-columns: repeat(3, 1fr);
+gap: 0.5rem;
+}
+.mesa-card {
+font-size: 0.8rem;
+padding: 0.75rem 0.5rem;
+min-height: 70px;
+}
+.mesa-card i {
+font-size: 1.5rem;
+}
+/* Productos grid móvil */
+.menu-grid {
+grid-template-columns: repeat(2, 1fr);
+gap: 0.5rem;
+padding-bottom: 100px;
+}
+.product-card {
+padding: 0.75rem 0.5rem;
+min-height: 80px;
+}
+.product-card .fw-bold {
+font-size: 0.8rem;
+line-height: 1.2;
+margin-bottom: 0.25rem;
+}
+.product-card small {
+display: none;
+}
+.product-price {
+font-size: 1.1rem;
+}
+/* Categorías scroll horizontal */
+.categoria-tabs {
+padding: 0.5rem 0;
+margin-bottom: 0.5rem;
+gap: 0.4rem;
+-webkit-overflow-scrolling: touch;
+scrollbar-width: none;
+}
+.categoria-tabs::-webkit-scrollbar {
+display: none;
+}
+.categoria-tab {
+padding: 0.5rem 1rem;
+font-size: 0.85rem;
+border-radius: 25px;
+min-height: 38px;
+}
+/* Ocultar carrito lateral en móvil */
+#panel-mesero > .row > .col-lg-4,
+#cajero-pedido-tab > .row > .col-lg-4 {
+display: none;
+}
+#panel-mesero > .row > .col-lg-8,
+#cajero-pedido-tab > .row > .col-lg-8 {
+width: 100%;
+max-width: 100%;
+flex: 0 0 100%;
+}
+/* Pedidos cards móvil */
+.pedido-card {
+margin-bottom: 0.5rem;
+border-radius: 12px;
+}
+.pedido-header {
+padding: 0.75rem;
+border-radius: 12px 12px 0 0;
+}
+.pedido-body {
+padding: 0.75rem;
+}
+/* Role selector móvil */
+.role-selector {
+padding: 1rem;
+border-radius: 15px;
+margin: 0 !important;
+}
+.role-selector h3 {
+font-size: 1.2rem;
+margin-bottom: 1rem !important;
+}
+.role-card {
+padding: 1rem !important;
+margin-bottom: 0.5rem;
+}
+.role-icon {
+font-size: 2.5rem;
+margin-bottom: 0.5rem;
+}
+.role-card h4 {
+font-size: 1.1rem;
+margin-bottom: 0.25rem;
+}
+.role-card p {
+font-size: 0.8rem;
+margin-bottom: 0;
+}
+/* Alertas compactas */
+.alert {
+padding: 0.75rem;
+font-size: 0.85rem;
+border-radius: 10px;
+}
+/* Cards compactas */
+.card {
+border-radius: 12px;
+margin-bottom: 0.75rem;
+}
+.card-header {
+padding: 0.75rem;
+border-radius: 12px 12px 0 0 !important;
+}
+.card-header h5 {
+font-size: 0.95rem;
+}
+.card-body {
+padding: 0.75rem;
+}
+}
+/* Mobile pequeño */
+@media (max-width: 576px) {
+.mesa-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+.menu-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+.product-card .fw-bold {
+font-size: 0.75rem;
+}
+.role-selector .row {
+flex-direction: column;
+}
+.role-selector .col-md-4 {
+width: 100%;
+}
+}
+/* ============ CARRITO FLOTANTE MÓVIL ============ */
+.cart-fab {
+display: none;
+position: fixed;
+bottom: 20px;
+right: 15px;
+width: 60px;
+height: 60px;
+border-radius: 50%;
+background: var(--primary-color);
+color: white;
+border: none;
+box-shadow: 0 4px 15px rgba(230, 81, 0, 0.4);
+z-index: 1040;
+font-size: 1.5rem;
+transition: transform 0.2s;
+}
+.cart-fab:active {
+transform: scale(0.95);
+}
+.cart-fab .badge {
+position: absolute;
+top: -5px;
+right: -5px;
+background: var(--danger-color);
+border-radius: 50%;
+width: 24px;
+height: 24px;
+font-size: 0.75rem;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+.cart-fab.pulse {
+animation: pulse-animation 0.3s ease;
+}
+@keyframes pulse-animation {
+0% { transform: scale(1); }
+50% { transform: scale(1.2); }
+100% { transform: scale(1); }
+}
+@media (max-width: 768px) {
+.cart-fab {
+display: flex;
+align-items: center;
+justify-content: center;
+}
+}
+/* Clases para forzar visibilidad en móvil (JS las agrega/remueve) */
+.cart-fab.mobile-active {
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+}
+.cart-fab.mobile-hidden {
+display: none !important;
+}
+.bottom-nav.mobile-active {
+display: block !important;
+visibility: visible !important;
+}
+.bottom-nav.mobile-hidden {
+display: none !important;
+}
+/* ============ BOTTOM SHEET CARRITO ============ */
+.cart-sheet {
+display: none;
+position: fixed;
+bottom: 0;
+left: 0;
+right: 0;
+background: white;
+border-radius: 20px 20px 0 0;
+box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
+z-index: 1050;
+max-height: 85vh;
+overflow: hidden;
+transform: translateY(100%);
+transition: transform 0.3s ease-out;
+}
+.cart-sheet.show {
+display: block;
+transform: translateY(0);
+}
+.cart-sheet-header {
+padding: 1rem;
+border-bottom: 1px solid #eee;
+display: flex;
+justify-content: space-between;
+align-items: center;
+background: #f8f9fa;
+border-radius: 20px 20px 0 0;
+}
+.cart-sheet-header .drag-handle {
+width: 40px;
+height: 4px;
+background: #ddd;
+border-radius: 2px;
+position: absolute;
+top: 8px;
+left: 50%;
+transform: translateX(-50%);
+}
+.cart-sheet-body {
+max-height: 30vh;
+overflow-y: auto;
+padding: 0.5rem 0.75rem;
+}
+.cart-sheet-footer {
+padding: 0.75rem;
+background: #f8f9fa;
+border-top: 1px solid #eee;
+}
+.cart-sheet-footer .mb-2 {
+margin-bottom: 0.4rem !important;
+}
+.cart-sheet-footer .form-control,
+.cart-sheet-footer .form-select {
+padding: 0.4rem 0.75rem;
+font-size: 0.9rem;
+}
+.cart-sheet-footer .btn-lg {
+padding: 0.6rem 1rem;
+font-size: 1rem;
+}
+.cart-sheet-overlay {
+display: none;
+position: fixed;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background: rgba(0,0,0,0.5);
+z-index: 1045;
+}
+.cart-sheet-overlay.show {
+display: block;
+}
+/* ============ BOTTOM NAVIGATION ============ */
+.bottom-nav {
+display: none;
+position: fixed;
+bottom: 0;
+left: 0;
+right: 0;
+background: white;
+box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+z-index: 1030;
+padding: 0.5rem 0;
+padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+.bottom-nav-items {
+display: flex;
+justify-content: space-around;
+align-items: center;
+}
+.bottom-nav-item {
+display: flex;
+flex-direction: column;
+align-items: center;
+padding: 0.25rem 1rem;
+color: #666;
+text-decoration: none;
+font-size: 0.7rem;
+border: none;
+background: none;
+cursor: pointer;
+transition: color 0.2s;
+}
+.bottom-nav-item i {
+font-size: 1.3rem;
+margin-bottom: 0.15rem;
+}
+.bottom-nav-item.active {
+color: var(--primary-color);
+}
+.bottom-nav-item:active {
+transform: scale(0.95);
+}
+/* Bottom nav deshabilitado - las opciones están en los tabs superiores */
+/*
+@media (max-width: 768px) {
+.bottom-nav {
+display: block;
+}
+}
+*/
+/* ============ MODAL FULLSCREEN MÓVIL ============ */
+@media (max-width: 768px) {
+.modal-dialog {
+margin: 0;
+max-width: 100%;
+min-height: 100vh;
+}
+.modal-content {
+border: none;
+border-radius: 0;
+min-height: 100vh;
+}
+.modal-header {
+border-radius: 0;
+}
+.modal-body {
+padding: 1rem;
+overflow-y: auto;
+}
+.modal-body .row {
+flex-direction: column;
+}
+.modal-body .col-md-6 {
+width: 100%;
+margin-bottom: 1rem;
+}
+.modal-footer {
+flex-direction: column;
+gap: 0.5rem;
+padding: 1rem;
+padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+.modal-footer .btn {
+width: 100%;
+min-height: 48px;
+}
+}
+/* ============ MEJORAS TÁCTILES ============ */
+.mesa-card:active,
+.product-card:active,
+.categoria-tab:active,
+.btn:active {
+transform: scale(0.97);
+opacity: 0.9;
+}
+.btn {
+-webkit-tap-highlight-color: transparent;
+}
+/* Inputs más grandes en móvil */
+@media (max-width: 768px) {
+.form-control, .form-select {
+min-height: 48px;
+font-size: 16px !important;
+}
+.form-control-sm, .form-select-sm {
+min-height: 44px;
+}
+.btn {
+min-height: 44px;
+}
+.btn-lg {
+min-height: 52px;
+}
+}
+/* Scroll suave */
+.categoria-tabs,
+.cart-sheet-body,
+#pedidos-cajero-container,
+#pedidos-cocina-container {
+-webkit-overflow-scrolling: touch;
+}
+/* Ocultar scrollbar pero mantener funcionalidad */
+.categoria-tabs::-webkit-scrollbar {
+display: none;
+}
+.categoria-tabs {
+scrollbar-width: none;
+}
+</style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-pos navbar-dark">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
-                <i class="bi bi-shop"></i> POS Pupusería
-            </span>
-            <div class="d-flex align-items-center gap-3 flex-wrap">
-                <span id="current-role" class="badge bg-light text-dark d-none"></span>
-                <span class="text-white d-none d-md-inline" id="usuario-info">
-                    <i class="bi bi-person-circle"></i>
-                    <span id="usuario-nombre-display"></span>
-                </span>
-                <span id="current-time" class="text-white d-none d-md-inline"></span>
+<!-- Navbar -->
+<nav class="navbar navbar-pos navbar-dark">
+<div class="container-fluid">
+<span class="navbar-brand mb-0 h1">
+<i class="bi bi-shop"></i> POS Pupusería
+</span>
+<div class="d-flex align-items-center gap-3 flex-wrap">
+<span id="current-role" class="badge bg-light text-dark d-none"></span>
+<span class="text-white d-none d-md-inline" id="usuario-info">
+<i class="bi bi-person-circle"></i>
+<span id="usuario-nombre-display"></span>
+</span>
+<span id="current-time" class="text-white d-none d-md-inline"></span>
+<!-- Menú desplegable para navegación (responsive) -->
+<div class="dropdown">
+<button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="navDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+<i class="bi bi-list"></i> <span class="d-md-none">Menú</span><span class="d-none d-md-inline">Opciones</span>
+</button>
+<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navDropdown" style="min-width: 180px;">
+<!-- Cambiar Rol - Solo para Manager -->
+<li id="li-cambiar-rol" class="d-none">
+<button class="dropdown-item" onclick="mostrarSelectorRol()">
+<i class="bi bi-arrow-repeat"></i> Cambiar Rol
+</button>
+</li>
+<!-- Administración - Solo para Manager -->
+<li id="li-admin" class="d-none">
+<a class="dropdown-item" href="admin.html">
+<i class="bi bi-gear"></i> Administración
+</a>
+</li>
+<!-- Facturación - Solo para Manager -->
+<li id="li-factura" class="d-none">
+<a class="dropdown-item" href="index.html">
+<i class="bi bi-receipt"></i> Facturación
+</a>
+</li>
+<li><hr class="dropdown-divider"></li>
+<li>
+<button class="dropdown-item" onclick="logout()">
+<i class="bi bi-box-arrow-right"></i> Salir
+</button>
+</li>
+</ul>
+</div>
+<!-- Botones en desktop (ocultos en móvil) -->
+<div id="manager-nav-links" class="d-none d-lg-flex gap-2">
+<a href="index.html" class="btn btn-outline-light btn-sm">
+<i class="bi bi-receipt"></i> <span class="d-none d-xl-inline">Facturación</span>
+</a>
+<a href="admin.html" class="btn btn-outline-light btn-sm">
+<i class="bi bi-gear"></i> <span class="d-none d-xl-inline">Administración</span>
+</a>
+<button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none">
+<i class="bi bi-arrow-repeat"></i> <span class="d-none d-xl-inline">Cambiar Rol</span>
+</button>
+</div>
+</div>
+</div>
+</nav>
+<div class="container-fluid mt-4">
+<!-- Selector de Rol (oculto por defecto, solo visible para managers) -->
+<div id="role-selector" class="role-selector mx-auto" style="max-width: 800px; display: none;">
+<h3 class="text-center mb-4">Selecciona tu rol</h3>
+<div class="row g-4">
+<div class="col-md-4">
+<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('mesero')">
+<div class="role-icon role-mesero">
+<i class="bi bi-person-badge"></i>
+</div>
+<h4>Mesero</h4>
+<p class="text-muted">Tomar pedidos y servir mesas</p>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cajero')">
+<div class="role-icon role-cajero">
+<i class="bi bi-cash-register"></i>
+</div>
+<h4>Cajero</h4>
+<p class="text-muted">Procesar pagos y facturar</p>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocina')">
+<div class="role-icon role-cocina">
+<i class="bi bi-fire"></i>
+</div>
+<h4>Cocina</h4>
+<p class="text-muted">Preparar pedidos</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel Mesero -->
+<div id="panel-mesero" class="work-panel">
+<div class="row">
+<!-- Mesas y Menú -->
+<div class="col-lg-8">
+<ul class="nav nav-tabs mb-3" id="meseroTabs">
+<li class="nav-item">
+<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#mesas-tab">
+<i class="bi bi-grid-3x3"></i> Mesas
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#menu-tab">
+<i class="bi bi-menu-button-wide"></i> Menú
+</button>
+</li>
+<li class="nav-item position-relative">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#servir-tab">
+<i class="bi bi-bell"></i> Por Servir
+<span id="badge-servir" class="notification-badge d-none">0</span>
+</button>
+</li>
+</ul>
+<div class="tab-content">
+<!-- Tab Mesas -->
+<div class="tab-pane fade show active" id="mesas-tab">
+<div class="mesa-grid" id="mesas-container"></div>
+</div>
+<!-- Tab Menú -->
+<div class="tab-pane fade" id="menu-tab">
+<div class="categoria-tabs" id="categorias-container"></div>
+<div class="menu-grid" id="productos-container"></div>
+</div>
+<!-- Tab Por Servir -->
+<div class="tab-pane fade" id="servir-tab">
+<div id="pedidos-servir-container"></div>
+</div>
+</div>
+</div>
+<!-- Carrito -->
+<div class="col-lg-4">
+<div class="cart-panel">
+<div class="p-3 border-bottom">
+<h5 class="mb-0">
+<i class="bi bi-cart3"></i> Pedido Actual
+<span id="mesa-seleccionada" class="badge bg-primary ms-2"></span>
+</h5>
+</div>
+<div class="cart-items" id="cart-items">
+<p class="text-muted text-center">Selecciona productos del menú</p>
+</div>
+<div class="cart-total">
+<div class="d-flex justify-content-between mb-2">
+<span>Subtotal:</span>
+<span id="cart-subtotal">$0.00</span>
+</div>
+<div class="d-flex justify-content-between mb-2">
+<span>IVA (13%):</span>
+<span id="cart-iva">$0.00</span>
+</div>
+<div class="d-flex justify-content-between mb-3">
+<strong>Total:</strong>
+<strong id="cart-total">$0.00</strong>
+</div>
+<div class="mb-2">
+<select class="form-select form-select-sm" id="tipo-pago" onchange="toggleOpcionesPago()">
+<option value="anticipado">Pago anticipado (para llevar)</option>
+<option value="al_final">Pago al final (en mesa)</option>
+</select>
+</div>
+<div id="opciones-para-llevar" class="mb-2">
+<input type="text" class="form-control form-control-sm" id="cliente-nombre-pedido" placeholder="Nombre del cliente">
+</div>
+<button class="btn btn-primary w-100" onclick="enviarPedido()" id="btn-enviar-pedido" disabled>
+<i class="bi bi-send"></i> Enviar Pedido
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel Cajero -->
+<div id="panel-cajero" class="work-panel">
+<ul class="nav nav-tabs mb-3" id="cajeroTabs">
+<li class="nav-item">
+<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cajero-cobros-tab">
+<i class="bi bi-cash-stack"></i> Cobros Pendientes
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-pedido-tab">
+<i class="bi bi-bag-plus"></i> Nuevo Pedido
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-creditos-tab">
+<i class="bi bi-credit-card-2-front"></i> Gestión Créditos
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-reportes-tab">
+<i class="bi bi-graph-up"></i> Reportes Rápidos
+</button>
+</li>
+</ul>
+<div class="tab-content">
+<!-- Tab Cobros Pendientes -->
+<div class="tab-pane fade show active" id="cajero-cobros-tab">
+<div class="row">
+<div class="col-lg-8">
+<h5 class="mb-3"><i class="bi bi-hourglass-split"></i> Pedidos Pendientes de Pago</h5>
+<div id="pedidos-cajero-container"></div>
+</div>
+<div class="col-lg-4">
+<div class="card">
+<div class="card-header bg-success text-white">
+<h5 class="mb-0"><i class="bi bi-graph-up"></i> Resumen del Día</h5>
+</div>
+<div class="card-body">
+<div class="d-flex justify-content-between mb-2">
+<span>Pedidos cerrados:</span>
+<strong id="stat-pedidos">0</strong>
+</div>
+<div class="d-flex justify-content-between mb-2">
+<span>Ventas totales:</span>
+<strong id="stat-ventas">$0.00</strong>
+</div>
+<hr>
+<h6>Top Productos</h6>
+<ul id="stat-top-productos" class="list-unstyled small"></ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Tab Nuevo Pedido (Para Llevar) -->
+<div class="tab-pane fade" id="cajero-pedido-tab">
+<div class="row">
+<div class="col-lg-8">
+<div class="alert alert-info mb-3">
+<i class="bi bi-info-circle"></i> <strong>Pedido Para Llevar:</strong> Crea pedidos directamente y cobra al momento.
+</div>
+<div class="categoria-tabs" id="categorias-container-cajero"></div>
+<div class="menu-grid" id="productos-container-cajero"></div>
+</div>
+<div class="col-lg-4">
+<div class="cart-panel" id="cart-panel-cajero">
+<div class="p-3 border-bottom">
+<h5 class="mb-0">
+<i class="bi bi-bag"></i> Pedido Para Llevar
+</h5>
+</div>
+<div class="cart-items" id="cart-items-cajero">
+<p class="text-muted text-center">Selecciona productos del menú</p>
+</div>
+<div class="cart-total">
+<div class="d-flex justify-content-between mb-2">
+<span>Subtotal:</span>
+<span id="cart-subtotal-cajero">$0.00</span>
+</div>
+<div class="d-flex justify-content-between mb-2">
+<span>IVA (13%):</span>
+<span id="cart-iva-cajero">$0.00</span>
+</div>
+<div class="d-flex justify-content-between mb-3">
+<strong>Total:</strong>
+<strong id="cart-total-cajero">$0.00</strong>
+</div>
+<div class="mb-2">
+<input type="text" class="form-control" id="cliente-nombre-cajero" placeholder="Nombre del cliente (requerido)">
+</div>
+<button class="btn btn-success w-100" onclick="crearPedidoCajero()" id="btn-crear-pedido-cajero" disabled>
+<i class="bi bi-cash-coin"></i> Crear y Cobrar
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Tab Gestión de Créditos -->
+<div class="tab-pane fade" id="cajero-creditos-tab">
+<div class="row">
+<div class="col-lg-6">
+<div class="card mb-3">
+<div class="card-header bg-warning">
+<h5 class="mb-0"><i class="bi bi-person-plus"></i> Otorgar/Modificar Crédito</h5>
+</div>
+<div class="card-body">
+<div class="mb-3">
+<label class="form-label">Buscar Cliente</label>
+<input type="text" class="form-control" id="buscar-cliente-credito"
+placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
+<div id="resultados-cliente-credito" class="list-group mt-2"></div>
+</div>
+<div id="form-credito-cliente" style="display:none;">
+<hr>
+<h6 id="nombre-cliente-credito"></h6>
+<input type="hidden" id="id-cliente-credito">
+<div class="row mb-3">
+<div class="col-6">
+<label class="form-label">Crédito Autorizado ($)</label>
+<input type="number" class="form-control" id="monto-credito-autorizado" min="0" step="0.01">
+</div>
+<div class="col-6">
+<label class="form-label">Días de Crédito</label>
+<input type="number" class="form-control" id="dias-credito-cliente" min="0">
+</div>
+</div>
+<div class="alert alert-secondary mb-3">
+<div class="d-flex justify-content-between">
+<span>Crédito Utilizado:</span>
+<strong id="credito-utilizado-info">$0.00</strong>
+</div>
+<div class="d-flex justify-content-between">
+<span>Crédito Disponible:</span>
+<strong id="credito-disponible-info">$0.00</strong>
+</div>
+</div>
+<button class="btn btn-warning w-100" onclick="guardarCreditoCliente()">
+<i class="bi bi-save"></i> Guardar Crédito
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="col-lg-6">
+<div class="card">
+<div class="card-header bg-info text-white">
+<h5 class="mb-0"><i class="bi bi-list-check"></i> Ventas a Crédito Pendientes</h5>
+</div>
+<div class="card-body" style="max-height: 400px; overflow-y: auto;">
+<div id="lista-creditos-pendientes">
+<p class="text-muted text-center">Cargando...</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Tab Reportes Rápidos -->
+<div class="tab-pane fade" id="cajero-reportes-tab">
+<!-- Selector de período rápido -->
+<div class="row mb-3">
+<div class="col-md-12">
+<div class="btn-group w-100" role="group">
+<input type="radio" class="btn-check" name="periodoReportes" id="periodo-hoy" value="hoy" checked onchange="cambiarPeriodoReportes('hoy')">
+<label class="btn btn-outline-primary" for="periodo-hoy">
+<i class="bi bi-calendar-day"></i> Hoy
+</label>
+<input type="radio" class="btn-check" name="periodoReportes" id="periodo-7d" value="7d" onchange="cambiarPeriodoReportes('7d')">
+<label class="btn btn-outline-primary" for="periodo-7d">
+<i class="bi bi-calendar-week"></i> Últimos 7 días
+</label>
+<input type="radio" class="btn-check" name="periodoReportes" id="periodo-30d" value="30d" onchange="cambiarPeriodoReportes('30d')">
+<label class="btn btn-outline-primary" for="periodo-30d">
+<i class="bi bi-calendar-month"></i> Último mes
+</label>
+</div>
+</div>
+</div>
+<!-- Tarjetas de Métricas -->
+<div class="row" id="metricas-reportes">
+<div class="col-md-3 mb-3">
+<div class="card">
+<div class="card-body">
+<h6 class="card-title text-muted">Total Vendido</h6>
+<h3 class="mb-0" id="metrica-total-ventas">$0.00</h3>
+<small id="metrica-variacion-ventas" class="text-success"></small>
+</div>
+</div>
+</div>
+<div class="col-md-3 mb-3">
+<div class="card">
+<div class="card-body">
+<h6 class="card-title text-muted">Total Pedidos</h6>
+<h3 class="mb-0" id="metrica-total-pedidos">0</h3>
+<small id="metrica-variacion-pedidos" class="text-success"></small>
+</div>
+</div>
+</div>
+<div class="col-md-3 mb-3">
+<div class="card">
+<div class="card-body">
+<h6 class="card-title text-muted">Ticket Promedio</h6>
+<h3 class="mb-0" id="metrica-ticket-promedio">$0.00</h3>
+<small id="metrica-variacion-promedio" class="text-success"></small>
+</div>
+</div>
+</div>
+<div class="col-md-3 mb-3">
+<div class="card">
+<div class="card-body">
+<h6 class="card-title text-muted">Efectivo vs Crédito</h6>
+<div class="d-flex justify-content-between">
+<small><strong>Efectivo:</strong> <span id="metrica-efectivo">$0.00</span></small>
+<small><strong>Crédito:</strong> <span id="metrica-credito">$0.00</span></small>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Top Productos del período -->
+<div class="row">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h6 class="mb-0"><i class="bi bi-bar-chart"></i> Top Productos</h6>
+</div>
+<div class="card-body" style="max-height: 300px; overflow-y: auto;">
+<div id="tabla-top-productos">
+<p class="text-muted text-center">Cargando...</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Desglose por Categoría -->
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h6 class="mb-0"><i class="bi bi-tag"></i> Ventas por Categoría</h6>
+</div>
+<div class="card-body" style="max-height: 300px; overflow-y: auto;">
+<div id="tabla-categorias">
+<p class="text-muted text-center">Cargando...</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Botón para acceder a reportes detallados (solo para managers) -->
+<div class="row mt-3" id="boton-reportes-detallados" style="display: none;">
+<div class="col-md-12">
+<a href="reportes.html" class="btn btn-primary w-100" target="_blank">
+<i class="bi bi-file-earmark-text"></i> Ver Reportes Detallados
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel Cocina -->
+<div id="panel-cocina" class="work-panel">
+<h4 class="mb-3"><i class="bi bi-fire"></i> Pedidos en Cola</h4>
+<div class="row" id="pedidos-cocina-container"></div>
+</div>
+</div>
+<!-- Modal Confirmar Pago -->
+<div class="modal fade" id="modalPago" tabindex="-1">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<div class="modal-header bg-success text-white">
+<h5 class="modal-title"><i class="bi bi-cash"></i> Confirmar Pago</h5>
+<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+</div>
+<div class="modal-body">
+<div class="row">
+<div class="col-md-6">
+<div id="detalle-pago"></div>
+<hr>
+<!-- Método de Pago -->
+<h6 class="mb-2"><i class="bi bi-wallet2"></i> Método de Pago</h6>
+<div class="btn-group w-100 mb-3" role="group">
+<input type="radio" class="btn-check" name="metodoPago" id="pago-efectivo" value="efectivo" checked onchange="onMetodoPagoChange()">
+<label class="btn btn-outline-success" for="pago-efectivo">
+<i class="bi bi-cash"></i> Efectivo
+</label>
+<input type="radio" class="btn-check" name="metodoPago" id="pago-credito" value="credito" onchange="onMetodoPagoChange()">
+<label class="btn btn-outline-warning" for="pago-credito">
+<i class="bi bi-credit-card"></i> Crédito
+</label>
+</div>
+<!-- Alerta de crédito del cliente -->
+<div id="info-credito-cliente" class="alert alert-warning d-none mb-3">
+<div class="d-flex justify-content-between align-items-center">
+<div>
+<i class="bi bi-credit-card"></i> <strong>Crédito disponible:</strong>
+<span id="credito-disponible-pago">$0.00</span>
+</div>
+<small class="text-muted">
+Usado: <span id="credito-usado-pago">$0.00</span> /
+<span id="credito-limite-pago">$0.00</span>
+</small>
+</div>
+<div class="progress mt-2" style="height: 8px;">
+<div id="barra-credito-pago" class="progress-bar bg-warning" style="width: 0%"></div>
+</div>
+</div>
+<!-- Alerta cuando no tiene crédito -->
+<div id="alerta-sin-credito" class="alert alert-danger d-none mb-3">
+<i class="bi bi-exclamation-triangle"></i>
+<strong>Sin crédito disponible.</strong>
+<span id="mensaje-sin-credito">Seleccione un cliente con crédito autorizado.</span>
+</div>
+<!-- Monto recibido (solo para efectivo) -->
+<div id="seccion-monto-recibido" class="mb-3">
+<label class="form-label">Monto recibido:</label>
+<input type="number" class="form-control form-control-lg" id="monto-recibido" step="0.01">
+</div>
+<div class="alert alert-info" id="cambio-container" style="display:none;">
+<strong>Cambio: <span id="monto-cambio">$0.00</span></strong>
+</div>
+</div>
+<div class="col-md-6">
+<h6 class="mb-3"><i class="bi bi-receipt"></i> Tipo de Comprobante</h6>
+<div class="form-check mb-2">
+<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked onchange="toggleSeccionPropina()">
+<label class="form-check-label" for="tipo-ticket">
+<strong>Ticket</strong> - Comprobante simple (no fiscal)
+</label>
+</div>
+<div class="form-check mb-3">
+<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura" onchange="toggleSeccionPropina()">
+<label class="form-check-label" for="tipo-factura">
+<strong>Factura Electrónica</strong> - DTE (requiere datos)
+</label>
+</div>
+<!-- Opción de Propina (solo para ticket/efectivo) -->
+<div id="seccion-propina" class="mb-3">
+<hr>
+<h6 class="mb-2"><i class="bi bi-gift"></i> Propina (Opcional)</h6>
+<div class="row g-2 mb-2">
+<div class="col-auto">
+<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0)">Sin propina</button>
+</div>
+<div class="col-auto">
+<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.05)">5%</button>
+</div>
+<div class="col-auto">
+<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.10)">10%</button>
+</div>
+<div class="col-auto">
+<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.15)">15%</button>
+</div>
+</div>
+<div class="input-group input-group-sm">
+<span class="input-group-text">$</span>
+<input type="number" class="form-control" id="propina-monto" placeholder="Monto personalizado" step="0.01" min="0" onchange="actualizarPropinaPersonalizada()">
+</div>
+<small class="text-muted d-block mt-1">Propina: <span id="propina-display">$0.00</span></small>
+</div>
+<!-- Datos del cliente (para factura) -->
+<div id="datos-cliente-container" style="display:none;">
+<hr>
+<h6 class="mb-3"><i class="bi bi-person"></i> Datos del Cliente</h6>
+<!-- Buscador de cliente -->
+<div class="mb-3">
+<div class="input-group input-group-sm">
+<span class="input-group-text"><i class="bi bi-search"></i></span>
+<input type="text" class="form-control" id="buscar-cliente-factura"
+placeholder="Buscar cliente por nombre, DUI, NIT..."
+onkeyup="buscarClienteFactura(this.value)">
+<button class="btn btn-outline-primary" type="button" onclick="limpiarClienteFactura()">
+<i class="bi bi-x"></i>
+</button>
+</div>
+<div id="resultados-busqueda-cliente" class="list-group position-absolute w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto;"></div>
+</div>
+<input type="hidden" id="cliente-id-factura">
+<div class="mb-2">
+<input type="text" class="form-control form-control-sm" id="cliente-nombre" placeholder="Nombre del cliente">
+</div>
+<div class="row mb-2">
+<div class="col-6">
+<select class="form-select form-select-sm" id="cliente-tipo-doc">
+<option value="">Sin documento</option>
+<option value="36">NIT</option>
+<option value="13">DUI</option>
+<option value="37">Otro</option>
+</select>
+</div>
+<div class="col-6">
+<input type="text" class="form-control form-control-sm" id="cliente-num-doc" placeholder="Número documento">
+</div>
+</div>
+<div class="mb-2">
+<input type="text" class="form-control form-control-sm" id="cliente-nrc" placeholder="NRC (opcional)">
+</div>
+<div class="mb-2">
+<input type="text" class="form-control form-control-sm" id="cliente-direccion" placeholder="Dirección">
+</div>
+<div class="row mb-2">
+<div class="col-6">
+<input type="tel" class="form-control form-control-sm" id="cliente-telefono" placeholder="Teléfono">
+</div>
+<div class="col-6">
+<input type="email" class="form-control form-control-sm" id="cliente-correo" placeholder="Correo">
+</div>
+</div>
+<div class="row mb-2 d-none">
+<div class="col-md-6">
+<label class="form-label small">Crédito Autorizado ($)</label>
+<input type="number" class="form-control form-control-sm" id="cliente-credito" min="0" step="0.01" value="0">
+</div>
+<div class="col-md-6">
+<label class="form-label small">Días de Crédito</label>
+<input type="number" class="form-control form-control-sm" id="cliente-dias-credito" min="0" value="0">
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+<button type="button" class="btn btn-outline-success" onclick="confirmarPagoSinComprobante()">
+<i class="bi bi-check-circle"></i> Solo Pagar
+</button>
+<button type="button" class="btn btn-success" onclick="confirmarPagoConComprobante()">
+<i class="bi bi-receipt"></i> Pagar y Emitir Comprobante
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Toast Notificaciones -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+<div id="toast-notification" class="toast" role="alert">
+<div class="toast-header">
+<i class="bi bi-bell me-2"></i>
+<strong class="me-auto" id="toast-title">Notificación</strong>
+<button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+</div>
+<div class="toast-body" id="toast-message"></div>
+</div>
+</div>
+<!-- FAB Carrito (Solo móvil) -->
+<button class="cart-fab" id="cart-fab" onclick="toggleCartSheet()">
+<i class="bi bi-cart3"></i>
+<span class="badge" id="cart-fab-count">0</span>
+</button>
+<!-- Bottom Sheet Carrito (Solo móvil) -->
+<div class="cart-sheet-overlay" id="cart-sheet-overlay" onclick="toggleCartSheet()"></div>
+<div class="cart-sheet" id="cart-sheet">
+<div class="cart-sheet-header">
+<div class="drag-handle"></div>
+<h5 class="mb-0"><i class="bi bi-cart3"></i> Pedido Actual</h5>
+<button class="btn btn-sm btn-outline-secondary" onclick="toggleCartSheet()">
+<i class="bi bi-x-lg"></i>
+</button>
+</div>
+<div class="cart-sheet-body" id="cart-sheet-items">
+<p class="text-muted text-center py-3">Carrito vacío</p>
+</div>
+<div class="cart-sheet-footer">
+<div class="d-flex justify-content-between align-items-center mb-2">
+<small>Sub: <span id="cart-sheet-subtotal">$0.00</span> + IVA: <span id="cart-sheet-iva">$0.00</span></small>
+<strong class="text-primary fs-5"><span id="cart-sheet-total">$0.00</span></strong>
+</div>
+<div class="row g-2 mb-2">
+<div class="col-5">
+<select class="form-select form-select-sm" id="tipo-pago-mobile" onchange="toggleOpcionesPagoMobile()">
+<option value="anticipado">Llevar</option>
+<option value="al_final">Mesa</option>
+</select>
+</div>
+<div class="col-7">
+<input type="text" class="form-control form-control-sm" id="cliente-nombre-mobile" placeholder="Nombre cliente">
+</div>
+</div>
+<button class="btn btn-primary w-100" onclick="enviarPedidoMobile()" id="btn-enviar-mobile" disabled>
+<i class="bi bi-send"></i> Enviar Pedido
+</button>
+</div>
+</div>
+<!-- Bottom Navigation (Solo móvil) -->
+<nav class="bottom-nav" id="bottom-nav">
+<div class="bottom-nav-items">
+<button class="bottom-nav-item" onclick="navegarMobile('mesas')" id="nav-mesas">
+<i class="bi bi-grid-3x3"></i>
+<span>Mesas</span>
+</button>
+<button class="bottom-nav-item" onclick="navegarMobile('menu')" id="nav-menu">
+<i class="bi bi-list-ul"></i>
+<span>Menú</span>
+</button>
+<button class="bottom-nav-item" onclick="navegarMobile('servir')" id="nav-servir">
+<i class="bi bi-bell"></i>
+<span>Servir</span>
+</button>
+<button class="bottom-nav-item" onclick="logout()">
+<i class="bi bi-box-arrow-right"></i>
+<span>Salir</span>
+</button>
+</div>
+</nav>
 
-                <!-- Menú desplegable para navegación (responsive) -->
-                <div class="dropdown">
-                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="navDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-list"></i> <span class="d-md-none">Menú</span><span class="d-none d-md-inline">Opciones</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navDropdown" style="min-width: 180px;">
-                        <!-- Cambiar Rol - Solo para Manager -->
-                        <li id="li-cambiar-rol" class="d-none">
-                            <button class="dropdown-item" onclick="mostrarSelectorRol()">
-                                <i class="bi bi-arrow-repeat"></i> Cambiar Rol
-                            </button>
-                        </li>
-                        <!-- Administración - Solo para Manager -->
-                        <li id="li-admin" class="d-none">
-                            <a class="dropdown-item" href="admin.html">
-                                <i class="bi bi-gear"></i> Administración
-                            </a>
-                        </li>
-                        <!-- Facturación - Solo para Manager -->
-                        <li id="li-factura" class="d-none">
-                            <a class="dropdown-item" href="index.html">
-                                <i class="bi bi-receipt"></i> Facturación
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <button class="dropdown-item" onclick="logout()">
-                                <i class="bi bi-box-arrow-right"></i> Salir
-                            </button>
-                        </li>
-                    </ul>
-                </div>
+<!-- ✅ Scripts en orden crítico -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="utils.js"></script>
+<script src="config.js"></script>
 
-                <!-- Botones en desktop (ocultos en móvil) -->
-                <div id="manager-nav-links" class="d-none d-lg-flex gap-2">
-                    <a href="index.html" class="btn btn-outline-light btn-sm">
-                        <i class="bi bi-receipt"></i> <span class="d-none d-xl-inline">Facturación</span>
-                    </a>
-                    <a href="admin.html" class="btn btn-outline-light btn-sm">
-                        <i class="bi bi-gear"></i> <span class="d-none d-xl-inline">Administración</span>
-                    </a>
-                    <button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none">
-                        <i class="bi bi-arrow-repeat"></i> <span class="d-none d-xl-inline">Cambiar Rol</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
+<!-- 🔄 Script de verificación inicial (usa fetch directo) -->
+<script>
+// Verificación de sesión activa al cargar
+document.addEventListener('DOMContentLoaded', async () => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    try {
+      // ✅ Usa fetch directo (sin CSRF) para verificar sesión
+      const response = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const user = await response.json();
+        // Actualizar UI con datos del usuario
+        document.getElementById('usuario-nombre-display').textContent = user.nombre || '';
+        // Mostrar opciones según rol
+        actualizarInterfazPorRol(user.rol);
+        return;
+      }
+    } catch (e) {
+      console.warn('Sesión inválida:', e.message);
+    }
+    // Limpiar si token inválido
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  } else {
+    // Redirigir a login si no hay token
+    window.location.href = 'login.html';
+  }
+});
 
-    <div class="container-fluid mt-4">
-        <!-- Selector de Rol (oculto por defecto, solo visible para managers) -->
-        <div id="role-selector" class="role-selector mx-auto" style="max-width: 800px; display: none;">
-            <h3 class="text-center mb-4">Selecciona tu rol</h3>
-            <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('mesero')">
-                        <div class="role-icon role-mesero">
-                            <i class="bi bi-person-badge"></i>
-                        </div>
-                        <h4>Mesero</h4>
-                        <p class="text-muted">Tomar pedidos y servir mesas</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cajero')">
-                        <div class="role-icon role-cajero">
-                            <i class="bi bi-cash-register"></i>
-                        </div>
-                        <h4>Cajero</h4>
-                        <p class="text-muted">Procesar pagos y facturar</p>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocina')">
-                        <div class="role-icon role-cocina">
-                            <i class="bi bi-fire"></i>
-                        </div>
-                        <h4>Cocina</h4>
-                        <p class="text-muted">Preparar pedidos</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+// Función auxiliar: mostrar UI según rol
+function actualizarInterfazPorRol(rol) {
+  // Mostrar/Ocultar según rol
+  const isManager = rol === 'manager';
+  document.getElementById('li-cambiar-rol')?.classList.toggle('d-none', !isManager);
+  document.getElementById('li-admin')?.classList.toggle('d-none', !isManager);
+  document.getElementById('li-factura')?.classList.toggle('d-none', !isManager);
+  document.getElementById('btn-cambiar-rol')?.classList.toggle('d-none', !isManager);
+  document.getElementById('boton-reportes-detallados')?.style.display = isManager ? 'block' : 'none';
 
-        <!-- Panel Mesero -->
-        <div id="panel-mesero" class="work-panel">
-            <div class="row">
-                <!-- Mesas y Menú -->
-                <div class="col-lg-8">
-                    <ul class="nav nav-tabs mb-3" id="meseroTabs">
-                        <li class="nav-item">
-                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#mesas-tab">
-                                <i class="bi bi-grid-3x3"></i> Mesas
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#menu-tab">
-                                <i class="bi bi-menu-button-wide"></i> Menú
-                            </button>
-                        </li>
-                        <li class="nav-item position-relative">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#servir-tab">
-                                <i class="bi bi-bell"></i> Por Servir
-                                <span id="badge-servir" class="notification-badge d-none">0</span>
-                            </button>
-                        </li>
-                    </ul>
+  // Mostrar panel por defecto
+  if (['mesero', 'cajero', 'cocina', 'manager'].includes(rol)) {
+    document.getElementById(`panel-${rol}`)?.classList.add('active');
+  } else {
+    document.getElementById('role-selector').style.display = 'block';
+  }
+}
 
-                    <div class="tab-content">
-                        <!-- Tab Mesas -->
-                        <div class="tab-pane fade show active" id="mesas-tab">
-                            <div class="mesa-grid" id="mesas-container"></div>
-                        </div>
+// Función de logout segura
+function logout() {
+  if (typeof window.limpiarSesion === 'function') {
+    window.limpiarSesion();
+  } else {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    sessionStorage.removeItem('csrf_token');
+  }
+  window.location.href = 'login.html';
+}
+</script>
 
-                        <!-- Tab Menú -->
-                        <div class="tab-pane fade" id="menu-tab">
-                            <div class="categoria-tabs" id="categorias-container"></div>
-                            <div class="menu-grid" id="productos-container"></div>
-                        </div>
+<!-- Scripts principales -->
+<script src="auth-check.js?v=5"></script>
+<script src="pos.js?v=16"></script>
 
-                        <!-- Tab Por Servir -->
-                        <div class="tab-pane fade" id="servir-tab">
-                            <div id="pedidos-servir-container"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Carrito -->
-                <div class="col-lg-4">
-                    <div class="cart-panel">
-                        <div class="p-3 border-bottom">
-                            <h5 class="mb-0">
-                                <i class="bi bi-cart3"></i> Pedido Actual
-                                <span id="mesa-seleccionada" class="badge bg-primary ms-2"></span>
-                            </h5>
-                        </div>
-                        <div class="cart-items" id="cart-items">
-                            <p class="text-muted text-center">Selecciona productos del menú</p>
-                        </div>
-                        <div class="cart-total">
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Subtotal:</span>
-                                <span id="cart-subtotal">$0.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>IVA (13%):</span>
-                                <span id="cart-iva">$0.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-3">
-                                <strong>Total:</strong>
-                                <strong id="cart-total">$0.00</strong>
-                            </div>
-                            <div class="mb-2">
-                                <select class="form-select form-select-sm" id="tipo-pago" onchange="toggleOpcionesPago()">
-                                    <option value="anticipado">Pago anticipado (para llevar)</option>
-                                    <option value="al_final">Pago al final (en mesa)</option>
-                                </select>
-                            </div>
-                            <div id="opciones-para-llevar" class="mb-2">
-                                <input type="text" class="form-control form-control-sm" id="cliente-nombre-pedido" placeholder="Nombre del cliente">
-                            </div>
-                            <button class="btn btn-primary w-100" onclick="enviarPedido()" id="btn-enviar-pedido" disabled>
-                                <i class="bi bi-send"></i> Enviar Pedido
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel Cajero -->
-        <div id="panel-cajero" class="work-panel">
-            <ul class="nav nav-tabs mb-3" id="cajeroTabs">
-                <li class="nav-item">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cajero-cobros-tab">
-                        <i class="bi bi-cash-stack"></i> Cobros Pendientes
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-pedido-tab">
-                        <i class="bi bi-bag-plus"></i> Nuevo Pedido
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-creditos-tab">
-                        <i class="bi bi-credit-card-2-front"></i> Gestión Créditos
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cajero-reportes-tab">
-                        <i class="bi bi-graph-up"></i> Reportes Rápidos
-                    </button>
-                </li>
-            </ul>
-
-            <div class="tab-content">
-                <!-- Tab Cobros Pendientes -->
-                <div class="tab-pane fade show active" id="cajero-cobros-tab">
-                    <div class="row">
-                        <div class="col-lg-8">
-                            <h5 class="mb-3"><i class="bi bi-hourglass-split"></i> Pedidos Pendientes de Pago</h5>
-                            <div id="pedidos-cajero-container"></div>
-                        </div>
-                        <div class="col-lg-4">
-                            <div class="card">
-                                <div class="card-header bg-success text-white">
-                                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Resumen del Día</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Pedidos cerrados:</span>
-                                        <strong id="stat-pedidos">0</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Ventas totales:</span>
-                                        <strong id="stat-ventas">$0.00</strong>
-                                    </div>
-                                    <hr>
-                                    <h6>Top Productos</h6>
-                                    <ul id="stat-top-productos" class="list-unstyled small"></ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Nuevo Pedido (Para Llevar) -->
-                <div class="tab-pane fade" id="cajero-pedido-tab">
-                    <div class="row">
-                        <div class="col-lg-8">
-                            <div class="alert alert-info mb-3">
-                                <i class="bi bi-info-circle"></i> <strong>Pedido Para Llevar:</strong> Crea pedidos directamente y cobra al momento.
-                            </div>
-                            <div class="categoria-tabs" id="categorias-container-cajero"></div>
-                            <div class="menu-grid" id="productos-container-cajero"></div>
-                        </div>
-                        <div class="col-lg-4">
-                            <div class="cart-panel" id="cart-panel-cajero">
-                                <div class="p-3 border-bottom">
-                                    <h5 class="mb-0">
-                                        <i class="bi bi-bag"></i> Pedido Para Llevar
-                                    </h5>
-                                </div>
-                                <div class="cart-items" id="cart-items-cajero">
-                                    <p class="text-muted text-center">Selecciona productos del menú</p>
-                                </div>
-                                <div class="cart-total">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Subtotal:</span>
-                                        <span id="cart-subtotal-cajero">$0.00</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>IVA (13%):</span>
-                                        <span id="cart-iva-cajero">$0.00</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-3">
-                                        <strong>Total:</strong>
-                                        <strong id="cart-total-cajero">$0.00</strong>
-                                    </div>
-                                    <div class="mb-2">
-                                        <input type="text" class="form-control" id="cliente-nombre-cajero" placeholder="Nombre del cliente (requerido)">
-                                    </div>
-                                    <button class="btn btn-success w-100" onclick="crearPedidoCajero()" id="btn-crear-pedido-cajero" disabled>
-                                        <i class="bi bi-cash-coin"></i> Crear y Cobrar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Gestión de Créditos -->
-                <div class="tab-pane fade" id="cajero-creditos-tab">
-                    <div class="row">
-                        <div class="col-lg-6">
-                            <div class="card mb-3">
-                                <div class="card-header bg-warning">
-                                    <h5 class="mb-0"><i class="bi bi-person-plus"></i> Otorgar/Modificar Crédito</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <label class="form-label">Buscar Cliente</label>
-                                        <input type="text" class="form-control" id="buscar-cliente-credito"
-                                               placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
-                                        <div id="resultados-cliente-credito" class="list-group mt-2"></div>
-                                    </div>
-                                    <div id="form-credito-cliente" style="display:none;">
-                                        <hr>
-                                        <h6 id="nombre-cliente-credito"></h6>
-                                        <input type="hidden" id="id-cliente-credito">
-                                        <div class="row mb-3">
-                                            <div class="col-6">
-                                                <label class="form-label">Crédito Autorizado ($)</label>
-                                                <input type="number" class="form-control" id="monto-credito-autorizado" min="0" step="0.01">
-                                            </div>
-                                            <div class="col-6">
-                                                <label class="form-label">Días de Crédito</label>
-                                                <input type="number" class="form-control" id="dias-credito-cliente" min="0">
-                                            </div>
-                                        </div>
-                                        <div class="alert alert-secondary mb-3">
-                                            <div class="d-flex justify-content-between">
-                                                <span>Crédito Utilizado:</span>
-                                                <strong id="credito-utilizado-info">$0.00</strong>
-                                            </div>
-                                            <div class="d-flex justify-content-between">
-                                                <span>Crédito Disponible:</span>
-                                                <strong id="credito-disponible-info">$0.00</strong>
-                                            </div>
-                                        </div>
-                                        <button class="btn btn-warning w-100" onclick="guardarCreditoCliente()">
-                                            <i class="bi bi-save"></i> Guardar Crédito
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-6">
-                            <div class="card">
-                                <div class="card-header bg-info text-white">
-                                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Ventas a Crédito Pendientes</h5>
-                                </div>
-                                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
-                                    <div id="lista-creditos-pendientes">
-                                        <p class="text-muted text-center">Cargando...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab Reportes Rápidos -->
-                <div class="tab-pane fade" id="cajero-reportes-tab">
-                    <!-- Selector de período rápido -->
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-hoy" value="hoy" checked onchange="cambiarPeriodoReportes('hoy')">
-                                <label class="btn btn-outline-primary" for="periodo-hoy">
-                                    <i class="bi bi-calendar-day"></i> Hoy
-                                </label>
-                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-7d" value="7d" onchange="cambiarPeriodoReportes('7d')">
-                                <label class="btn btn-outline-primary" for="periodo-7d">
-                                    <i class="bi bi-calendar-week"></i> Últimos 7 días
-                                </label>
-                                <input type="radio" class="btn-check" name="periodoReportes" id="periodo-30d" value="30d" onchange="cambiarPeriodoReportes('30d')">
-                                <label class="btn btn-outline-primary" for="periodo-30d">
-                                    <i class="bi bi-calendar-month"></i> Último mes
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tarjetas de Métricas -->
-                    <div class="row" id="metricas-reportes">
-                        <div class="col-md-3 mb-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title text-muted">Total Vendido</h6>
-                                    <h3 class="mb-0" id="metrica-total-ventas">$0.00</h3>
-                                    <small id="metrica-variacion-ventas" class="text-success"></small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title text-muted">Total Pedidos</h6>
-                                    <h3 class="mb-0" id="metrica-total-pedidos">0</h3>
-                                    <small id="metrica-variacion-pedidos" class="text-success"></small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title text-muted">Ticket Promedio</h6>
-                                    <h3 class="mb-0" id="metrica-ticket-promedio">$0.00</h3>
-                                    <small id="metrica-variacion-promedio" class="text-success"></small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title text-muted">Efectivo vs Crédito</h6>
-                                    <div class="d-flex justify-content-between">
-                                        <small><strong>Efectivo:</strong> <span id="metrica-efectivo">$0.00</span></small>
-                                        <small><strong>Crédito:</strong> <span id="metrica-credito">$0.00</span></small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Top Productos del período -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Top Productos</h6>
-                                </div>
-                                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                                    <div id="tabla-top-productos">
-                                        <p class="text-muted text-center">Cargando...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Desglose por Categoría -->
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0"><i class="bi bi-tag"></i> Ventas por Categoría</h6>
-                                </div>
-                                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                                    <div id="tabla-categorias">
-                                        <p class="text-muted text-center">Cargando...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Botón para acceder a reportes detallados (solo para managers) -->
-                    <div class="row mt-3" id="boton-reportes-detallados" style="display: none;">
-                        <div class="col-md-12">
-                            <a href="reportes.html" class="btn btn-primary w-100" target="_blank">
-                                <i class="bi bi-file-earmark-text"></i> Ver Reportes Detallados
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel Cocina -->
-        <div id="panel-cocina" class="work-panel">
-            <h4 class="mb-3"><i class="bi bi-fire"></i> Pedidos en Cola</h4>
-            <div class="row" id="pedidos-cocina-container"></div>
-        </div>
-    </div>
-
-    <!-- Modal Confirmar Pago -->
-    <div class="modal fade" id="modalPago" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title"><i class="bi bi-cash"></i> Confirmar Pago</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div id="detalle-pago"></div>
-                            <hr>
-
-                            <!-- M&eacute;todo de Pago -->
-                            <h6 class="mb-2"><i class="bi bi-wallet2"></i> M&eacute;todo de Pago</h6>
-                            <div class="btn-group w-100 mb-3" role="group">
-                                <input type="radio" class="btn-check" name="metodoPago" id="pago-efectivo" value="efectivo" checked onchange="onMetodoPagoChange()">
-                                <label class="btn btn-outline-success" for="pago-efectivo">
-                                    <i class="bi bi-cash"></i> Efectivo
-                                </label>
-                                <input type="radio" class="btn-check" name="metodoPago" id="pago-credito" value="credito" onchange="onMetodoPagoChange()">
-                                <label class="btn btn-outline-warning" for="pago-credito">
-                                    <i class="bi bi-credit-card"></i> Cr&eacute;dito
-                                </label>
-                            </div>
-
-                            <!-- Alerta de cr&eacute;dito del cliente -->
-                            <div id="info-credito-cliente" class="alert alert-warning d-none mb-3">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <i class="bi bi-credit-card"></i> <strong>Cr&eacute;dito disponible:</strong>
-                                        <span id="credito-disponible-pago">$0.00</span>
-                                    </div>
-                                    <small class="text-muted">
-                                        Usado: <span id="credito-usado-pago">$0.00</span> /
-                                        <span id="credito-limite-pago">$0.00</span>
-                                    </small>
-                                </div>
-                                <div class="progress mt-2" style="height: 8px;">
-                                    <div id="barra-credito-pago" class="progress-bar bg-warning" style="width: 0%"></div>
-                                </div>
-                            </div>
-
-                            <!-- Alerta cuando no tiene cr&eacute;dito -->
-                            <div id="alerta-sin-credito" class="alert alert-danger d-none mb-3">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>Sin cr&eacute;dito disponible.</strong>
-                                <span id="mensaje-sin-credito">Seleccione un cliente con cr&eacute;dito autorizado.</span>
-                            </div>
-
-                            <!-- Monto recibido (solo para efectivo) -->
-                            <div id="seccion-monto-recibido" class="mb-3">
-                                <label class="form-label">Monto recibido:</label>
-                                <input type="number" class="form-control form-control-lg" id="monto-recibido" step="0.01">
-                            </div>
-                            <div class="alert alert-info" id="cambio-container" style="display:none;">
-                                <strong>Cambio: <span id="monto-cambio">$0.00</span></strong>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="mb-3"><i class="bi bi-receipt"></i> Tipo de Comprobante</h6>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked onchange="toggleSeccionPropina()">
-                                <label class="form-check-label" for="tipo-ticket">
-                                    <strong>Ticket</strong> - Comprobante simple (no fiscal)
-                                </label>
-                            </div>
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura" onchange="toggleSeccionPropina()">
-                                <label class="form-check-label" for="tipo-factura">
-                                    <strong>Factura Electr&oacute;nica</strong> - DTE (requiere datos)
-                                </label>
-                            </div>
-
-                            <!-- Opción de Propina (solo para ticket/efectivo) -->
-                            <div id="seccion-propina" class="mb-3">
-                                <hr>
-                                <h6 class="mb-2"><i class="bi bi-gift"></i> Propina (Opcional)</h6>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-auto">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0)">Sin propina</button>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.05)">5%</button>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.10)">10%</button>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.15)">15%</button>
-                                    </div>
-                                </div>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number" class="form-control" id="propina-monto" placeholder="Monto personalizado" step="0.01" min="0" onchange="actualizarPropinaPersonalizada()">
-                                </div>
-                                <small class="text-muted d-block mt-1">Propina: <span id="propina-display">$0.00</span></small>
-                            </div>
-
-                            <!-- Datos del cliente (para factura) -->
-                            <div id="datos-cliente-container" style="display:none;">
-                                <hr>
-                                <h6 class="mb-3"><i class="bi bi-person"></i> Datos del Cliente</h6>
-
-                                <!-- Buscador de cliente -->
-                                <div class="mb-3">
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                        <input type="text" class="form-control" id="buscar-cliente-factura"
-                                               placeholder="Buscar cliente por nombre, DUI, NIT..."
-                                               onkeyup="buscarClienteFactura(this.value)">
-                                        <button class="btn btn-outline-primary" type="button" onclick="limpiarClienteFactura()">
-                                            <i class="bi bi-x"></i>
-                                        </button>
-                                    </div>
-                                    <div id="resultados-busqueda-cliente" class="list-group position-absolute w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto;"></div>
-                                </div>
-                                <input type="hidden" id="cliente-id-factura">
-
-                                <div class="mb-2">
-                                    <input type="text" class="form-control form-control-sm" id="cliente-nombre" placeholder="Nombre del cliente">
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-6">
-                                        <select class="form-select form-select-sm" id="cliente-tipo-doc">
-                                            <option value="">Sin documento</option>
-                                            <option value="36">NIT</option>
-                                            <option value="13">DUI</option>
-                                            <option value="37">Otro</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="text" class="form-control form-control-sm" id="cliente-num-doc" placeholder="N&uacute;mero documento">
-                                    </div>
-                                </div>
-                                <div class="mb-2">
-                                    <input type="text" class="form-control form-control-sm" id="cliente-nrc" placeholder="NRC (opcional)">
-                                </div>
-                                <div class="mb-2">
-                                    <input type="text" class="form-control form-control-sm" id="cliente-direccion" placeholder="Direcci&oacute;n">
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-6">
-                                        <input type="tel" class="form-control form-control-sm" id="cliente-telefono" placeholder="Tel&eacute;fono">
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="email" class="form-control form-control-sm" id="cliente-correo" placeholder="Correo">
-                                    </div>
-                                </div>
-                                <div class="row mb-2 d-none">
-                                    <div class="col-md-6">
-                                        <label class="form-label small">Cr&eacute;dito Autorizado ($)</label>
-                                        <input type="number" class="form-control form-control-sm" id="cliente-credito" min="0" step="0.01" value="0">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small">D&iacute;as de Cr&eacute;dito</label>
-                                        <input type="number" class="form-control form-control-sm" id="cliente-dias-credito" min="0" value="0">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-outline-success" onclick="confirmarPagoSinComprobante()">
-                        <i class="bi bi-check-circle"></i> Solo Pagar
-                    </button>
-                    <button type="button" class="btn btn-success" onclick="confirmarPagoConComprobante()">
-                        <i class="bi bi-receipt"></i> Pagar y Emitir Comprobante
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notificaciones -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
-        <div id="toast-notification" class="toast" role="alert">
-            <div class="toast-header">
-                <i class="bi bi-bell me-2"></i>
-                <strong class="me-auto" id="toast-title">Notificación</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body" id="toast-message"></div>
-        </div>
-    </div>
-
-    <!-- FAB Carrito (Solo móvil) -->
-    <button class="cart-fab" id="cart-fab" onclick="toggleCartSheet()">
-        <i class="bi bi-cart3"></i>
-        <span class="badge" id="cart-fab-count">0</span>
-    </button>
-
-    <!-- Bottom Sheet Carrito (Solo móvil) -->
-    <div class="cart-sheet-overlay" id="cart-sheet-overlay" onclick="toggleCartSheet()"></div>
-    <div class="cart-sheet" id="cart-sheet">
-        <div class="cart-sheet-header">
-            <div class="drag-handle"></div>
-            <h5 class="mb-0"><i class="bi bi-cart3"></i> Pedido Actual</h5>
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleCartSheet()">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-        <div class="cart-sheet-body" id="cart-sheet-items">
-            <p class="text-muted text-center py-3">Carrito vacío</p>
-        </div>
-        <div class="cart-sheet-footer">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <small>Sub: <span id="cart-sheet-subtotal">$0.00</span> + IVA: <span id="cart-sheet-iva">$0.00</span></small>
-                <strong class="text-primary fs-5"><span id="cart-sheet-total">$0.00</span></strong>
-            </div>
-            <div class="row g-2 mb-2">
-                <div class="col-5">
-                    <select class="form-select form-select-sm" id="tipo-pago-mobile" onchange="toggleOpcionesPagoMobile()">
-                        <option value="anticipado">Llevar</option>
-                        <option value="al_final">Mesa</option>
-                    </select>
-                </div>
-                <div class="col-7">
-                    <input type="text" class="form-control form-control-sm" id="cliente-nombre-mobile" placeholder="Nombre cliente">
-                </div>
-            </div>
-            <button class="btn btn-primary w-100" onclick="enviarPedidoMobile()" id="btn-enviar-mobile" disabled>
-                <i class="bi bi-send"></i> Enviar Pedido
-            </button>
-        </div>
-    </div>
-
-    <!-- Bottom Navigation (Solo móvil) -->
-    <nav class="bottom-nav" id="bottom-nav">
-        <div class="bottom-nav-items">
-            <button class="bottom-nav-item" onclick="navegarMobile('mesas')" id="nav-mesas">
-                <i class="bi bi-grid-3x3"></i>
-                <span>Mesas</span>
-            </button>
-            <button class="bottom-nav-item" onclick="navegarMobile('menu')" id="nav-menu">
-                <i class="bi bi-list-ul"></i>
-                <span>Menú</span>
-            </button>
-            <button class="bottom-nav-item" onclick="navegarMobile('servir')" id="nav-servir">
-                <i class="bi bi-bell"></i>
-                <span>Servir</span>
-            </button>
-            <button class="bottom-nav-item" onclick="logout()">
-                <i class="bi bi-box-arrow-right"></i>
-                <span>Salir</span>
-            </button>
-        </div>
-    </nav>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="utils.js"></script>
-    <script src="config.js"></script>
-    <script src="auth-check.js?v=5"></script>
-    <script src="pos.js?v=16"></script>
 </body>
 </html>
