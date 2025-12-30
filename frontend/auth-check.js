@@ -42,7 +42,7 @@ function getUsuarioActual() {
     return userStr ? JSON.parse(userStr) : null;
 }
 
-// Verificar sesión con el servidor
+// Verificar sesión con el servidor (usa fetch directo para evitar bucle)
 async function verificarSesion() {
     const token = getAuthToken();
 
@@ -51,7 +51,8 @@ async function verificarSesion() {
     }
 
     try {
-        const response = await apiFetch(`${AUTH_API}/me`, {
+        // ✅ Usa fetch directo (no apiFetch) para evitar bucle en verificación inicial
+        const response = await fetch(`${AUTH_API}/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -126,7 +127,6 @@ async function verificarAcceso() {
 
     // Si la página no está en la lista de permitidas ni públicas,
     // es una URL desconocida - requiere autenticación
-    // (esto cubre el caso de nginx redirigiendo URLs inexistentes a index.html)
     const paginaDesconocida = !rolesPermitidos;
 
     // Verificar sesión primero
@@ -152,12 +152,22 @@ async function verificarAcceso() {
         return false;
     }
 
-    // Actualizar UI con info del usuario si existe el elemento
+    // Actualizar UI con info del usuario
     actualizarUIUsuario(usuario);
 
-    // Para pos.html, aplicar restricciones de rol directamente
+    // ✅ Para pos.html, activar permisos por rol
     if (pagina === 'pos.html') {
-        aplicarRestriccionesPOS(usuario);
+        // Si pos.js define aplicarPermisosPorRol, usarla
+        if (typeof window.aplicarPermisosPorRol === 'function') {
+            window.aplicarPermisosPorRol(usuario.rol);
+        } else {
+            // Fallback: usar lógica básica
+            const panel = document.getElementById(`panel-${usuario.rol}`);
+            if (panel) {
+                document.querySelectorAll('.work-panel').forEach(p => p.classList.remove('active'));
+                panel.classList.add('active');
+            }
+        }
     }
 
     // Llamar función de callback si existe (para pos.js)
@@ -168,87 +178,19 @@ async function verificarAcceso() {
     return true;
 }
 
-// Aplicar restricciones de rol en POS
-function aplicarRestriccionesPOS(usuario) {
-    console.log('aplicarRestriccionesPOS llamado con usuario:', usuario);
-
-    const roleSelector = document.getElementById('role-selector');
-    const btnCambiarRol = document.getElementById('btn-cambiar-rol');
-    const managerNavLinks = document.getElementById('manager-nav-links');
-
-    console.log('Elementos encontrados:', {
-        roleSelector: !!roleSelector,
-        btnCambiarRol: !!btnCambiarRol,
-        managerNavLinks: !!managerNavLinks
-    });
-
-    // Ocultar selector para todos excepto manager
-    if (usuario.rol !== 'manager') {
-        if (roleSelector) roleSelector.style.display = 'none';
-        if (btnCambiarRol) btnCambiarRol.classList.add('d-none');
-        if (managerNavLinks) managerNavLinks.classList.add('d-none');
-    }
-
-    console.log('Usuario rol:', usuario.rol);
-
-    switch(usuario.rol) {
-        case 'mesero':
-            mostrarPanelPOS('mesero');
-            break;
-        case 'cajero':
-            mostrarPanelPOS('cajero');
-            break;
-        case 'cocinero':
-            window.location.href = 'cocina.html';
-            break;
-        case 'manager':
-            console.log('Activando elementos para manager');
-            if (roleSelector) roleSelector.style.display = 'block';
-            // El botón "Cambiar Rol" solo se muestra después de seleccionar un rol
-            if (btnCambiarRol) btnCambiarRol.classList.add('d-none');
-            if (managerNavLinks) {
-                managerNavLinks.classList.remove('d-none');
-                console.log('manager-nav-links después de remove d-none:', managerNavLinks.className);
-            }
-            break;
-    }
-}
-
-// Mostrar panel específico en POS
-function mostrarPanelPOS(rol) {
-    console.log('Mostrando panel:', rol);
-
-    // Mostrar badge de rol actual
-    const currentRole = document.getElementById('current-role');
-    if (currentRole) {
-        currentRole.textContent = rol.charAt(0).toUpperCase() + rol.slice(1);
-        currentRole.classList.remove('d-none');
-    }
-
-    // Ocultar todos los paneles
-    document.querySelectorAll('.work-panel').forEach(p => p.classList.remove('active'));
-
-    // Mostrar panel correspondiente
-    const panel = document.getElementById(`panel-${rol}`);
-    if (panel) {
-        panel.classList.add('active');
-        console.log('Panel activado:', panel.id);
-    } else {
-        console.error('Panel no encontrado:', `panel-${rol}`);
-    }
-}
-
 // Actualizar elementos de UI con información del usuario
 function actualizarUIUsuario(usuario) {
-    // Actualizar nombre de usuario si existe el elemento
+    // Actualizar nombre de usuario
     const userNameEl = document.getElementById('usuario-nombre-display');
     if (userNameEl) {
-        userNameEl.textContent = usuario.nombre;
+        userNameEl.textContent = usuario.nombre || '';
     }
 
-    const userRolEl = document.getElementById('usuario-rol-display');
-    if (userRolEl) {
-        userRolEl.textContent = usuario.rol;
+    // Actualizar rol (badge)
+    const currentRole = document.getElementById('current-role');
+    if (currentRole) {
+        currentRole.textContent = usuario.rol.charAt(0).toUpperCase() + usuario.rol.slice(1);
+        currentRole.classList.remove('d-none');
     }
 }
 
@@ -257,7 +199,8 @@ async function logout() {
     const token = getAuthToken();
 
     try {
-        await apiFetch(`${AUTH_API}/logout`, {
+        // ✅ Usa fetch directo para logout (no requiere CSRF en logout)
+        await fetch(`${AUTH_API}/logout`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             credentials: 'include'
@@ -268,6 +211,7 @@ async function logout() {
 
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    sessionStorage.removeItem('csrf_token');
     window.location.href = 'login.html';
 }
 

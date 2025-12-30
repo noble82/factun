@@ -113,6 +113,83 @@ if (crearClienteForm) {
     }
 }
 
+// ✅ CONTROL DE ACCESO POR ROL (RBAC) — Definido aquí para que auth-check.js pueda usarlo
+/**
+ * Control de acceso por rol — Oculta/muestra elementos según permisos
+ * @param {string} rol - Rol del usuario autenticado
+ */
+function aplicarPermisosPorRol(rol) {
+    if (!rol) {
+        console.warn('Rol no especificado. Redirigiendo a login.');
+        logout();
+        return;
+    }
+
+    // Ocultar todos los paneles y el selector
+    document.querySelectorAll('.work-panel').forEach(el => el.classList.remove('active'));
+    const roleSelector = document.getElementById('role-selector');
+    if (roleSelector) roleSelector.style.display = 'none';
+
+    // ✅ Activar paneles según rol
+    switch (rol) {
+        case 'manager':
+            // ✅ Manager: acceso a todos los paneles
+            document.getElementById('panel-mesero')?.classList.add('active');
+            document.getElementById('panel-cajero')?.classList.add('active');
+            document.getElementById('panel-cocina')?.classList.add('active');
+            // Mostrar selector de rol (solo manager puede cambiar)
+            if (roleSelector) roleSelector.style.display = 'block';
+            break;
+
+        case 'mesero':
+            // ✅ Mesero: solo panel mesero
+            document.getElementById('panel-mesero')?.classList.add('active');
+            break;
+
+        case 'cajero':
+            // ✅ Cajero: panel cajero + acceso a menú (pedido para llevar)
+            document.getElementById('panel-cajero')?.classList.add('active');
+            document.getElementById('panel-mesero')?.classList.add('active');
+            // Ocultar tabs no necesarios del panel mesero
+            const meseroTabs = document.getElementById('meseroTabs');
+            if (meseroTabs) meseroTabs.classList.add('d-none');
+            break;
+
+        case 'cocinero':
+            // ✅ Cocinero: redirigir a cocina.html (mejor experiencia)
+            window.location.href = 'cocina.html';
+            return;
+
+        default:
+            console.error(`Rol no reconocido: ${rol}`);
+            logout();
+            return;
+    }
+
+    // ✅ Actualizar badge de rol
+    const currentRole = document.getElementById('current-role');
+    if (currentRole) {
+        currentRole.textContent = rol.charAt(0).toUpperCase() + rol.slice(1);
+        currentRole.classList.remove('d-none');
+    }
+
+    console.log(`✅ Permisos aplicados: rol ${rol}`);
+}
+
+// ✅ Callback para auth-check.js — se llama cuando la autenticación está verificada
+function onAuthVerificado(usuario) {
+    if (usuario && usuario.rol) {
+        aplicarPermisosPorRol(usuario.rol);
+    } else {
+        console.error('onAuthVerificado: usuario sin rol');
+        logout();
+    }
+}
+
+// Exportar funciones globales
+window.handleCreateClientSubmit = handleCreateClientSubmit;
+window.aplicarPermisosPorRol = aplicarPermisosPorRol;
+window.onAuthVerificado = onAuthVerificado;
 
 // --- Notas de Seguridad ---
 // - apiFetch asegura la inclusión automática de tokens de seguridad.
