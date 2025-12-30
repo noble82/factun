@@ -890,3 +890,4 @@ window.limpiarListeners = limpiarListeners;
 window.getElementText = getElementText;
 window.setElementText = setElementText;
 window.afterTransition = afterTransition;
+window.apiFetch = apiFetch;
