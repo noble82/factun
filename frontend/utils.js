@@ -771,7 +771,63 @@ function afterTransition(element, callback) {
 
     element.addEventListener('transitionend', handler);
 }
+/**
+ * Control de acceso por rol — Oculta/muestra elementos según permisos
+ * @param {string} rol - Rol del usuario autenticado
+ */
+function aplicarPermisosPorRol(rol) {
+    if (!rol) {
+        console.warn('Rol no especificado. Redirigiendo a login.');
+        if (typeof window.logout === 'function') window.logout();
+        else window.location.href = 'login.html';
+        return;
+    }
 
+    // Ocultar todos los paneles y el selector
+    document.querySelectorAll('.work-panel').forEach(el => el.classList.remove('active'));
+    const roleSelector = document.getElementById('role-selector');
+    if (roleSelector) roleSelector.style.display = 'none';
+
+    // ✅ Activar paneles según rol
+    switch (rol) {
+        case 'manager':
+            document.getElementById('panel-mesero')?.classList.add('active');
+            document.getElementById('panel-cajero')?.classList.add('active');
+            document.getElementById('panel-cocina')?.classList.add('active');
+            if (roleSelector) roleSelector.style.display = 'block';
+            break;
+
+        case 'mesero':
+            document.getElementById('panel-mesero')?.classList.add('active');
+            break;
+
+        case 'cajero':
+            document.getElementById('panel-cajero')?.classList.add('active');
+            // ✅ Acceso a menú (pedido para llevar)
+            document.getElementById('panel-mesero')?.classList.add('active');
+            const meseroTabs = document.getElementById('meseroTabs');
+            if (meseroTabs) meseroTabs.classList.add('d-none');
+            break;
+
+        case 'cocinero':
+            window.location.href = 'cocina.html';
+            return;
+
+        default:
+            console.error('Rol no reconocido:', rol);
+            if (typeof window.logout === 'function') window.logout();
+            return;
+    }
+
+    // ✅ Actualizar badge de rol
+    const currentRole = document.getElementById('current-role');
+    if (currentRole) {
+        currentRole.textContent = rol.charAt(0).toUpperCase() + rol.slice(1);
+        currentRole.classList.remove('d-none');
+    }
+
+    console.log(`✅ Permisos aplicados: rol ${rol}`);
+}
 // ============ EXPOSICIÓN GLOBAL DE FUNCIONES ============
 if (typeof window !== 'undefined') {
   // --- Seguridad: CSRF & Auth ---
@@ -829,4 +885,6 @@ if (typeof window !== 'undefined') {
   // --- Formato y Utilidades Generales ---
   window.formatDateTime = formatDateTime;
   window.formatCurrency = formatCurrency;
+window.aplicarPermisosPorRol = aplicarPermisosPorRol;
+
 }
