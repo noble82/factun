@@ -254,20 +254,10 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    // ✅ Actualizar token CSRF desde la respuesta
+                    // ✅ Actualizar token CSRF desde la respuesta real
                     if (typeof window.updateCsrfTokenFromResponse === 'function') {
-                        // Creamos un objeto Response-like para updateCsrfTokenFromResponse
-                        const mockResponse = {
-                            headers: new Map([
-                                ['X-CSRF-Token', response.headers.get('X-CSRF-Token')]
-                            ]).forEach((v, k) => mockResponse.headers.set(k, v)),
-                            json: async () => data
-                        };
-                        mockResponse.headers = new Headers();
-                        if (response.headers.get('X-CSRF-Token')) {
-                            mockResponse.headers.set('X-CSRF-Token', response.headers.get('X-CSRF-Token'));
-                        }
-                        await window.updateCsrfTokenFromResponse(mockResponse);
+                        // Pasar directamente la respuesta real (no mock)
+                        await window.updateCsrfTokenFromResponse(response);
                     }
 
                     // Guardar token y datos de usuario
