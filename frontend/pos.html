@@ -1456,5 +1456,39 @@ function logout() {
 <script src="auth-check.js?v=5"></script>
 <script src="pos.js?v=16"></script>
 
+<!-- ✅ Manejo de cambio de rol (solo para manager) -->
+<script>
+function seleccionarRol(nuevoRol) {
+    const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+    if (usuario.rol !== 'manager') {
+        if (typeof window.mostrarNotificacion === 'function') {
+            window.mostrarNotificacion('Acceso denegado', 'Solo el manager puede cambiar de rol.', 'warning');
+        } else {
+            alert('⚠️ Solo el manager puede cambiar de rol.');
+        }
+        return;
+    }
+
+    const rolesPermitidos = ['mesero', 'cajero', 'cocina', 'manager'];
+    if (!rolesPermitidos.includes(nuevoRol)) {
+        console.error('Rol no válido:', nuevoRol);
+        return;
+    }
+
+    usuario.rol = nuevoRol;
+    localStorage.setItem('user', JSON.stringify(usuario));
+
+    // Aplicar cambios sin recargar
+    if (typeof window.aplicarPermisosPorRol === 'function') {
+        window.aplicarPermisosPorRol(nuevoRol);
+        if (typeof window.mostrarNotificacion === 'function') {
+            window.mostrarNotificacion('Éxito', `Rol cambiado a: ${nuevoRol}`, 'success');
+        }
+    } else {
+        location.reload();
+    }
+}
+</script>
+
 </body>
 </html>
