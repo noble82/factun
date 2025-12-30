@@ -281,7 +281,7 @@ function updateCsrfTokenFromResponse(response) {
  * @param {object} options - Opciones de fetch (method, body, etc.).
  * @returns {Promise<Response|null>} Respuesta del fetch o null si hubo un error manejado.
  */
-function fetch(url, options) {
+function apiFetch(url, options) {
     if (!options) options = {};
 
     // 1. Obtener el token CSRF FRESCO justo antes de construir las cabeceras.
@@ -333,7 +333,7 @@ function fetch(url, options) {
 
     try {
         console.log('apiFetch: Realizando petición a ' + url + ' con método ' + (mergedOptions.method || 'GET'));
-        // ✅ CORREGIDO: era 'await apiFetch(...)' → debe ser 'await fetch(...)'
+        // ✅ Garantizado: usa fetch, no apiFetch
         return fetch(url, mergedOptions).then(function(response) {
             // --- Actualización Asíncrona del Token CSRF ---
             updateCsrfTokenFromResponse(response);
@@ -431,49 +431,6 @@ function mostrarNotificacion(titulo, mensaje, tipo) {
             }
         }
     }, 5000);
-}
-
-// ============ API CALLS - Wrapper con error handling ============
-function apiCall(endpoint, options) {
-    if (!options) options = {};
-
-    try {
-        return apiFetch(endpoint, {
-            method: options.method || 'GET',
-            headers: options.headers || {},
-            body: options.body || null
-        }).then(function(response) {
-            if (!response) return null;
-
-            // Manejar 401 Unauthorized
-            if (response.status === 401) {
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('user');
-                window.location.href = 'login.html';
-                return null;
-            }
-
-            // Manejar otros errores HTTP
-            if (!response.ok) {
-                return response.json().catch(function() {
-                    return { message: 'HTTP ' + response.status };
-                }).then(function(error) {
-                    mostrarNotificacion(
-                        'Error en API',
-                        error.message || error.error || 'Error ' + response.status,
-                        'danger'
-                    );
-                    return null;
-                });
-            }
-
-            return response.json();
-        });
-    } catch (error) {
-        console.error('API Error:', error);
-        mostrarNotificacion('Error de conexión', error.message, 'danger');
-        return Promise.resolve(null);
-    }
 }
 
 // ============ FORMATO DE DATOS ============
