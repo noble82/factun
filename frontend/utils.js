@@ -180,45 +180,47 @@ function limpiarSesion() {
 // ============ CSRF PROTECTION ============
 
 /**
- * Obtiene el token CSRF almacenado en sesión
- * @returns {string|null} Token CSRF si existe, null caso contrario
+ * Obtiene el token CSRF almacenado en sesión.
+ * @returns {string|null} Token CSRF si existe, null caso contrario.
  */
 function getCsrfToken() {
     try {
+        // Asegurarse de que la clave 'csrf_token' es la que se usa consistentemente.
         return sessionStorage.getItem('csrf_token');
     } catch (e) {
-        console.error('Error accediendo CSRF token:', e);
+        console.error('Error accediendo CSRF token desde sessionStorage:', e);
         return null;
     }
 }
 
 /**
- * Guarda el token CSRF de forma segura en sessionStorage
- * @param {string} token - Token CSRF a guardar
+ * Guarda el token CSRF de forma segura en sessionStorage.
+ * @param {string} token - Token CSRF a guardar.
  */
 function saveCsrfToken(token) {
     try {
         if (token) {
             sessionStorage.setItem('csrf_token', token);
+            console.log('CSRF token guardado:', token.substring(0, 10) + '...'); // Log de confirmación (parcial para seguridad)
         } else {
             sessionStorage.removeItem('csrf_token');
+            console.log('CSRF token removido de sessionStorage.');
         }
     } catch (e) {
-        console.error('Error guardando CSRF token:', e);
+        console.error('Error guardando CSRF token en sessionStorage:', e);
     }
 }
 
 /**
- * Obtiene headers con autenticación y CSRF token
- * Reemplaza getAuthHeaders - esta es la versión mejorada
- * @param {string} contentType - Content-Type del request
- * @returns {object} Headers con autenticación y CSRF
+ * Obtiene headers con autenticación y CSRF token.
+ * @param {string} contentType - Content-Type del request.
+ * @returns {object} Headers con autenticación y CSRF.
  */
 function getSecureHeaders(contentType = 'application/json') {
     const token = getAuthToken();
     const csrfToken = getCsrfToken();
     const headers = {
-        'Content-Type': contentType
+        'Content-Type': contentType || 'application/json' // Asegurar siempre un Content-Type
     };
 
     if (token) {
@@ -226,77 +228,141 @@ function getSecureHeaders(contentType = 'application/json') {
     }
 
     if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
+        headers['X-CSRF-Token'] = csrfToken; // La cabecera clave para CSRF
     }
 
     return headers;
 }
 
 /**
- * Actualiza el CSRF token desde la respuesta (header o body)
- * Debe llamarse después de cada request para obtener un nuevo token válido
- * @param {Response} response - Respuesta del fetch
+ * Actualiza el CSRF token desde la respuesta (header o body).
+ * Ejecuta la actualización de forma asíncrona. La respuesta de apiFetch se
+ * devuelve inmediatamente, mientras que esta función trabaja en segundo plano.
+ * @param {Response} response - Respuesta del fetch.
  */
-function updateCsrfTokenFromResponse(response) {
-    // Intentar obtener token del header
+async function updateCsrfTokenFromResponse(response) {
+    // --- Priorizar token del Header ---
     const tokenFromHeader = response.headers.get('X-CSRF-Token');
     if (tokenFromHeader) {
         saveCsrfToken(tokenFromHeader);
-        return;
+        console.log('CSRF token actualizado desde el header de respuesta.');
+        return; // Si se obtuvo del header, no es necesario procesar el body para el token CSRF.
     }
 
-    // Intentar obtener token del body si es JSON
-    if (response.headers.get('content-type')?.includes('application/json')) {
+    // --- Intentar obtener token del body si es JSON y no se obtuvo del header ---
+    const contentType = response.headers.get('content-type');
+    if (contentType?.includes('application/json')) {
         try {
-            response.clone().json().then(data => {
-                if (data._csrf_token) {
-                    saveCsrfToken(data._csrf_token);
-                }
-            }).catch(() => {
-                // Ignorar errores de parseo
-            });
+            // Usamos clone() para poder leer el body.
+            // Usamos await para parsear el JSON de forma síncrona dentro de esta async function.
+            const data = await response.clone().json();
+            if (data && data._csrf_token) { // Verificar que data existe y tiene _csrf_token
+                saveCsrfToken(data._csrf_token);
+                console.log('CSRF token actualizado desde el body de respuesta JSON.');
+            }
         } catch (e) {
-            console.error('Error obteniendo CSRF token de respuesta:', e);
+            // Solo loguear el error, no lanzar, para no interrumpir el flujo principal de apiFetch.
+            // Un error aquí puede indicar que el body no es JSON válido o ya fue consumido.
+            console.warn('Error al intentar obtener CSRF token del body JSON:', e);
         }
     }
 }
 
 /**
- * Wrapper para fetch que automáticamente incluye autenticación y CSRF tokens
- * @param {string} url - URL del endpoint
- * @param {object} options - Opciones de fetch (method, body, etc)
- * @returns {Promise<Response>} Respuesta del fetch
+ * Wrapper para fetch que automáticamente incluye autenticación y CSRF tokens.
+ * Maneja errores y redirige en caso de 401.
+ * @param {string} url - URL del endpoint.
+ * @param {object} options - Opciones de fetch (method, body, etc.).
+ * @returns {Promise<Response|null>} Respuesta del fetch o null si hubo un error manejado.
  */
 async function apiFetch(url, options = {}) {
-    // Obtener headers seguros (con auth y CSRF tokens)
-    const headers = getSecureHeaders(
+    // 1. Obtener las cabeceras seguras base (Auth y CSRF)
+    const defaultSecureHeaders = getSecureHeaders(
         options.headers?.['Content-Type'] || 'application/json'
     );
 
-    // Mergear con headers adicionales de opciones
+    // 2. Construir las cabeceras finales:
+    //    - Combinar las cabeceras del usuario (options.headers) con las seguras.
+    //    - Priorizar las cabeceras seguras ('X-CSRF-Token', 'Authorization')
+    //      para evitar que las definidas por el usuario las sobrescriban incorrectamente.
+    const finalHeaders = {
+        ...(options.headers || {}), // Empieza con las cabeceras del usuario
+    };
+
+    // Asegurar que las cabeceras críticas de seguridad se incluyan y tengan prioridad.
+    // Esto previene que un 'X-CSRF-Token: ""' en options.headers anule la protección.
+    if (defaultSecureHeaders['X-CSRF-Token']) {
+        finalHeaders['X-CSRF-Token'] = defaultSecureHeaders['X-CSRF-Token'];
+    } else {
+        // Si getCsrfToken() devolvió null, nos aseguramos de que no haya un X-CSRF-Token vacío
+        // en las cabeceras finales si el usuario lo había intentado poner.
+        delete finalHeaders['X-CSRF-Token'];
+    }
+
+    if (defaultSecureHeaders['Authorization']) {
+        finalHeaders['Authorization'] = defaultSecureHeaders['Authorization'];
+    } else {
+        delete finalHeaders['Authorization'];
+    }
+    
+    // Asegurar Content-Type si no está definido y se envía body
+    if (!finalHeaders['Content-Type'] && options.body) {
+        finalHeaders['Content-Type'] = 'application/json';
+    }
+
     const mergedOptions = {
         ...options,
-        headers: { ...headers, ...(options.headers || {}) }
+        headers: finalHeaders, // Usar las cabeceras finales construidas
     };
 
     try {
+        // Ejecutar la petición fetch
         const response = await fetch(url, mergedOptions);
 
-        // Actualizar CSRF token desde respuesta
+        // --- Actualización Asíncrona del Token CSRF ---
+        // Esta función se ejecuta en segundo plano para actualizar el token
+        // para la SIGUIENTE petición. apiFetch retorna la respuesta principal
+        // de inmediato.
         updateCsrfTokenFromResponse(response);
+        // --------------------------------------------
 
-        // Si la respuesta es 401, posiblemente el token de auth expiró
+        // Manejo de 401 Unauthorized: Token de autenticación expirado
         if (response.status === 401) {
-            console.warn('Autenticación expirada');
-            limpiarSesion();
-            window.location.href = '/login.html';
-            return null;
+            console.warn('Autenticación expirada. Redirigiendo a login.');
+            limpiarSesion(); // Limpiar tokens y sesión del usuario
+            window.location.href = '/login.html'; // Redirigir a la página de login
+            return null; // Detener procesamiento
         }
 
+        // Manejo de otros errores HTTP (ej. 400, 403 CSRF missing, 500)
+        if (!response.ok) {
+            let errorDetails = { message: `HTTP error ${response.status}` };
+            try {
+                // Intentar obtener detalles del error del body JSON
+                const errorData = await response.clone().json();
+                // Combinar detalles del error si existen en el cuerpo de la respuesta
+                errorDetails = { ...errorDetails, ...(typeof errorData === 'object' ? errorData : { message: errorData }) };
+            } catch {
+                // Si no es JSON o falla el parseo, usar el mensaje genérico.
+            }
+            console.error(`API Error (${url}):`, errorDetails);
+            // Mostrar notificación al usuario
+            mostrarNotificacion(
+                'Error en API',
+                errorDetails.message || errorDetails.error || `Error ${response.status}`,
+                'danger'
+            );
+            return null; // Devolver null para indicar fallo
+        }
+
+        // Si la respuesta es OK, devolver la respuesta para que el llamador la procese
         return response;
+
     } catch (error) {
+        // Capturar errores de red o de la propia llamada fetch()
         console.error(`Error en apiFetch(${url}):`, error);
-        throw error;
+        mostrarNotificacion('Error de conexión', error.message || 'No se pudo conectar al servidor.', 'danger');
+        throw error; // Relanzar el error para que el código superior sepa que algo falló gravemente
     }
 }
 
