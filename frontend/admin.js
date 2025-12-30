@@ -169,10 +169,10 @@ function renderDashboardAlertas(alertas) {
             <tbody>
                 ${alertas.map(a => `
                     <tr>
-                        <td>${escapeHtml(a.nombre)}</td>
+                        <td>${window.window.window.escapeHtml(a.nombre)}</td>
                         <td>
                             <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'}">
-                                ${escapeHtml(String(a.stock_actual))} ${escapeHtml(a.unidad_medida)} / ${escapeHtml(String(a.stock_minimo))}
+                                ${window.window.window.escapeHtml(String(a.stock_actual))} ${window.window.window.escapeHtml(a.unidad_medida)} / ${window.window.window.escapeHtml(String(a.stock_minimo))}
                             </span>
                         </td>
                     </tr>
@@ -195,11 +195,11 @@ function renderDashboardMovimientos(movimientos) {
             <tbody>
                 ${movimientos.map(m => `
                     <tr>
-                        <td><small>${escapeHtml(formatDateTime(m.created_at))}</small></td>
-                        <td>${escapeHtml(m.materia_nombre)}</td>
+                        <td><small>${window.window.window.escapeHtml(formatDateTime(m.created_at))}</small></td>
+                        <td>${window.window.window.escapeHtml(m.materia_nombre)}</td>
                         <td>
                             <span class="badge ${m.tipo === 'entrada' ? 'bg-success' : m.tipo === 'salida' ? 'bg-danger' : 'bg-secondary'}">
-                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${escapeHtml(String(m.cantidad))}
+                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${window.window.window.escapeHtml(String(m.cantidad))}
                             </span>
                         </td>
                     </tr>
@@ -294,13 +294,13 @@ function renderProductosTabla() {
 
         return `
             <tr class="${!prod.disponible ? 'table-secondary' : ''}">
-                <td><strong>${escapeHtml(prod.nombre)}</strong></td>
-                <td><small>${escapeHtml(prod.descripcion || '-')}</small></td>
-                <td>${categoria ? escapeHtml(categoria.nombre) : '-'}</td>
+                <td><strong>${window.window.window.escapeHtml(prod.nombre)}</strong></td>
+                <td><small>${window.window.window.escapeHtml(prod.descripcion || '-')}</small></td>
+                <td>${categoria ? window.window.window.escapeHtml(categoria.nombre) : '-'}</td>
                 <td><strong>$${parseFloat(prod.precio).toFixed(2)}</strong></td>
                 <td>
                     ${materiaPrimaVinculada ?
-                        `<span class="badge bg-info">${escapeHtml(materiaPrimaVinculada.nombre)}</span>` :
+                        `<span class="badge bg-info">${window.window.window.escapeHtml(materiaPrimaVinculada.nombre)}</span>` :
                         '<span class="text-muted">-</span>'}
                 </td>
                 <td>
@@ -335,7 +335,7 @@ function renderCategoriasTabla() {
         return `
             <tr>
                 <td>${cat.id}</td>
-                <td><strong>${cat.nombre}</strong></td>
+                <td><strong>${window.window.window.escapeHtml(cat.nombre)}</strong></td>
                 <td><span class="badge bg-secondary">${numProductos}</span></td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary" onclick="editarCategoria(${cat.id})" title="Editar">
@@ -1222,12 +1222,12 @@ function renderAlertas(alertas) {
     container.innerHTML = alertas.map(a => `
         <div class="alert ${a.stock_actual <= 0 ? 'alert-danger' : 'alert-warning'} d-flex justify-content-between align-items-center">
             <div>
-                <strong>${escapeHtml(a.nombre)}</strong>
+                <strong>${window.window.window.escapeHtml(a.nombre)}</strong>
                 <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'} ms-2">
                     ${a.stock_actual <= 0 ? 'AGOTADO' : 'STOCK BAJO'}
                 </span>
                 <br>
-                <small>Stock actual: ${a.stock_actual} ${escapeHtml(a.unidad_medida)} | Mínimo: ${a.stock_minimo} ${escapeHtml(a.unidad_medida)}</small>
+                <small>Stock actual: ${a.stock_actual} ${window.window.window.escapeHtml(a.unidad_medida)} | Mínimo: ${a.stock_minimo} ${window.window.window.escapeHtml(a.unidad_medida)}</small>
             </div>
             <button class="btn btn-sm btn-outline-primary" onclick="ajustarMateria(${a.id})">
                 <i class="bi bi-plus-circle"></i> Reabastecer

@@ -3,14 +3,14 @@
  * Incluir este archivo antes que otros scripts
  */
 
-// ============ SEGURIDAD - Escape HTML para prevenir XSS ============\
+// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
 
 /**
  * Escapa caracteres HTML para prevenir inyección XSS
  * @param {string} unsafe - String sin escapar
  * @returns {string} String escapado seguro para insertar en HTML
  */
-function escapeHtml(unsafe) {
+function window.escapeHtml(unsafe) {
     if (!unsafe) return '';
     if (typeof unsafe !== 'string') unsafe = String(unsafe);
 
@@ -23,7 +23,7 @@ function escapeHtml(unsafe) {
         '/': '&#x2F;'
     };
 
-    return unsafe.replace(/[&<>\"\'\\/]/g, char => htmlEntityMap[char]);
+    return unsafe.replace(/[&<>"'/]/g, char => htmlEntityMap[char]);
 }
 
 /**
@@ -75,7 +75,7 @@ function createSafeElement(tagName, attributes = {}, content = '') {
     return elem;
 }
 
-// ============ AUTENTICACIÓN - Token Management ============\
+// ============ AUTENTICACIÓN - Token Management ============
 
 /**
  * Obtiene el token de autenticación del localStorage
@@ -177,7 +177,7 @@ function limpiarSesion() {
     }
 }
 
-// ============ CSRF PROTECTION ============\
+// ============ CSRF PROTECTION ============
 
 /**
  * Obtiene el token CSRF almacenado en sesión.
@@ -373,7 +373,7 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-// ============ NOTIFICACIONES - Toast/Alert Handler ============\
+// ============ NOTIFICACIONES - Toast/Alert Handler ============
 function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
     /**
      * Muestra una notificación visual al usuario
@@ -411,9 +411,9 @@ function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
         <div class="alert ${clase} alert-dismissible fade show d-flex align-items-start" role="alert" style="max-width: 500px; word-wrap: break-word;">
             <i class="bi bi-${icon} me-2" style="margin-top: 3px;"></i>
             <div>
-                ${titulo ? `<strong>${escapeHtml(titulo)}</strong>` : ''}
+                ${titulo ? `<strong>${window.escapeHtml(titulo)}</strong>` : ''}
                 ${titulo && mensaje ? '<br>' : ''}
-                ${mensaje ? escapeHtml(mensaje) : ''}
+                ${mensaje ? window.escapeHtml(mensaje) : ''}
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -434,7 +434,7 @@ function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
     }, 5000);
 }
 
-// ============ API CALLS - Wrapper con error handling ============\
+// ============ API CALLS - Wrapper con error handling ============
 async function apiCall(endpoint, options = {}) {
     /**
      * Realiza una llamada a API con manejo de errores
@@ -479,7 +479,7 @@ async function apiCall(endpoint, options = {}) {
     }
 }
 
-// ============ FORMATO DE DATOS ============\
+// ============ FORMATO DE DATOS ============
 function formatDateTime(dateString) {
     /**
      * Formatea fecha y hora a formato local
@@ -508,7 +508,7 @@ function formatCurrency(amount) {
     return `$${parseFloat(amount).toFixed(2)}`;
 }
 
-// ============ UTILIDADES DE DOM ============\
+// ============ UTILIDADES DE DOM ============
 function ocultarElemento(id) {
     const elem = document.getElementById(id);
     if (elem) elem.classList.add('d-none');
@@ -524,7 +524,7 @@ function toggleElemento(id) {
     if (elem) elem.classList.toggle('d-none');
 }
 
-// ============ VALIDACIÓN - Client-side form validation ============\
+// ============ VALIDACIÓN - Client-side form validation ============
 
 /**
  * Valida que un valor sea un número positivo
@@ -567,7 +567,7 @@ function validarNumeroEntero(value) {
 function validarEmail(email) {
     if (!email) return false;
 
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(String(email).trim());
 }
 
@@ -580,10 +580,10 @@ function validarTelefono(phone) {
     if (!phone) return false;
 
     // Remover caracteres comunes de formateo
-    const phoneClean = String(phone).replace(/[\\s\\-()]/g, '');
+    const phoneClean = String(phone).replace(/[\s-()]/g, '');
 
     // Verificar que sea solo dígitos y tenga entre 7 y 15 dígitos
-    return /^\\d{7,15}$/.test(phoneClean);
+    return /^\d{7,15}$/.test(phoneClean);
 }
 
 /**
@@ -648,7 +648,7 @@ function deshabilitarFormulario(formId, disabled = true) {
     });
 }
 
-// ============ CONSTANTES Y CONFIGURACIÓN ============\
+// ============ CONSTANTES Y CONFIGURACIÓN ============
 
 /**
  * Constantes para rates, timings y configuración general
@@ -691,7 +691,7 @@ const CONFIG = {
     }
 };
 
-// ============ OPTIMIZACIÓN - Consolidación de Funciones ============\
+// ============ OPTIMIZACIÓN - Consolidación de Funciones ============
 
 /**
  * Renderiza una lista genérica de items
@@ -708,7 +708,7 @@ function renderItems(container, items, template, emptyMsg = 'No hay datos') {
     if (!elem) return;
 
     if (!items || items.length === 0) {
-        elem.innerHTML = `<div class="alert alert-info">${escapeHtml(emptyMsg)}</div>`;
+        elem.innerHTML = `<div class="alert alert-info">${window.escapeHtml(emptyMsg)}</div>`;
         return;
     }
 
@@ -846,3 +846,47 @@ function afterTransition(element, callback) {
 
     element.addEventListener('transitionend', handler);
 }
+
+// ============ EXPOSICIÓN GLOBAL DE FUNCIONES DE UTILIDAD ============
+// Esto asegura que las funciones definidas en utils.js estén disponibles
+// globalmente para otros scripts que se carguen después.
+window.escapeHtml = escapeHtml;
+window.escapeAttribute = escapeAttribute;
+window.createSafeElement = createSafeElement;
+window.getAuthToken = getAuthToken;
+window.getUsuarioActual = getUsuarioActual;
+window.getAuthHeaders = getAuthHeaders;
+window.saveAuthToken = saveAuthToken;
+window.saveUsuarioActual = saveUsuarioActual;
+window.limpiarSesion = limpiarSesion;
+window.getCsrfToken = getCsrfToken;
+window.saveCsrfToken = saveCsrfToken;
+window.getSecureHeaders = getSecureHeaders;
+window.updateCsrfTokenFromResponse = updateCsrfTokenFromResponse;
+window.apiFetch = apiFetch;
+window.mostrarNotificacion = mostrarNotificacion;
+window.apiCall = apiCall;
+window.formatDateTime = formatDateTime;
+window.formatCurrency = formatCurrency;
+window.ocultarElemento = ocultarElemento;
+window.mostrarElemento = mostrarElemento;
+window.toggleElemento = toggleElemento;
+window.validarNumeroPositivo = validarNumeroPositivo;
+window.validarNumeroEntero = validarNumeroEntero;
+window.validarEmail = validarEmail;
+window.validarTelefono = validarTelefono;
+window.validarRequerido = validarRequerido;
+window.getFormValue = getFormValue;
+window.getFormNumber = getFormNumber;
+window.limpiarFormulario = limpiarFormulario;
+window.deshabilitarFormulario = deshabilitarFormulario;
+window.renderItems = renderItems;
+window.createDebouncedFunction = createDebouncedFunction;
+window.toggleModal = toggleModal;
+window.calculateIVA = calculateIVA;
+window.calculateTotal = calculateTotal;
+window.getEstadoColor = getEstadoColor;
+window.limpiarListeners = limpiarListeners;
+window.getElementText = getElementText;
+window.setElementText = setElementText;
+window.afterTransition = afterTransition;

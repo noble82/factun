@@ -215,10 +215,10 @@ function renderDashboardAlertas(alertas) {
             <tbody>
                 ${alertas.map(a => `
                     <tr>
-                        <td>${escapeHtml(a.nombre)}</td>
+                        <td>${window.escapeHtml(a.nombre)}</td>
                         <td>
                             <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'}">
-                                ${escapeHtml(String(a.stock_actual))} ${escapeHtml(a.unidad_medida)} / ${escapeHtml(String(a.stock_minimo))}
+                                ${window.escapeHtml(String(a.stock_actual))} ${window.escapeHtml(a.unidad_medida)} / ${window.escapeHtml(String(a.stock_minimo))}
                             </span>
                         </td>
                     </tr>
@@ -242,11 +242,11 @@ function renderDashboardMovimientos(movimientos) {
             <tbody>
                 ${movimientos.map(m => `
                     <tr>
-                        <td><small>${escapeHtml(formatDateTime(m.created_at))}</small></td>
-                        <td>${escapeHtml(m.materia_nombre)}</td>
+                        <td><small>${window.escapeHtml(formatDateTime(m.created_at))}</small></td>
+                        <td>${window.escapeHtml(m.materia_nombre)}</td>
                         <td>
                             <span class="badge ${m.tipo === 'entrada' ? 'bg-success' : m.tipo === 'salida' ? 'bg-danger' : 'bg-secondary'}">
-                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${escapeHtml(String(m.cantidad))}
+                                ${m.tipo === 'entrada' ? '+' : m.tipo === 'salida' ? '-' : ''}${window.escapeHtml(String(m.cantidad))}
                             </span>
                         </td>
                     </tr>
@@ -336,13 +336,13 @@ function renderProductosTabla() {
 
         return `
             <tr class="${!prod.disponible ? 'table-secondary' : ''}">
-                <td><strong>${escapeHtml(prod.nombre)}</strong></td>
-                <td><small>${escapeHtml(prod.descripcion || '-')}</small></td>
-                <td>${categoria ? escapeHtml(categoria.nombre) : '-'}</td>
+                <td><strong>${window.escapeHtml(prod.nombre)}</strong></td>
+                <td><small>${window.escapeHtml(prod.descripcion || '-')}</small></td>
+                <td>${categoria ? window.escapeHtml(categoria.nombre) : '-'}</td>
                 <td><strong>$${parseFloat(prod.precio).toFixed(2)}</strong></td>
                 <td>
                     ${materiaPrimaVinculada ?
-                        `<span class="badge bg-info">${escapeHtml(materiaPrimaVinculada.nombre)}</span>` :
+                        `<span class="badge bg-info">${window.escapeHtml(materiaPrimaVinculada.nombre)}</span>` :
                         '<span class="text-muted">-</span>'}
                 </td>
                 <td>
@@ -611,11 +611,11 @@ function renderMateriaPrima() {
         // 3. Retorno de la fila para el .map()
         return `
             <tr>
-                <td><strong>${escapeHtml(item.nombre)}</strong></td>
+                <td><strong>${window.escapeHtml(item.nombre)}</strong></td>
                 <td>${tipoLabel}</td>
-                <td>${escapeHtml(item.categoria || '-')}</td>
-                <td>${item.stock_actual} ${escapeHtml(item.unidad_medida)}</td>
-                <td>${item.stock_minimo} ${escapeHtml(item.unidad_medida)}</td>
+                <td>${window.escapeHtml(item.categoria || '-')}</td>
+                <td>${item.stock_actual} ${window.escapeHtml(item.unidad_medida)}</td>
+                <td>${item.stock_minimo} ${window.escapeHtml(item.unidad_medida)}</td>
                 <td><span class="badge ${estadoClass}">${estadoTexto}</span></td>
                 <td>$${(item.costo_promedio || 0).toFixed(2)}</td>
                 <td>
@@ -735,11 +735,11 @@ function renderProveedores() {
 
     tbody.innerHTML = proveedores.map(prov => `
         <tr class="${!prov.activo ? 'table-secondary' : ''}">
-            <td><code>${escapeHtml(prov.codigo)}</code></td>
-            <td><strong>${escapeHtml(prov.nombre)}</strong></td>
-            <td>${escapeHtml(prov.telefono || '-')}</td>
-            <td>${escapeHtml(prov.contacto_nombre || '-')}</td>
-            <td>${escapeHtml(prov.condiciones_pago)}${prov.dias_credito > 0 ? ` (${prov.dias_credito} días)` : ''}</td>
+            <td><code>${window.escapeHtml(prov.codigo)}</code></td>
+            <td><strong>${window.escapeHtml(prov.nombre)}</strong></td>
+            <td>${window.escapeHtml(prov.telefono || '-')}</td>
+            <td>${window.escapeHtml(prov.contacto_nombre || '-')}</td>
+            <td>${window.escapeHtml(prov.condiciones_pago)}${prov.dias_credito > 0 ? ` (${prov.dias_credito} días)` : ''}</td>
             <td>
                 <span class="badge ${prov.activo ? 'bg-success' : 'bg-secondary'}">
                     ${prov.activo ? 'Activo' : 'Inactivo'}
@@ -764,7 +764,7 @@ function actualizarSelectProveedores() {
     if (select) {
         select.innerHTML = '<option value="">Seleccionar proveedor...</option>' +
             proveedores.filter(p => p.activo).map(p =>
-                `<option value="${p.id}">${escapeHtml(p.nombre)}</option>`
+                `<option value="${p.id}">${window.escapeHtml(p.nombre)}</option>`
             ).join('');
     }
 }
@@ -912,11 +912,11 @@ function renderOrdenes(ordenes) {
 
     tbody.innerHTML = ordenes.map(orden => `
         <tr>
-            <td><code>${escapeHtml(orden.numero)}</code></td>
-            <td>${escapeHtml(orden.proveedor_nombre)}</td>
-            <td>${escapeHtml(orden.fecha_orden || '-')}</td>
+            <td><code>${window.escapeHtml(orden.numero)}</code></td>
+            <td>${window.escapeHtml(orden.proveedor_nombre)}</td>
+            <td>${window.escapeHtml(orden.fecha_orden || '-')}</td>
             <td>$${orden.total.toFixed(2)}</td>
-            <td><span class="badge ${estadoClases[orden.estado] || 'bg-secondary'}">${escapeHtml(orden.estado)}</span></td>
+            <td><span class="badge ${estadoClases[orden.estado] || 'bg-secondary'}">${window.escapeHtml(orden.estado)}</span></td>
             <td>
                 <button class="btn btn-sm btn-outline-primary" onclick="verOrden(${orden.id})">
                     <i class="bi bi-eye"></i>
@@ -991,9 +991,9 @@ function renderItemsOrden() {
 
     tbody.innerHTML = itemsOrden.map((item, index) => `
         <tr>
-            <td>${escapeHtml(item.materia_nombre)}</td>
-            <td>${item.cantidad} ${escapeHtml(item.unidad_medida)}</td>
-            <td>$${item.costo_unitario.toFixed(2)}/${escapeHtml(item.unidad_medida)}</td>
+            <td>${window.escapeHtml(item.materia_nombre)}</td>
+            <td>${item.cantidad} ${window.escapeHtml(item.unidad_medida)}</td>
+            <td>$${item.costo_unitario.toFixed(2)}/${window.escapeHtml(item.unidad_medida)}</td>
             <td>$${item.subtotal.toFixed(2)}</td>
             <td>
                 <button class="btn btn-sm btn-outline-danger" onclick="eliminarItemOrden(${index})">
@@ -1080,8 +1080,8 @@ async function abrirModalRecibir(ordenId) {
         if (tbody) {
             tbody.innerHTML = orden.items.map(item => `
                 <tr>
-                    <td>${escapeHtml(item.materia_nombre)}</td>
-                    <td>${item.cantidad_ordenada} ${escapeHtml(item.unidad_medida || '')}</td>
+                    <td>${window.escapeHtml(item.materia_nombre)}</td>
+                    <td>${item.cantidad_ordenada} ${window.escapeHtml(item.unidad_medida || '')}</td>
                     <td>${item.cantidad_recibida || 0}</td>
                     <td>
                         <input type="number" class="form-control form-control-sm recibir-cantidad"
@@ -1170,13 +1170,13 @@ function renderMovimientos(movimientos) {
 
     tbody.innerHTML = movimientos.map(m => `
         <tr>
-            <td><small>${escapeHtml(formatDateTime(m.created_at))}</small></td>
-            <td>${escapeHtml(m.materia_nombre)}</td>
-            <td><span class="badge ${tipoClases[m.tipo] || 'bg-dark'}">${escapeHtml(m.tipo)}</span></td>
-            <td>${m.tipo === 'entrada' ? '+' : '-'}${escapeHtml(String(m.cantidad))}</td>
+            <td><small>${window.escapeHtml(formatDateTime(m.created_at))}</small></td>
+            <td>${window.escapeHtml(m.materia_nombre)}</td>
+            <td><span class="badge ${tipoClases[m.tipo] || 'bg-dark'}">${window.escapeHtml(m.tipo)}</span></td>
+            <td>${m.tipo === 'entrada' ? '+' : '-'}${window.escapeHtml(String(m.cantidad))}</td>
             <td>${m.stock_anterior}</td>
             <td>${m.stock_nuevo}</td>
-            <td><small>${escapeHtml(m.motivo || '-')}</small></td>
+            <td><small>${window.escapeHtml(m.motivo || '-')}</small></td>
         </tr>
     `).join('');
 }
@@ -1210,12 +1210,12 @@ function renderAlertas(alertas) {
     container.innerHTML = alertas.map(a => `
         <div class="alert ${a.stock_actual <= 0 ? 'alert-danger' : 'alert-warning'} d-flex justify-content-between align-items-center">
             <div>
-                <strong>${escapeHtml(a.nombre)}</strong>
+                <strong>${window.escapeHtml(a.nombre)}</strong>
                 <span class="badge ${a.stock_actual <= 0 ? 'bg-danger' : 'bg-warning'} ms-2">
                     ${a.stock_actual <= 0 ? 'AGOTADO' : 'STOCK BAJO'}
                 </span>
                 <br>
-                <small>Stock actual: ${a.stock_actual} ${escapeHtml(a.unidad_medida)} | Mínimo: ${a.stock_minimo} ${escapeHtml(a.unidad_medida)}</small>
+                <small>Stock actual: ${a.stock_actual} ${window.escapeHtml(a.unidad_medida)} | Mínimo: ${a.stock_minimo} ${window.escapeHtml(a.unidad_medida)}</small>
             </div>
             <button class="btn btn-sm btn-outline-primary" onclick="ajustarMateria(${a.id})">
                 <i class="bi bi-plus-circle"></i> Reabastecer
@@ -1290,11 +1290,11 @@ function renderUsuariosTabla() {
 
     tbody.innerHTML = usuarios.map(user => `
         <tr class="${!user.activo ? 'table-secondary' : ''}">
-            <td><code>${escapeHtml(user.username)}</code></td>
-            <td><strong>${escapeHtml(user.nombre)}</strong></td>
+            <td><code>${window.escapeHtml(user.username)}</code></td>
+            <td><strong>${window.escapeHtml(user.nombre)}</strong></td>
             <td>
                 <span class="badge ${rolClases[user.rol] || 'bg-secondary'}" style="${user.rol === 'manager' ? 'background:#9b59b6!important' : ''}">
-                    <i class="bi bi-${rolIconos[user.rol] || 'person'}"></i> ${escapeHtml(user.rol)}
+                    <i class="bi bi-${rolIconos[user.rol] || 'person'}"></i> ${window.escapeHtml(user.rol)}
                 </span>
             </td>
             <td>
@@ -1307,7 +1307,7 @@ function renderUsuariosTabla() {
                 <button class="btn btn-sm btn-outline-primary" onclick="editarUsuario(${user.id})" title="Editar">
                     <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-warning" onclick="mostrarResetPassword(${user.id}, '${escapeHtml(user.nombre)}')" title="Cambiar contraseña">
+                <button class="btn btn-sm btn-outline-warning" onclick="mostrarResetPassword(${user.id}, '${window.escapeHtml(user.nombre)}')" title="Cambiar contraseña">
                     <i class="bi bi-key"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuario(${user.id})" title="Desactivar">
@@ -1551,18 +1551,18 @@ function renderTablaClientes() {
 
     tbody.innerHTML = clientes.map(cliente => `
         <tr>
-            <td><code>${escapeHtml(cliente.codigo)}</code></td>
+            <td><code>${window.escapeHtml(cliente.codigo)}</code></td>
             <td>
-                <strong>${escapeHtml(cliente.nombre)}</strong>
-                ${cliente.nombre_comercial ? `<br><small class="text-muted">${escapeHtml(cliente.nombre_comercial)}</small>` : ''}
+                <strong>${window.escapeHtml(cliente.nombre)}</strong>
+                ${cliente.nombre_comercial ? `<br><small class="text-muted">${window.escapeHtml(cliente.nombre_comercial)}</small>` : ''}
             </td>
             <td>
                 ${cliente.numero_documento ?
-                    `<span class="badge bg-secondary">${escapeHtml(cliente.tipo_documento)}</span> ${escapeHtml(cliente.numero_documento)}` :
+                    `<span class="badge bg-secondary">${window.escapeHtml(cliente.tipo_documento)}</span> ${window.escapeHtml(cliente.numero_documento)}` :
                     '<span class="text-muted">-</span>'}
             </td>
-            <td>${escapeHtml(cliente.nrc || '-')}</td>
-            <td>${escapeHtml(cliente.telefono || '-')}</td>
+            <td>${window.escapeHtml(cliente.nrc || '-')}</td>
+            <td>${window.escapeHtml(cliente.telefono || '-')}</td>
             <td>
                 <span class="badge ${cliente.tipo_cliente === 'contribuyente' ? 'bg-success' : 'bg-info'}">
                     ${cliente.tipo_cliente === 'contribuyente' ? 'Contribuyente' : 'Consumidor Final'}

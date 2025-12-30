@@ -146,11 +146,11 @@ function showResult(data, targetId, type) {
     `;
 }
 
-// Nota: escapeHtml() está centralizada en utils.js
+// Nota: window.escapeHtml() está centralizada en utils.js
 
 function showAlert(message, type, targetId) {
     const resultDiv = document.getElementById(targetId);
-    const safeMessage = escapeHtml(message);
+    const safeMessage = window.escapeHtml(message);
     resultDiv.innerHTML = `
         <div class="alert alert-${type} alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle-fill"></i> ${safeMessage}
