@@ -50,7 +50,7 @@
             // --- Paso 1: Simular Login ---
             console.log("Paso 1: Simulando login...");
             try {
-                loginResponse = await fetch(LOGIN_URL, {
+                loginResponse = await apiFetch(LOGIN_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD })

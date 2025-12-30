@@ -51,7 +51,7 @@ async function verificarSesion() {
     }
 
     try {
-        const response = await fetch(`${AUTH_API}/me`, {
+        const response = await apiFetch(`${AUTH_API}/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -257,7 +257,7 @@ async function logout() {
     const token = getAuthToken();
 
     try {
-        await fetch(`${AUTH_API}/logout`, {
+        await apiFetch(`${AUTH_API}/logout`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             credentials: 'include'

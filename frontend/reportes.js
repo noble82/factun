@@ -89,7 +89,7 @@ async function cargarReportes() {
 
     try {
         const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`, {
+        const response = await apiFetch(`${API_BASE}/reportes/periodo?inicio=${inicio}&fin=${fin}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             }

@@ -655,7 +655,7 @@ docker exec -it digifact-backend sqlite3 /app/pos.db ".tables"
 
 # Forzar actualización desde repo
 cd /root/facturacion
-git fetch origin main
+git apiFetch origin main
 git reset --hard origin/main
 docker compose restart frontend
 ```
@@ -693,7 +693,7 @@ docker compose restart frontend
 **Solución:**
 ```bash
 cd /root/facturacion
-git fetch origin main
+git apiFetch origin main
 git reset --hard origin/main
 docker compose restart frontend
 ```

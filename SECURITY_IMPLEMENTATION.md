@@ -17,7 +17,7 @@ Sistema POS ha completado **FASES 1-2.6** de auditoría integral con enfoque en 
 - ✅ **280+ líneas de código de seguridad agregadas**
 - ✅ **150-200 líneas de código duplicado consolidado**
 - ✅ **Índices de base de datos (30+)** agregados
-- ✅ **Response validation (response.ok)** en fetch calls
+- ✅ **Response validation (response.ok)** en apiFetch calls
 
 ---
 
@@ -81,7 +81,7 @@ Sistema POS ha completado **FASES 1-2.6** de auditoría integral con enfoque en 
 - Token expiry: 1 hora con limpieza automática
 
 ### 2.6 - Performance Optimization ✓
-- response.ok checks agregados a fetch calls críticas
+- response.ok checks agregados a apiFetch calls críticas
 - Patrón de validación documentado y implementado
 - Logs de error mejorados para debugging
 - Retornos tempranos para evitar procesamiento inválido
@@ -177,7 +177,7 @@ admin.js (1980+ líneas):
 ### API Security
 - [x] Content-Type validation
 - [x] CORS habilitado con credenciales
-- [x] response.ok validation en fetch
+- [x] response.ok validation en apiFetch
 - [x] Error messages sin info sensible
 - [x] Foreign keys habilitadas
 - [x] SQL injection prevention (prepared statements)

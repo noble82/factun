@@ -259,7 +259,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/api/pos/pedidos/${pedidoId}/comprobante`);
+                const response = await apiFetch(`${API_BASE}/api/pos/pedidos/${pedidoId}/comprobante`);
 
                 if (!response.ok) {
                     throw new Error('Comprobante no encontrado');

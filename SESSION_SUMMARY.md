@@ -109,7 +109,7 @@ Proteger contra ataques Cross-Site Request Forgery (CSRF).
   - `saveCsrfToken(token)`: Almacena en sessionStorage
   - `getSecureHeaders()`: Headers con auth + CSRF
   - `updateCsrfTokenFromResponse()`: Auto-actualiza token
-  - `apiFetch()`: Wrapper de fetch con CSRF automático
+  - `apiFetch()`: Wrapper de apiFetch con CSRF automático
 
 ### Seguridad
 - Token expiry: 1 hora
@@ -151,7 +151,7 @@ Funciones en **admin.js**:
 
 ### Patrón Implementado
 ```javascript
-const response = await fetch(url);
+const response = await apiFetch(url);
 if (!response.ok) {
     console.error(`Error: ${response.status}`);
     return;
@@ -162,7 +162,7 @@ const data = await response.json();
 ### Commits
 ```
 Commit: cda97dd
-Mensaje: fix(frontend): add response.ok validation to critical fetch calls - FASE 2.6 Performance
+Mensaje: fix(frontend): add response.ok validation to critical apiFetch calls - FASE 2.6 Performance
 ```
 
 ---
@@ -276,7 +276,7 @@ Ver **TESTING_PLAN.md** para:
 
 ```bash
 fda1fc9 feat(frontend/backend): refactor code with CONFIG constants and implement CSRF protection
-cda97dd fix(frontend): add response.ok validation to critical fetch calls - FASE 2.6 Performance
+cda97dd fix(frontend): add response.ok validation to critical apiFetch calls - FASE 2.6 Performance
 31f31f2 docs(security): comprehensive security implementation documentation - FASES 1-2.6
 956030b docs(testing): comprehensive FASE 3 integration & security testing plan
 ```

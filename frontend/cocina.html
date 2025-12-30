@@ -288,7 +288,7 @@
             console.log('cargarPedidos() llamado');
             try {
                 // Usar endpoint específico de cocina
-                const response = await fetch(`${API_POS}/cocina/pedidos`);
+                const response = await apiFetch(`${API_POS}/cocina/pedidos`);
                 const pedidos = await response.json();
                 console.log('Pedidos recibidos:', pedidos.length, pedidos);
 
@@ -394,7 +394,7 @@
 
         async function cambiarEstado(pedidoId, nuevoEstado) {
             try {
-                const response = await fetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
+                const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ estado: nuevoEstado })
@@ -419,7 +419,7 @@
 
             // Obtener listos de hoy
             try {
-                const response = await fetch(`${API_POS}/pedidos?estado=listo,servido`);
+                const response = await apiFetch(`${API_POS}/pedidos?estado=listo,servido`);
                 const pedidos = await response.json();
                 const hoy = new Date().toDateString();
                 const listosHoy = pedidos.filter(p => new Date(p.created_at).toDateString() === hoy).length;

@@ -168,7 +168,7 @@ function showSection(section) {
 
 async function cargarEstadisticas() {
     try {
-        const response = await fetch(`${API_INV}/estadisticas`, {
+        const response = await apiFetch(`${API_INV}/estadisticas`, {
             headers: getHeaders()
         });
         if (!response.ok) {
@@ -183,14 +183,14 @@ async function cargarEstadisticas() {
         document.getElementById('stat-proveedores').textContent = stats.proveedores_activos || 0;
 
         // Cargar alertas para dashboard
-        const alertasResp = await fetch(`${API_INV}/alertas`, { headers: getHeaders() });
+        const alertasResp = await apiFetch(`${API_INV}/alertas`, { headers: getHeaders() });
         if (alertasResp.ok) {
             const alertas = await alertasResp.json();
             renderDashboardAlertas(alertas.slice(0, 5));
         }
 
         // Cargar últimos movimientos para dashboard
-        const movResp = await fetch(`${API_INV}/movimientos?limit=5`, { headers: getHeaders() });
+        const movResp = await apiFetch(`${API_INV}/movimientos?limit=5`, { headers: getHeaders() });
         if (movResp.ok) {
             const movimientos = await movResp.json();
             renderDashboardMovimientos(movimientos);
@@ -260,7 +260,7 @@ function renderDashboardMovimientos(movimientos) {
 
 async function cargarProductosAdmin() {
     try {
-        const response = await fetch(`${API_POS}/productos`, { headers: getHeaders() });
+        const response = await apiFetch(`${API_POS}/productos`, { headers: getHeaders() });
         productos = await response.json();
         renderProductosTabla();
         actualizarSelectProductos();
@@ -275,7 +275,7 @@ function actualizarSelectProductos() {
 
 async function cargarCategorias() {
     try {
-        const response = await fetch(`${API_POS}/categorias`, { headers: getHeaders() });
+        const response = await apiFetch(`${API_POS}/categorias`, { headers: getHeaders() });
         categorias = await response.json();
         renderCategoriasTabla();
         actualizarSelectCategorias();
@@ -423,7 +423,7 @@ function mostrarModalProducto() {
 async function editarProducto(id) {
     try {
         // CORRECCIÓN: Se añaden headers para validación de rol
-        const response = await fetch(`${API_POS}/productos/${id}`, {
+        const response = await apiFetch(`${API_POS}/productos/${id}`, {
             headers: getHeaders()
         });
         const prod = await response.json();
@@ -478,7 +478,7 @@ async function guardarProducto() {
         const url = id ? `${API_POS}/productos/${id}` : `${API_POS}/productos`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify(data)
@@ -504,7 +504,7 @@ async function eliminarProducto(id) {
     if (!confirm(`¿Está seguro de eliminar el producto "${prod?.nombre}"?`)) return;
 
     try {
-        const response = await fetch(`${API_POS}/productos/${id}`, { 
+        const response = await apiFetch(`${API_POS}/productos/${id}`, { 
             method: 'DELETE',
             headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
         });
@@ -534,7 +534,7 @@ async function guardarCategoria() {
         const url = id ? `${API_POS}/categorias/${id}` : `${API_POS}/categorias`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify({ nombre })
@@ -557,7 +557,7 @@ async function eliminarCategoria(id) {
     if (!confirm(`¿Está seguro de eliminar la categoría?`)) return;
 
     try {
-        const response = await fetch(`${API_POS}/categorias/${id}`, { 
+        const response = await apiFetch(`${API_POS}/categorias/${id}`, { 
             method: 'DELETE',
             headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
         });
@@ -574,7 +574,7 @@ async function eliminarCategoria(id) {
 
 async function cargarMateriaPrima() {
     try {
-        const response = await fetch(`${API_INV}/materia-prima`, {
+        const response = await apiFetch(`${API_INV}/materia-prima`, {
             headers: getHeaders()
         });
         materiaPrima = await response.json();
@@ -673,7 +673,7 @@ async function realizarAjuste() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/materia-prima/${materiaId}/ajuste`, {
+        const response = await apiFetch(`${API_INV}/materia-prima/${materiaId}/ajuste`, {
             method: 'POST',
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify({
@@ -704,7 +704,7 @@ async function realizarAjuste() {
 
 async function verDetalleMateria(materiaId) {
     try {
-        const response = await fetch(`${API_INV}/materia-prima/${materiaId}`, {
+        const response = await apiFetch(`${API_INV}/materia-prima/${materiaId}`, {
             headers: getHeaders()
         });
         const data = await response.json();
@@ -718,7 +718,7 @@ async function verDetalleMateria(materiaId) {
 
 async function cargarProveedores() {
     try {
-        const response = await fetch(`${API_INV}/proveedores?activos=false`, {
+        const response = await apiFetch(`${API_INV}/proveedores?activos=false`, {
             headers: getHeaders()
         });
         proveedores = await response.json();
@@ -790,7 +790,7 @@ function mostrarModalProveedor() {
 
 async function editarProveedor(id) {
     try {
-        const response = await fetch(`${API_INV}/proveedores/${id}`, {
+        const response = await apiFetch(`${API_INV}/proveedores/${id}`, {
             headers: getHeaders()
         });
         const prov = await response.json();
@@ -842,7 +842,7 @@ async function guardarProveedor() {
         const url = id ? `${API_INV}/proveedores/${id}` : `${API_INV}/proveedores`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify(data)
@@ -867,7 +867,7 @@ async function desactivarProveedor(id) {
     if (!confirm('¿Está seguro de desactivar este proveedor?')) return;
 
     try {
-        const response = await fetch(`${API_INV}/proveedores/${id}`, { 
+        const response = await apiFetch(`${API_INV}/proveedores/${id}`, { 
             method: 'DELETE',
             headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
         });
@@ -884,7 +884,7 @@ async function desactivarProveedor(id) {
 
 async function cargarOrdenes() {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra`, {
             headers: getHeaders()
         });
         const ordenes = await response.json();
@@ -1026,7 +1026,7 @@ async function crearOrdenCompra() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra`, {
             method: 'POST',
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify({
@@ -1057,7 +1057,7 @@ async function crearOrdenCompra() {
 
 async function verOrden(id) {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${id}`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${id}`, {
             headers: getHeaders()
         });
         const orden = await response.json();
@@ -1069,7 +1069,7 @@ async function verOrden(id) {
 
 async function abrirModalRecibir(ordenId) {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${ordenId}`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${ordenId}`, {
             headers: getHeaders()
         });
         const orden = await response.json();
@@ -1118,7 +1118,7 @@ async function procesarRecepcion() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${ordenId}/recibir`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${ordenId}/recibir`, {
             method: 'POST',
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify({ items, usuario: 'Admin' })
@@ -1149,7 +1149,7 @@ async function cargarMovimientos() {
         let url = `${API_INV}/movimientos?limit=100`;
         if (tipo) url += `&tipo=${tipo}`;
 
-        const response = await fetch(url, { headers: getHeaders() });
+        const response = await apiFetch(url, { headers: getHeaders() });
         const movimientos = await response.json();
         renderMovimientos(movimientos);
     } catch (error) {
@@ -1185,7 +1185,7 @@ function renderMovimientos(movimientos) {
 
 async function cargarAlertas() {
     try {
-        const response = await fetch(`${API_INV}/alertas`, { headers: getHeaders() });
+        const response = await apiFetch(`${API_INV}/alertas`, { headers: getHeaders() });
         const alertas = await response.json();
         renderAlertas(alertas);
     } catch (error) {
@@ -1227,7 +1227,7 @@ function renderAlertas(alertas) {
 
 async function cargarUsuarios() {
     try {
-        const response = await fetch(`${API_AUTH}/usuarios`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios`, {
             headers: getHeaders()
         });
 
@@ -1248,7 +1248,7 @@ async function cargarUsuarios() {
 
 async function cargarEstadisticasUsuarios() {
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/estadisticas`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/estadisticas`, {
             headers: getHeaders()
         });
 
@@ -1377,7 +1377,7 @@ async function guardarUsuario() {
             body = JSON.stringify({ username, password, nombre, rol });
         }
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body
@@ -1407,7 +1407,7 @@ async function resetearPassword() {
     }
 
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/${id}/reset-password`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/${id}/reset-password`, {
             method: 'POST',
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify({ password })
@@ -1429,7 +1429,7 @@ async function eliminarUsuario(id) {
     if (!confirm(`¿Está seguro de desactivar al usuario?`)) return;
 
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/${id}`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/${id}`, {
             method: 'DELETE',
             headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
         });
@@ -1445,7 +1445,7 @@ async function eliminarUsuario(id) {
 function cerrarSesion() {
     if (!confirm('¿Está seguro de cerrar sesión?')) return;
 
-    fetch(`${API_AUTH}/logout`, {
+    apiFetch(`${API_AUTH}/logout`, {
         method: 'POST',
         headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
     }).finally(() => {
@@ -1508,7 +1508,7 @@ async function cargarClientes() {
         if (tipo) url += `&tipo=${tipo}`;
         if (buscar) url += `&buscar=${encodeURIComponent(buscar)}`;
 
-        const response = await fetch(url, { headers: getHeaders() });
+        const response = await apiFetch(url, { headers: getHeaders() });
         clientes = await response.json();
         renderTablaClientes();
     } catch (error) {
@@ -1517,7 +1517,7 @@ async function cargarClientes() {
 }
 async function cargarEstadisticasClientes() {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/estadisticas`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/estadisticas`, {
             headers: getHeaders()
         });
         const stats = await response.json();
@@ -1618,7 +1618,7 @@ function mostrarModalCliente() {
 
 async function editarCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}`, {
             headers: getHeaders()
         });
         const cliente = await response.json();
@@ -1681,7 +1681,7 @@ async function guardarCliente() {
         const url = id ? `${API_CLIENTES}/clientes/${id}` : `${API_CLIENTES}/clientes`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getHeaders(), // CORRECCIÓN: Inyección de CSRF y Auth
             body: JSON.stringify(data)
@@ -1705,7 +1705,7 @@ async function eliminarCliente(id) {
     if (!confirm(`¿Está seguro de eliminar al cliente?`)) return;
 
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}`, {
             method: 'DELETE',
             headers: getHeaders() // CORRECCIÓN: Inyección de CSRF y Auth
         });
@@ -1747,7 +1747,7 @@ function exportarClientes() {
 
 async function verHistorialCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}/historial`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}/historial`, {
             headers: getHeaders()
         });
         const data = await response.json();
@@ -1778,7 +1778,7 @@ async function verHistorialCliente(id) {
 
 async function verCreditoCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}/credito`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}/credito`, {
             headers: getHeaders()
         });
         const data = await response.json();

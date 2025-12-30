@@ -34,7 +34,7 @@ function getAuthHeaders(contentType = 'application/json') {
 async function apiFetch(endpoint, options = {}) {
     try {
         const url = `${API_BASE_URL}${endpoint}`;
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             ...options,
             headers: {
                 ...getAuthHeaders(),

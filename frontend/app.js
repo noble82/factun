@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function testConnection() {
     try {
-        const response = await fetch(`${API_BASE}/health`);
+        const response = await apiFetch(`${API_BASE}/health`);
         if (response.ok) {
             updateStatus('Conectado', 'success');
         } else {
@@ -46,7 +46,7 @@ async function certificarDTE() {
 
     try {
         showLoading();
-        const response = await fetch(`${API_BASE}/api/certificar`, {
+        const response = await apiFetch(`${API_BASE}/api/certificar`, {
             method: 'POST',
             body: formData
         });
@@ -83,7 +83,7 @@ async function anularDTE() {
 
     try {
         showLoading();
-        const response = await fetch(`${API_BASE}/api/anular`, {
+        const response = await apiFetch(`${API_BASE}/api/anular`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ guid, serie, numero, motivo })
@@ -114,7 +114,7 @@ async function consultarDTE() {
 
     try {
         showLoading();
-        const response = await fetch(`${API_BASE}/api/consultar?nit=${encodeURIComponent(nit)}&guid=${encodeURIComponent(guid)}`);
+        const response = await apiFetch(`${API_BASE}/api/consultar?nit=${encodeURIComponent(nit)}&guid=${encodeURIComponent(guid)}`);
 
         const result = await response.json();
         hideLoading();
@@ -170,7 +170,7 @@ function addDownloadButton(pdfBase64, targetId) {
 
 async function downloadPDF(pdfBase64) {
     try {
-        const response = await fetch(`${API_BASE}/api/download/pdf`, {
+        const response = await apiFetch(`${API_BASE}/api/download/pdf`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ pdfBase64 })

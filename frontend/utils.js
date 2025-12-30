@@ -244,7 +244,7 @@ function getSecureHeaders(contentType = 'application/json', explicitCsrfToken = 
  * Actualiza el CSRF token desde la respuesta (header o body).
  * Ejecuta la actualización de forma asíncrona. La respuesta de apiFetch se
  * devuelve inmediatamente, mientras que esta función trabaja en segundo plano.
- * @param {Response} response - Respuesta del fetch.
+ * @param {Response} response - Respuesta del apiFetch.
  */
 async function updateCsrfTokenFromResponse(response) {
     // --- Priorizar token del Header ---
@@ -273,11 +273,11 @@ async function updateCsrfTokenFromResponse(response) {
 }
 
 /**
- * Wrapper para fetch que automáticamente incluye autenticación y CSRF tokens.
+ * Wrapper para apiFetch que automáticamente incluye autenticación y CSRF tokens.
  * Maneja errores y redirige en caso de 401.
  * @param {string} url - URL del endpoint.
- * @param {object} options - Opciones de fetch (method, body, etc.).
- * @returns {Promise<Response|null>} Respuesta del fetch o null si hubo un error manejado.
+ * @param {object} options - Opciones de apiFetch (method, body, etc.).
+ * @returns {Promise<Response|null>} Respuesta del apiFetch o null si hubo un error manejado.
  */
 async function apiFetch(url, options = {}) {
     // 1. Obtener el token CSRF FRESCO justo antes de construir las cabeceras.
@@ -324,8 +324,8 @@ async function apiFetch(url, options = {}) {
 
     try {
         console.log(`apiFetch: Realizando petición a ${url} con método ${mergedOptions.method || 'GET'}`);
-        // Ejecutar la petición fetch
-        const response = await fetch(url, mergedOptions);
+        // Ejecutar la petición apiFetch
+        const response = await apiFetch(url, mergedOptions);
 
         // --- Actualización Asíncrona del Token CSRF ---
         // Esta función se ejecuta en segundo plano para actualizar el token
@@ -366,7 +366,7 @@ async function apiFetch(url, options = {}) {
         return response;
 
     } catch (error) {
-        // Capturar errores de red o de la propia llamada fetch()
+        // Capturar errores de red o de la propia llamada apiFetch()
         console.error(`Error en apiFetch(${url}):`, error);
         mostrarNotificacion('Error de conexión', error.message || 'No se pudo conectar al servidor.', 'danger');
         throw error; // Relanzar el error para que el código superior sepa que algo falló gravemente
@@ -440,11 +440,11 @@ async function apiCall(endpoint, options = {}) {
      * Realiza una llamada a API con manejo de errores
      *
      * @param {string} endpoint - URL del endpoint (ej: '/api/pos/productos')
-     * @param {object} options - Opciones de fetch (method, body, etc)
+     * @param {object} options - Opciones de apiFetch (method, body, etc)
      * @returns {object} Respuesta JSON o null si error
      */
     try {
-        const response = await fetch(endpoint, {
+        const response = await apiFetch(endpoint, {
             ...options,
             headers: {
                 ...getAuthHeaders(),

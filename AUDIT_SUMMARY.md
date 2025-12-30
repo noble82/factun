@@ -247,7 +247,7 @@ PRAGMA foreign_keys = ON;  -- Habilitado en todas las conexiones
 ### Pendiente: FASE 2.6 - Performance (BAJA Prioridad)
 - Agregar debounce a event listeners
 - Limpiar intervals cuando cambia rol
-- Validar response.ok en todos los fetch
+- Validar response.ok en todos los apiFetch
 
 ### Pendiente: FASE 2.7-2.8 - Accesibilidad & Docs (BAJA Prioridad)
 - WCAG 2.1 AA compliance
@@ -295,7 +295,7 @@ bed02da fix(frontend): fix critical XSS vulnerabilities in pos.js and admin.js
 ### Inmediatas (Hacer en Próxima Sprint)
 1. ✅ Implementar CSRF tokens (FASE 2.5b)
 2. ✅ Limpiar event listeners en pos.js (memory leak)
-3. ✅ Agregar response.ok checks a fetch calls
+3. ✅ Agregar response.ok checks a apiFetch calls
 
 ### Corto Plazo (1-2 Semanas)
 1. Refactorizar código duplicado

@@ -121,7 +121,7 @@ function showSection(section) {
 
 async function cargarEstadisticas() {
     try {
-        const response = await fetch(`${API_INV}/estadisticas`);
+        const response = await apiFetch(`${API_INV}/estadisticas`);
         if (!response.ok) {
             console.error(`Error cargando estadísticas: ${response.status}`);
             return;
@@ -134,7 +134,7 @@ async function cargarEstadisticas() {
         document.getElementById('stat-proveedores').textContent = stats.proveedores_activos || 0;
 
         // Cargar alertas para dashboard
-        const alertasResp = await fetch(`${API_INV}/alertas`);
+        const alertasResp = await apiFetch(`${API_INV}/alertas`);
         if (!alertasResp.ok) {
             console.error(`Error cargando alertas: ${alertasResp.status}`);
             return;
@@ -143,7 +143,7 @@ async function cargarEstadisticas() {
         renderDashboardAlertas(alertas.slice(0, 5));
 
         // Cargar últimos movimientos para dashboard
-        const movResp = await fetch(`${API_INV}/movimientos?limit=5`);
+        const movResp = await apiFetch(`${API_INV}/movimientos?limit=5`);
         if (!movResp.ok) {
             console.error(`Error cargando movimientos: ${movResp.status}`);
             return;
@@ -213,7 +213,7 @@ function renderDashboardMovimientos(movimientos) {
 
 async function cargarProductosAdmin() {
     try {
-        const response = await fetch(`${API_POS}/productos`);
+        const response = await apiFetch(`${API_POS}/productos`);
         productos = await response.json();
         renderProductosTabla();
         actualizarSelectProductos();
@@ -229,7 +229,7 @@ function actualizarSelectProductos() {
 
 async function cargarCategorias() {
     try {
-        const response = await fetch(`${API_POS}/categorias`);
+        const response = await apiFetch(`${API_POS}/categorias`);
         categorias = await response.json();
         renderCategoriasTabla();
         actualizarSelectCategorias();
@@ -382,7 +382,7 @@ function mostrarModalProducto() {
 
 async function editarProducto(id) {
     try {
-        const response = await fetch(`${API_POS}/productos/${id}`);
+        const response = await apiFetch(`${API_POS}/productos/${id}`);
         const prod = await response.json();
 
         // Actualizar select de categorías primero
@@ -442,7 +442,7 @@ async function guardarProducto() {
         const url = id ? `${API_POS}/productos/${id}` : `${API_POS}/productos`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -470,7 +470,7 @@ async function eliminarProducto(id) {
     if (!confirm(`¿Está seguro de eliminar el producto "${prod?.nombre}"?`)) return;
 
     try {
-        const response = await fetch(`${API_POS}/productos/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`${API_POS}/productos/${id}`, { method: 'DELETE' });
         const result = await response.json();
 
         if (response.ok && result.success) {
@@ -521,7 +521,7 @@ async function guardarCategoria() {
         const url = id ? `${API_POS}/categorias/${id}` : `${API_POS}/categorias`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nombre })
@@ -549,7 +549,7 @@ async function eliminarCategoria(id) {
     if (!confirm(`¿Está seguro de eliminar la categoría "${cat?.nombre}"?`)) return;
 
     try {
-        const response = await fetch(`${API_POS}/categorias/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`${API_POS}/categorias/${id}`, { method: 'DELETE' });
         const result = await response.json();
 
         if (response.ok && result.success) {
@@ -581,7 +581,7 @@ function actualizarSelectMateriaPrima() {
 
 async function cargarMateriaPrima() {
     try {
-        const response = await fetch(`${API_INV}/materia-prima`);
+        const response = await apiFetch(`${API_INV}/materia-prima`);
         materiaPrima = await response.json();
         renderMateriaPrima();
         actualizarSelectMateriaPrima();
@@ -693,7 +693,7 @@ async function realizarAjuste() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/materia-prima/${materiaId}/ajuste`, {
+        const response = await apiFetch(`${API_INV}/materia-prima/${materiaId}/ajuste`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -724,7 +724,7 @@ async function realizarAjuste() {
 
 async function verDetalleMateria(materiaId) {
     try {
-        const response = await fetch(`${API_INV}/materia-prima/${materiaId}`);
+        const response = await apiFetch(`${API_INV}/materia-prima/${materiaId}`);
         const data = await response.json();
         alert(`Materia Prima: ${data.nombre}\nUnidad: ${data.unidad_medida}\nCategoría: ${data.categoria || '-'}\nStock: ${data.stock_actual} ${data.unidad_medida}\nMínimo: ${data.stock_minimo} ${data.unidad_medida}\nCosto Promedio: $${(data.costo_promedio || 0).toFixed(2)}/${data.unidad_medida}`);
     } catch (error) {
@@ -736,7 +736,7 @@ async function verDetalleMateria(materiaId) {
 
 async function cargarProveedores() {
     try {
-        const response = await fetch(`${API_INV}/proveedores?activos=false`);
+        const response = await apiFetch(`${API_INV}/proveedores?activos=false`);
         proveedores = await response.json();
         renderProveedores();
         actualizarSelectProveedores();
@@ -806,7 +806,7 @@ function mostrarModalProveedor() {
 
 async function editarProveedor(id) {
     try {
-        const response = await fetch(`${API_INV}/proveedores/${id}`);
+        const response = await apiFetch(`${API_INV}/proveedores/${id}`);
         const prov = await response.json();
 
         document.getElementById('proveedor-id').value = prov.id;
@@ -857,7 +857,7 @@ async function guardarProveedor() {
         const url = id ? `${API_INV}/proveedores/${id}` : `${API_INV}/proveedores`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -883,7 +883,7 @@ async function desactivarProveedor(id) {
     if (!confirm('¿Está seguro de desactivar este proveedor?')) return;
 
     try {
-        await fetch(`${API_INV}/proveedores/${id}`, { method: 'DELETE' });
+        await apiFetch(`${API_INV}/proveedores/${id}`, { method: 'DELETE' });
         mostrarNotificacion('Proveedor Desactivado', 'El proveedor ha sido desactivado', 'success');
         cargarProveedores();
     } catch (error) {
@@ -895,7 +895,7 @@ async function desactivarProveedor(id) {
 
 async function cargarOrdenes() {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra`);
+        const response = await apiFetch(`${API_INV}/ordenes-compra`);
         const ordenes = await response.json();
         renderOrdenes(ordenes);
     } catch (error) {
@@ -1035,7 +1035,7 @@ async function crearOrdenCompra() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1067,7 +1067,7 @@ async function crearOrdenCompra() {
 
 async function verOrden(id) {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${id}`);
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${id}`);
         const orden = await response.json();
         alert(`Orden: ${orden.numero}\nProveedor: ${orden.proveedor_nombre}\nTotal: $${orden.total.toFixed(2)}\nEstado: ${orden.estado}\nItems: ${orden.items.length}`);
     } catch (error) {
@@ -1077,7 +1077,7 @@ async function verOrden(id) {
 
 async function abrirModalRecibir(ordenId) {
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${ordenId}`);
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${ordenId}`);
         const orden = await response.json();
 
         document.getElementById('recibir-orden-id').value = ordenId;
@@ -1126,7 +1126,7 @@ async function procesarRecepcion() {
     }
 
     try {
-        const response = await fetch(`${API_INV}/ordenes-compra/${ordenId}/recibir`, {
+        const response = await apiFetch(`${API_INV}/ordenes-compra/${ordenId}/recibir`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items, usuario: 'Admin' })
@@ -1159,7 +1159,7 @@ async function cargarMovimientos() {
         let url = `${API_INV}/movimientos?limit=100`;
         if (tipo) url += `&tipo=${tipo}`;
 
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         const movimientos = await response.json();
         renderMovimientos(movimientos);
     } catch (error) {
@@ -1198,7 +1198,7 @@ function renderMovimientos(movimientos) {
 
 async function cargarAlertas() {
     try {
-        const response = await fetch(`${API_INV}/alertas`);
+        const response = await apiFetch(`${API_INV}/alertas`);
         const alertas = await response.json();
         renderAlertas(alertas);
     } catch (error) {
@@ -1249,7 +1249,7 @@ let usuarios = [];
 
 async function cargarUsuarios() {
     try {
-        const response = await fetch(`${API_AUTH}/usuarios`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios`, {
             headers: getAuthHeaders()
         });
 
@@ -1270,7 +1270,7 @@ async function cargarUsuarios() {
 
 async function cargarEstadisticasUsuarios() {
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/estadisticas`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/estadisticas`, {
             headers: getAuthHeaders()
         });
 
@@ -1413,7 +1413,7 @@ async function guardarUsuario() {
             body = JSON.stringify({ username, password, nombre, rol });
         }
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method,
             headers: getAuthHeaders(),
             body
@@ -1456,7 +1456,7 @@ async function resetearPassword() {
     }
 
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/${id}/reset-password`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/${id}/reset-password`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ password })
@@ -1483,7 +1483,7 @@ async function eliminarUsuario(id) {
     if (!confirm(`¿Está seguro de desactivar al usuario "${user?.nombre}"?`)) return;
 
     try {
-        const response = await fetch(`${API_AUTH}/usuarios/${id}`, {
+        const response = await apiFetch(`${API_AUTH}/usuarios/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders()
         });
@@ -1505,7 +1505,7 @@ async function eliminarUsuario(id) {
 function cerrarSesion() {
     if (!confirm('¿Está seguro de cerrar sesión?')) return;
 
-    fetch(`${API_AUTH}/logout`, {
+    apiFetch(`${API_AUTH}/logout`, {
         method: 'POST',
         headers: getAuthHeaders(),
         credentials: 'include'
@@ -1569,7 +1569,7 @@ async function cargarClientes() {
         if (tipo) url += `&tipo=${tipo}`;
         if (buscar) url += `&buscar=${encodeURIComponent(buscar)}`;
 
-        const response = await fetch(url);
+        const response = await apiFetch(url);
         clientes = await response.json();
         renderTablaClientes();
     } catch (error) {
@@ -1579,7 +1579,7 @@ async function cargarClientes() {
 
 async function cargarEstadisticasClientes() {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/estadisticas`);
+        const response = await apiFetch(`${API_CLIENTES}/clientes/estadisticas`);
         const stats = await response.json();
 
         document.getElementById('stat-clientes-total').textContent = stats.total || 0;
@@ -1687,7 +1687,7 @@ function mostrarModalCliente() {
 
 async function editarCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}`);
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}`);
         const cliente = await response.json();
 
         if (response.ok) {
@@ -1755,7 +1755,7 @@ async function guardarCliente() {
         const url = id ? `${API_CLIENTES}/clientes/${id}` : `${API_CLIENTES}/clientes`;
         const method = id ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -1785,7 +1785,7 @@ async function eliminarCliente(id) {
     }
 
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}`, {
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}`, {
             method: 'DELETE'
         });
 
@@ -1843,7 +1843,7 @@ function exportarClientes() {
 
 async function verHistorialCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}/historial`);
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}/historial`);
         const data = await response.json();
 
         if (!response.ok) {
@@ -1914,7 +1914,7 @@ async function verHistorialCliente(id) {
 
 async function verCreditoCliente(id) {
     try {
-        const response = await fetch(`${API_CLIENTES}/clientes/${id}/credito`);
+        const response = await apiFetch(`${API_CLIENTES}/clientes/${id}/credito`);
         const data = await response.json();
 
         if (!response.ok) {

@@ -28,9 +28,9 @@ if (loginForm) {
         try {
             // --- Llamada al Endpoint de Login ---
             // Para el login inicial, típicamente no se envía un token CSRF.
-            // Usamos fetch directo aquí para evitar enviar un token CSRF que aún no tenemos.
+            // Usamos apiFetch directo aquí para evitar enviar un token CSRF que aún no tenemos.
             // El backend DEBE responder con un nuevo token CSRF para la sesión.
-            const response = await fetch(loginUrl, {
+            const response = await apiFetch(loginUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ if (loginForm) {
             }
 
         } catch (error) {
-            // Captura de errores de red o de la llamada fetch()
+            // Captura de errores de red o de la llamada apiFetch()
             console.error('Error general durante el login:', error);
             mostrarNotificacion('Error de conexión', 'No se pudo conectar al servidor.', 'danger');
         }
