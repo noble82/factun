@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Iniciar Sesi&oacute;n - Pupuser&iacute;a</title>
+    <title>Iniciar Sesión - Pupusería</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="styles-responsive.css">
@@ -159,7 +159,7 @@
     <div class="login-container">
         <div class="login-header">
             <i class="bi bi-shop"></i>
-            <h1>Pupuser&iacute;a POS</h1>
+            <h1>Pupusería POS</h1>
             <p>Sistema de Punto de Venta</p>
         </div>
         <div class="login-body">
@@ -175,15 +175,15 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label">Contrase&ntilde;a</label>
+                    <label class="form-label">Contraseña</label>
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                        <input type="password" class="form-control" id="password" placeholder="Ingrese su contrase&ntilde;a" required>
+                        <input type="password" class="form-control" id="password" placeholder="Ingrese su contraseña" required>
                     </div>
                 </div>
 
                 <button type="submit" class="btn btn-login" id="btnLogin">
-                    <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n
+                    <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
                 </button>
             </form>
 
@@ -199,26 +199,33 @@
         </div>
     </div>
 
+    <!-- ✅ Cargar utils.js ANTES de cualquier script que lo use -->
+    <script src="utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         const API_AUTH = '/api/auth';
 
-        // Verificar si ya hay sesi&oacute;n activa
+        // Verificar si ya hay sesión activa (usa fetch directo, no apiFetch)
         document.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('auth_token');
             if (token) {
                 try {
-                    const response = await apiFetch(`${API_AUTH}/me`, {
+                    // ✅ Usa fetch directo para /api/auth/me (no requiere CSRF)
+                    const response = await fetch(`${API_AUTH}/me`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (response.ok) {
                         const user = await response.json();
                         redirectByRole(user.rol);
                         return;
+                    } else {
+                        // Token inválido → limpiar
+                        localStorage.removeItem('auth_token');
+                        localStorage.removeItem('user');
                     }
                 } catch (e) {
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user');
+                    console.warn('Error verificando sesión:', e.message);
                 }
             }
         });
@@ -236,7 +243,8 @@
             alertContainer.innerHTML = '';
 
             try {
-                const response = await apiFetch(`${API_AUTH}/login`, {
+                // ✅ Usa fetch directo para login (no requiere CSRF)
+                const response = await fetch(`${API_AUTH}/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password }),
@@ -246,6 +254,22 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    // ✅ Actualizar token CSRF desde la respuesta
+                    if (typeof window.updateCsrfTokenFromResponse === 'function') {
+                        // Creamos un objeto Response-like para updateCsrfTokenFromResponse
+                        const mockResponse = {
+                            headers: new Map([
+                                ['X-CSRF-Token', response.headers.get('X-CSRF-Token')]
+                            ]).forEach((v, k) => mockResponse.headers.set(k, v)),
+                            json: async () => data
+                        };
+                        mockResponse.headers = new Headers();
+                        if (response.headers.get('X-CSRF-Token')) {
+                            mockResponse.headers.set('X-CSRF-Token', response.headers.get('X-CSRF-Token'));
+                        }
+                        await window.updateCsrfTokenFromResponse(mockResponse);
+                    }
+
                     // Guardar token y datos de usuario
                     localStorage.setItem('auth_token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.usuario));
@@ -256,15 +280,15 @@
                         redirectByRole(data.usuario.rol);
                     }, 1000);
                 } else {
-                    showAlert('danger', data.error || 'Error al iniciar sesi&oacute;n');
+                    showAlert('danger', data.error || 'Error al iniciar sesión');
                     btnLogin.disabled = false;
-                    btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n';
+                    btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión';
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showAlert('danger', 'Error de conexi&oacute;n. Intente nuevamente.');
+                showAlert('danger', 'Error de conexión. Intente nuevamente.');
                 btnLogin.disabled = false;
-                btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesi&oacute;n';
+                btnLogin.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión';
             }
         }
 
