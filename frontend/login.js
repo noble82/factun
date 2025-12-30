@@ -40,10 +40,8 @@ if (loginForm) {
             });
 
             // --- ¡CRÍTICO! Actualizar el Token CSRF desde la respuesta del Login ---
-            // Esta llamada debe hacerse SIEMPRE después de recibir una respuesta del servidor,
-            // para que la SIGUIENTE petición (que sí requiere CSRF) tenga un token válido.
-            // La función es asíncrona, pero su ejecución en segundo plano está bien.
-            updateCsrfTokenFromResponse(response);
+            // Asegurarse de que esto se completa antes de realizar otras verificaciones.
+            await updateCsrfTokenFromResponse(response);
             // ---------------------------------------------------------------------
 
             // Procesar la respuesta del servidor

@@ -3,7 +3,7 @@
  * Incluir este archivo antes que otros scripts
  */
 
-// ============ SEGURIDAD - Escape HTML para prevenir XSS ============
+// ============ SEGURIDAD - Escape HTML para prevenir XSS ============\
 
 /**
  * Escapa caracteres HTML para prevenir inyección XSS
@@ -23,7 +23,7 @@ function escapeHtml(unsafe) {
         '/': '&#x2F;'
     };
 
-    return unsafe.replace(/[&<>"'\/]/g, char => htmlEntityMap[char]);
+    return unsafe.replace(/[&<>\"\'\\/]/g, char => htmlEntityMap[char]);
 }
 
 /**
@@ -75,7 +75,7 @@ function createSafeElement(tagName, attributes = {}, content = '') {
     return elem;
 }
 
-// ============ AUTENTICACIÓN - Token Management ============
+// ============ AUTENTICACIÓN - Token Management ============\
 
 /**
  * Obtiene el token de autenticación del localStorage
@@ -177,7 +177,7 @@ function limpiarSesion() {
     }
 }
 
-// ============ CSRF PROTECTION ============
+// ============ CSRF PROTECTION ============\
 
 /**
  * Obtiene el token CSRF almacenado en sesión.
@@ -214,11 +214,14 @@ function saveCsrfToken(token) {
 /**
  * Obtiene headers con autenticación y CSRF token.
  * @param {string} contentType - Content-Type del request.
+ * @param {string|null} explicitCsrfToken - CSRF token a usar, si está disponible. Esto permite a apiFetch pasar el token fresco leído justo antes de construir cabeceras.
  * @returns {object} Headers con autenticación y CSRF.
  */
-function getSecureHeaders(contentType = 'application/json') {
+function getSecureHeaders(contentType = 'application/json', explicitCsrfToken = null) {
     const token = getAuthToken();
-    const csrfToken = getCsrfToken();
+    // Si se pasa un token explícito, usarlo; de lo contrario, leer de sessionStorage.
+    const csrfToken = explicitCsrfToken !== null ? explicitCsrfToken : getCsrfToken(); 
+    
     const headers = {
         'Content-Type': contentType || 'application/json' // Asegurar siempre un Content-Type
     };
@@ -229,6 +232,9 @@ function getSecureHeaders(contentType = 'application/json') {
 
     if (csrfToken) {
         headers['X-CSRF-Token'] = csrfToken; // La cabecera clave para CSRF
+    } else {
+        // Si no hay token CSRF explícito o leído de sessionStorage, nos aseguramos de no incluir una cabecera vacía.
+        delete headers['X-CSRF-Token'];
     }
 
     return headers;
@@ -253,8 +259,7 @@ async function updateCsrfTokenFromResponse(response) {
     const contentType = response.headers.get('content-type');
     if (contentType?.includes('application/json')) {
         try {
-            // Usamos clone() para poder leer el body.
-            // Usamos await para parsear el JSON de forma síncrona dentro de esta async function.
+            // Usamos clone() para poder leer el body. Usamos await para parsear el JSON.
             const data = await response.clone().json();
             if (data && data._csrf_token) { // Verificar que data existe y tiene _csrf_token
                 saveCsrfToken(data._csrf_token);
@@ -262,7 +267,6 @@ async function updateCsrfTokenFromResponse(response) {
             }
         } catch (e) {
             // Solo loguear el error, no lanzar, para no interrumpir el flujo principal de apiFetch.
-            // Un error aquí puede indicar que el body no es JSON válido o ya fue consumido.
             console.warn('Error al intentar obtener CSRF token del body JSON:', e);
         }
     }
@@ -276,27 +280,30 @@ async function updateCsrfTokenFromResponse(response) {
  * @returns {Promise<Response|null>} Respuesta del fetch o null si hubo un error manejado.
  */
 async function apiFetch(url, options = {}) {
-    // 1. Obtener las cabeceras seguras base (Auth y CSRF)
-    const defaultSecureHeaders = getSecureHeaders(
-        options.headers?.['Content-Type'] || 'application/json'
-    );
+    // 1. Obtener el token CSRF FRESCO justo antes de construir las cabeceras.
+    const csrfToken = getCsrfToken();
+    console.log(`apiFetch: Token CSRF leído de sessionStorage justo antes de construir cabeceras: ${csrfToken ? 'YES' : 'NO'}`);
 
-    // 2. Construir las cabeceras finales:
+    // 2. Obtener las cabeceras seguras base (Auth y CSRF)
+    const contentType = options.headers?.['Content-Type'] || 'application/json';
+    // Pasar el token CSRF fresco explícitamente a getSecureHeaders
+    const defaultSecureHeaders = getSecureHeaders(contentType, csrfToken); 
+
+    // 3. Construir las cabeceras finales:
     //    - Combinar las cabeceras del usuario (options.headers) con las seguras.
-    //    - Priorizar las cabeceras seguras ('X-CSRF-Token', 'Authorization')
-    //      para evitar que las definidas por el usuario las sobrescriban incorrectamente.
+    //    - Priorizar las cabeceras seguras ('X-CSRF-Token', 'Authorization') para evitar que sean sobrescritas incorrectamente.
     const finalHeaders = {
         ...(options.headers || {}), // Empieza con las cabeceras del usuario
     };
 
     // Asegurar que las cabeceras críticas de seguridad se incluyan y tengan prioridad.
-    // Esto previene que un 'X-CSRF-Token: ""' en options.headers anule la protección.
     if (defaultSecureHeaders['X-CSRF-Token']) {
         finalHeaders['X-CSRF-Token'] = defaultSecureHeaders['X-CSRF-Token'];
+        console.log(`apiFetch: Añadiendo X-CSRF-Token: ${finalHeaders['X-CSRF-Token'].substring(0, 10)}...`);
     } else {
-        // Si getCsrfToken() devolvió null, nos aseguramos de que no haya un X-CSRF-Token vacío
-        // en las cabeceras finales si el usuario lo había intentado poner.
+        // Si no hay token CSRF, nos aseguramos de que no haya uno vacío si el usuario intentó ponerlo.
         delete finalHeaders['X-CSRF-Token'];
+        console.log('apiFetch: No se añadió X-CSRF-Token (ninguno disponible o vacío).');
     }
 
     if (defaultSecureHeaders['Authorization']) {
@@ -316,6 +323,7 @@ async function apiFetch(url, options = {}) {
     };
 
     try {
+        console.log(`apiFetch: Realizando petición a ${url} con método ${mergedOptions.method || 'GET'}`);
         // Ejecutar la petición fetch
         const response = await fetch(url, mergedOptions);
 
@@ -342,9 +350,7 @@ async function apiFetch(url, options = {}) {
                 const errorData = await response.clone().json();
                 // Combinar detalles del error si existen en el cuerpo de la respuesta
                 errorDetails = { ...errorDetails, ...(typeof errorData === 'object' ? errorData : { message: errorData }) };
-            } catch {
-                // Si no es JSON o falla el parseo, usar el mensaje genérico.
-            }
+            } catch { /* Ignorar si no es JSON o falla el parseo */ }
             console.error(`API Error (${url}):`, errorDetails);
             // Mostrar notificación al usuario
             mostrarNotificacion(
@@ -356,6 +362,7 @@ async function apiFetch(url, options = {}) {
         }
 
         // Si la respuesta es OK, devolver la respuesta para que el llamador la procese
+        console.log(`apiFetch: Petición a ${url} exitosa (status ${response.status}).`);
         return response;
 
     } catch (error) {
@@ -366,7 +373,7 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-// ============ NOTIFICACIONES - Toast/Alert Handler ============
+// ============ NOTIFICACIONES - Toast/Alert Handler ============\
 function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
     /**
      * Muestra una notificación visual al usuario
@@ -379,7 +386,7 @@ function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
 
     if (!container) {
         // Fallback a alert si no existe el contenedor
-        alert(`${titulo}\n${mensaje}`);
+        alert(`${titulo}\\n${mensaje}`);
         return;
     }
 
@@ -427,7 +434,7 @@ function mostrarNotificacion(titulo, mensaje, tipo = 'info') {
     }, 5000);
 }
 
-// ============ API CALLS - Wrapper con error handling ============
+// ============ API CALLS - Wrapper con error handling ============\
 async function apiCall(endpoint, options = {}) {
     /**
      * Realiza una llamada a API con manejo de errores
@@ -472,7 +479,7 @@ async function apiCall(endpoint, options = {}) {
     }
 }
 
-// ============ FORMATO DE DATOS ============
+// ============ FORMATO DE DATOS ============\
 function formatDateTime(dateString) {
     /**
      * Formatea fecha y hora a formato local
@@ -501,7 +508,7 @@ function formatCurrency(amount) {
     return `$${parseFloat(amount).toFixed(2)}`;
 }
 
-// ============ UTILIDADES DE DOM ============
+// ============ UTILIDADES DE DOM ============\
 function ocultarElemento(id) {
     const elem = document.getElementById(id);
     if (elem) elem.classList.add('d-none');
@@ -517,7 +524,7 @@ function toggleElemento(id) {
     if (elem) elem.classList.toggle('d-none');
 }
 
-// ============ VALIDACIÓN - Client-side form validation ============
+// ============ VALIDACIÓN - Client-side form validation ============\
 
 /**
  * Valida que un valor sea un número positivo
@@ -560,7 +567,7 @@ function validarNumeroEntero(value) {
 function validarEmail(email) {
     if (!email) return false;
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
     return emailRegex.test(String(email).trim());
 }
 
@@ -573,10 +580,10 @@ function validarTelefono(phone) {
     if (!phone) return false;
 
     // Remover caracteres comunes de formateo
-    const phoneClean = String(phone).replace(/[\s\-()]/g, '');
+    const phoneClean = String(phone).replace(/[\\s\\-()]/g, '');
 
     // Verificar que sea solo dígitos y tenga entre 7 y 15 dígitos
-    return /^\d{7,15}$/.test(phoneClean);
+    return /^\\d{7,15}$/.test(phoneClean);
 }
 
 /**
@@ -641,7 +648,7 @@ function deshabilitarFormulario(formId, disabled = true) {
     });
 }
 
-// ============ CONSTANTES Y CONFIGURACIÓN ============
+// ============ CONSTANTES Y CONFIGURACIÓN ============\
 
 /**
  * Constantes para rates, timings y configuración general
@@ -684,7 +691,7 @@ const CONFIG = {
     }
 };
 
-// ============ OPTIMIZACIÓN - Consolidación de Funciones ============
+// ============ OPTIMIZACIÓN - Consolidación de Funciones ============\
 
 /**
  * Renderiza una lista genérica de items
