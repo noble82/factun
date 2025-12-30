@@ -1,58 +1,48 @@
 /**
  * Configuración centralizada de APIs
- * Incluir este archivo al inicio de todas las páginas
+ * ✅ Incluir DESPUÉS de utils.js
+ * ✅ No define funciones duplicadas
+ * ✅ Usa apiFetch de utils.js
  */
 
-// Detectar URL base dinámicamente para soportar diferentes entornos
+// Detectar URL base dinámicamente
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
 
-// Configuración de todos los endpoints
+// Configuración de endpoints (usa con apiFetch(`${API_CONFIG.AUTH}/login`))
 const API_CONFIG = {
     // Autenticación
-    AUTH: `${API_BASE_URL}/api/auth`,
-
+    AUTH: '/api/auth',
     // Punto de Venta
-    POS: `${API_BASE_URL}/api/pos`,
-
+    POS: '/api/pos',
     // Inventario
-    INVENTARIO: `${API_BASE_URL}/api/inventario`,
-
+    INVENTARIO: '/api/inventario',
     // Clientes
-    CLIENTES: `${API_BASE_URL}/api/clientes`
+    CLIENTES: '/api/clientes'
 };
 
-// Funciones de utilidad para API calls
-function getAuthHeaders(contentType = 'application/json') {
-    const token = localStorage.getItem('auth_token');
-    return {
-        'Content-Type': contentType,
-        'Authorization': token ? `Bearer ${token}` : ''
-    };
+// Helpers para construir URLs completas
+function buildUrl(endpoint) {
+    return `${API_BASE_URL}${endpoint}`;
 }
 
-// Función auxiliar para llamadas API con manejo de errores
-async function apiFetch(endpoint, options = {}) {
-    try {
-        const url = `${API_BASE_URL}${endpoint}`;
-        const response = await apiFetch(url, {
-            ...options,
-            headers: {
-                ...getAuthHeaders(),
-                ...(options.headers || {})
-            }
-        });
+function buildApiUrl(configKey, path = '') {
+    const base = API_CONFIG[configKey];
+    if (!base) {
+        console.warn(`API_CONFIG: clave '${configKey}' no encontrada`);
+        return buildUrl(path);
+    }
+    return buildUrl(`${base}${path}`);
+}
 
-        if (response.status === 401) {
-            // Token expirado, redirigir a login
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user');
-            window.location.href = 'login.html';
-            return null;
-        }
+// Exponer globalmente (solo si utils.js ya cargó apiFetch)
+if (typeof window !== 'undefined') {
+    window.API_BASE_URL = API_BASE_URL;
+    window.API_CONFIG = API_CONFIG;
+    window.buildUrl = buildUrl;
+    window.buildApiUrl = buildApiUrl;
 
-        return response;
-    } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+    // Verificación de compatibilidad
+    if (typeof window.apiFetch !== 'function') {
+        console.warn('⚠️ config.js cargado antes que utils.js. Asegura orden: utils.js → config.js');
     }
 }
