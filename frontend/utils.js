@@ -795,18 +795,37 @@ function aplicarPermisosPorRol(rol) {
             document.getElementById('panel-cajero')?.classList.add('active');
             document.getElementById('panel-cocina')?.classList.add('active');
             if (roleSelector) roleSelector.style.display = 'block';
+            // ✅ Activar primera pestaña del mesero por defecto
+            setTimeout(() => {
+                const firstTab = document.querySelector('#meseroTabs .nav-link');
+                if (firstTab) new bootstrap.Tab(firstTab).show();
+            }, 10);
             break;
 
         case 'mesero':
             document.getElementById('panel-mesero')?.classList.add('active');
+            // ✅ Asegurar que la pestaña de mesas se active
+            setTimeout(() => {
+                const mesasTab = document.querySelector('#meseroTabs .nav-link');
+                if (mesasTab) new bootstrap.Tab(mesasTab).show();
+            }, 10);
             break;
 
         case 'cajero':
             document.getElementById('panel-cajero')?.classList.add('active');
-            // ✅ Acceso a menú (pedido para llevar)
-            document.getElementById('panel-mesero')?.classList.add('active');
-            const meseroTabs = document.getElementById('meseroTabs');
-            if (meseroTabs) meseroTabs.classList.add('d-none');
+            // ✅ Cajero: acceso al menú (pedido para llevar)
+            const panelMesero = document.getElementById('panel-mesero');
+            if (panelMesero) {
+                panelMesero.classList.add('active');
+                // Ocultar tabs innecesarios (solo mostrar "Menú")
+                const tabsContainer = document.getElementById('meseroTabs');
+                if (tabsContainer) tabsContainer.classList.add('d-none');
+                // ✅ Forzar activación del tab "Menú"
+                setTimeout(() => {
+                    const menuTabTrigger = document.querySelector('#menu-tab').previousElementSibling;
+                    if (menuTabTrigger) new bootstrap.Tab(menuTabTrigger).show();
+                }, 20);
+            }
             break;
 
         case 'cocinero':
@@ -828,6 +847,7 @@ function aplicarPermisosPorRol(rol) {
 
     console.log(`✅ Permisos aplicados: rol ${rol}`);
 }
+
 // ============ EXPOSICIÓN GLOBAL DE FUNCIONES ============
 if (typeof window !== 'undefined') {
   // --- Seguridad: CSRF & Auth ---
@@ -885,6 +905,7 @@ if (typeof window !== 'undefined') {
   // --- Formato y Utilidades Generales ---
   window.formatDateTime = formatDateTime;
   window.formatCurrency = formatCurrency;
-window.aplicarPermisosPorRol = aplicarPermisosPorRol;
 
+  // ✅ CORREGIDO: dentro del bloque, con punto y coma
+  window.aplicarPermisosPorRol = aplicarPermisosPorRol;
 }
