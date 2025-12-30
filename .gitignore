@@ -8,3 +8,5 @@ nginx.conf
 deploy-cert.sh
 docker-compose.yml
 backend/*.db
+backend/backend.log
+frontend/admin.js.old
