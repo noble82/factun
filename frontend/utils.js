@@ -850,7 +850,7 @@ function afterTransition(element, callback) {
 // ============ EXPOSICIÓN GLOBAL DE FUNCIONES DE UTILIDAD ============
 // Esto asegura que las funciones definidas en utils.js estén disponibles
 // globalmente para otros scripts que se carguen después.
-window.escapeHtml = escapeHtml;
+/*window.escapeHtml = escapeHtml;
 window.escapeAttribute = escapeAttribute;
 window.createSafeElement = createSafeElement;
 window.getAuthToken = getAuthToken;
@@ -889,5 +889,62 @@ window.getEstadoColor = getEstadoColor;
 window.limpiarListeners = limpiarListeners;
 window.getElementText = getElementText;
 window.setElementText = setElementText;
-window.afterTransition = afterTransition;
-window.apiFetch = apiFetch;
+window.afterTransition = afterTransition;*/
+// === EXPOSICIÓN GLOBAL PARA ACCESO EN OTROS SCRIPTS (login.js, pos.js, admin.js, reportes.js, etc.) ===
+if (typeof window !== 'undefined') {
+  // --- Seguridad: CSRF & Auth ---
+  window.getCsrfToken = getCsrfToken;
+  window.saveCsrfToken = saveCsrfToken;
+  window.getSecureHeaders = getSecureHeaders;
+  window.updateCsrfTokenFromResponse = updateCsrfTokenFromResponse;
+  window.apiFetch = apiFetch;
+
+  window.getAuthToken = getAuthToken;
+  window.getUsuarioActual = getUsuarioActual;
+  window.getAuthHeaders = getAuthHeaders;
+  window.saveAuthToken = saveAuthToken;
+  window.saveUsuarioActual = saveUsuarioActual;
+  window.limpiarSesion = limpiarSesion;
+
+  // --- Escaping & XSS Protection ---
+  window.escapeHtml = escapeHtml;
+  window.escapeAttribute = escapeAttribute;
+  window.createSafeElement = createSafeElement;
+
+  // --- Validación Cliente (implementadas en FASE 2.3) ---
+  window.validarNumeroPositivo = validarNumeroPositivo;
+  window.validarNumeroEntero = validarNumeroEntero;
+  window.validarEmail = validarEmail;
+  window.validarTelefono = validarTelefono;
+  window.validarRequerido = validarRequerido;
+
+  // --- Form Helpers (FASE 2.3) ---
+  window.getFormValue = getFormValue;
+  window.getFormNumber = getFormNumber;
+  window.limpiarFormulario = limpiarFormulario;
+  window.deshabilitarFormulario = deshabilitarFormulario;
+
+  // --- UI / Notificaciones ---
+  window.mostrarNotificacion = mostrarNotificacion;
+
+  // --- DOM Utilities (FASE 2.4) ---
+  window.setElementText = setElementText; // ✅ Seguro contra XSS
+  window.getElementText = getElementText;
+  window.ocultarElemento = ocultarElemento;
+  window.mostrarElemento = mostrarElemento;
+  window.toggleElemento = toggleElemento;
+  window.limpiarListeners = limpiarListeners;
+  window.afterTransition = afterTransition;
+
+  // --- Optimización / Helpers (FASE 2.4) ---
+  window.renderItems = renderItems;
+  window.createDebouncedFunction = createDebouncedFunction;
+  window.toggleModal = toggleModal;
+  window.calculateIVA = calculateIVA;
+  window.calculateTotal = calculateTotal;
+  window.getEstadoColor = getEstadoColor;
+
+  // --- Formato y Utilidades Generales ---
+  window.formatDateTime = formatDateTime;
+  window.formatCurrency = formatCurrency;
+}
