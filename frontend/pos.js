@@ -212,53 +212,9 @@ function onAuthVerificado(usuario) {
     }
 }
 
-async function cargarMesas() {
-    const container = document.getElementById('mesas-container');
-    if (!container) return;
-
-    try {
-        // Usando la ruta confirmada por el README y app.py
-        const response = await apiFetch('/api/pos/mesas'); 
-        if (!response) return;
-        
-        const mesas = await response.json();
-        container.innerHTML = ''; 
-
-        mesas.forEach(mesa => {
-            const div = document.createElement('div');
-            // Clases según tu README: mesa-libre o mesa-ocupada
-            div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
-            div.id = `mesa-${mesa.id}`;
-            div.innerHTML = `
-                <i class="bi bi-tablet-landscape"></i>
-                <span class="d-block">Mesa ${mesa.numero}</span>
-            `;
-
-            div.onclick = () => {
-                // Quitar selección previa de todas las mesas
-                document.querySelectorAll('.mesa-card').forEach(m => {
-                    m.classList.remove('mesa-seleccionada');
-                    m.style.backgroundColor = ''; 
-                    m.style.color = '';
-                });
-
-                // Aplicar ROJO a la mesa seleccionada
-                div.classList.add('mesa-seleccionada');
-                div.style.backgroundColor = '#d32f2f'; // Rojo Pupusería
-                div.style.color = 'white';
-
-                // Guardar en memoria global para el pedido
-                window.mesaSeleccionada = mesa;
-                console.log("Mesa lista para pedido:", mesa.numero);
-            };
-
-            container.appendChild(div);
-        });
-    } catch (error) {
-        console.error("Error al renderizar mesas:", error);
-    }
-}
-
+/**
+ * Carga las categorías del menú desde el servidor
+ */
 async function cargarCategorias() {
     const container = document.getElementById('categorias-container');
     if (!container) return;
@@ -267,56 +223,82 @@ async function cargarCategorias() {
         const response = await apiFetch('/api/pos/categorias');
         if (!response) return;
 
-        const categorias = await response.json();
+        let categorias = await response.json();
+
+        // ✅ Lógica: Verificar si "Combos" ya existe, si no, lo manejamos
+        const existeCombos = categorias.some(cat => cat.nombre.toLowerCase() === 'combos');
+        
         container.innerHTML = '';
 
+        // Renderizar categorías
         categorias.forEach(cat => {
             const btn = document.createElement('button');
-            btn.className = 'categoria-tab'; // Clase de tu styles-responsive.css
+            btn.className = 'categoria-tab';
             btn.innerHTML = `<i class="bi bi-tag"></i> ${cat.nombre}`;
             
             btn.onclick = () => {
+                // UI: Cambio de estado activo
                 document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 
-                // Carga los productos de la categoría seleccionada
-                if (typeof cargarProductos === 'function') {
-                    cargarProductos(cat.id);
-                }
+                // FILTRO: Cargar productos específicos de esta categoría
+                cargarProductosPorCategoria(cat.id);
             };
             container.appendChild(btn);
         });
 
-        // Cargar la primera categoría por defecto
-        if (categorias.length > 0) container.firstChild.click();
+        // ✅ Selección inicial: Pupusas por defecto
+        if (categorias.length > 0) {
+            const primera = container.querySelector('.categoria-tab');
+            if (primera) primera.click();
+        }
         
     } catch (error) {
-        console.error("Error al cargar menú:", error);
+        console.error("Error en cargarCategorias:", error);
     }
 }
-async function cargarProductos(categoriaId) {
+
+/**
+ * Carga productos filtrados por el ID de categoría
+ * @param {number|string} categoriaId 
+ */
+async function cargarProductosPorCategoria(categoriaId) {
     const container = document.getElementById('productos-container');
     if (!container) return;
 
     try {
+        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm text-warning"></div></div>';
+
+        // ✅ IMPORTANTE: Según la lógica de Flask, pasamos el filtro por query string
         const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
         if (!response) return;
 
         const productos = await response.json();
         container.innerHTML = '';
 
+        if (productos.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center p-3">No hay productos en esta categoría.</p>';
+            return;
+        }
+
         productos.forEach(prod => {
             const div = document.createElement('div');
             div.className = 'product-card';
             div.innerHTML = `
                 <div class="fw-bold">${prod.nombre}</div>
-                <div class="product-price">$${parseFloat(prod.precio).toFixed(2)}</div>
+                <div class="product-price">${formatCurrency(prod.precio)}</div>
             `;
-            div.onclick = () => window.agregarAlCarrito ? window.agregarAlCarrito(prod) : null;
+            
+            div.onclick = () => {
+                if (typeof agregarAlCarrito === 'function') {
+                    agregarAlCarrito(prod);
+                }
+            };
             container.appendChild(div);
         });
     } catch (error) {
         console.error("Error al cargar productos:", error);
+        container.innerHTML = '<p class="text-danger">Error al cargar productos.</p>';
     }
 }
 // Exportar funciones globales
