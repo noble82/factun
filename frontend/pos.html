@@ -862,7 +862,7 @@ scrollbar-width: none;
 <strong id="cart-total">$0.00</strong>
 </div>
 <div class="mb-2">
-<select class="form-select form-select-sm" id="tipo-pago" onchange="toggleOpcionesPago()">
+<select class="form-select form-select-sm" id="tipo-pago" onchange="if(typeof toggleOpcionesPago === 'function'){ toggleOpcionesPago(); }">
 <option value="anticipado">Pago anticipado (para llevar)</option>
 <option value="al_final">Pago al final (en mesa)</option>
 </select>
@@ -1429,7 +1429,11 @@ function actualizarInterfazPorRol(rol) {
   document.getElementById('li-admin')?.classList.toggle('d-none', !isManager);
   document.getElementById('li-factura')?.classList.toggle('d-none', !isManager);
   document.getElementById('btn-cambiar-rol')?.classList.toggle('d-none', !isManager);
-  document.getElementById('boton-reportes-detallados')?.style.display === isManager ? 'block' : 'none';
+  document.getElementById('boton-reportes-detallados');
+  if (btnReportes) {
+    btnReportes.style.display = isManager ? 'block' : 'none';
+  }
+  //document.getElementById('boton-reportes-detallados')?.style.display === isManager ? 'block' : 'none';
 
   // Mostrar panel por defecto
   if (['mesero', 'cajero', 'cocina', 'manager'].includes(rol)) {
