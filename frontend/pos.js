@@ -311,34 +311,54 @@ async function cargarMesas() {
     }
 }
 
-async function cargarCategorias() {
-    const container = document.getElementById('categorias-container');
+async function cargarProductos(categoriaId) {
+    const container = document.getElementById('productos-container');
     if (!container) return;
 
-    const response = await apiFetch('/api/pos/categorias');
-    if (response) {
-        let categorias = await response.json();
+    try {
+        // Mostramos un indicador de carga para mejor UX
+        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border text-warning" role="status"></div></div>';
+
+        // ✅ IMPORTANTE: Según tu app.py y README, la ruta es /api/pos/productos
+        // Pasamos el ID de la categoría para filtrar
+        const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
         
-        // ✅ AGREGAR OPCIÓN "COMBOS" si no viene de la DB
-        if (!categorias.find(c => c.nombre.toLowerCase() === 'combos')) {
-            categorias.push({ id: 'combos', nombre: 'Combos' });
+        if (!response) {
+            container.innerHTML = '<p class="text-danger text-center">Error de conexión.</p>';
+            return;
         }
 
-        container.innerHTML = '';
-        categorias.forEach(cat => {
-            const btn = document.createElement('button');
-            btn.className = 'categoria-tab'; // Clase de tu styles-responsive.css
-            btn.textContent = cat.nombre;
-            btn.onclick = () => {
-                document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                // Llamar a la carga de productos con filtro
-                if (typeof cargarProductos === 'function') cargarProductos(cat.id);
+        const productos = await response.json();
+        container.innerHTML = ''; // Limpiar contenedor
+
+        if (productos.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center p-4">No hay productos en esta categoría.</p>';
+            return;
+        }
+
+        // Renderizado de cada producto
+        productos.forEach(prod => {
+            const div = document.createElement('div');
+            div.className = 'product-card'; // Clase de tu styles-responsive.css
+            div.innerHTML = `
+                <div class="fw-bold">${escapeHtml(prod.nombre)}</div>
+                <div class="product-price">${formatCurrency(prod.precio)}</div>
+            `;
+            
+            // ✅ Lógica de Pedido: Al tocar, se agrega al "Pedido Actual"
+            div.onclick = () => {
+                if (typeof agregarAlCarrito === 'function') {
+                    agregarAlCarrito(prod);
+                } else {
+                    console.log("Producto seleccionado:", prod.nombre);
+                    // Si no tienes agregarAlCarrito, podemos crear una lógica simple aquí
+                }
             };
-            container.appendChild(btn);
+            container.appendChild(div);
         });
-        // Click automático en la primera para que no inicie vacío
-        if(categorias.length > 0) container.firstChild.click();
+    } catch (error) {
+        console.error("Error al cargar productos:", error);
+        container.innerHTML = '<p class="text-danger text-center">Error al cargar el menú.</p>';
     }
 }
 // Exportar funciones globales
