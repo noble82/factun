@@ -344,31 +344,35 @@ async function cargarCategorias() {
         if(categorias.length > 0) container.firstChild.click();
     }
 }
+// ✅ Función para cargar productos según el diseño de BD corregido
 async function cargarProductos(categoriaId) {
     const container = document.getElementById('productos-container');
     if (!container) return;
 
     try {
-        // Filtro por ID de categoría mediante query string
+        // El README indica que el filtro es por query string: ?categoria_id=
         const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
         if (!response) return;
 
         const productos = await response.json();
-        container.innerHTML = '';
+        container.innerHTML = ''; 
 
         if (productos.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center w-100">No hay productos aquí.</p>';
+            container.innerHTML = '<div class="text-center p-4 text-muted">No hay productos en esta categoría.</div>';
             return;
         }
 
         productos.forEach(prod => {
             const div = document.createElement('div');
-            div.className = 'product-card';
+            div.className = 'product-card animate__animated animate__fadeIn';
             div.innerHTML = `
-                <div class="fw-bold">${prod.nombre}</div>
-                <div class="product-price">$${parseFloat(prod.precio).toFixed(2)}</div>
+                <div class="product-info">
+                    <span class="product-name">${prod.nombre}</span>
+                    <span class="product-price">$${parseFloat(prod.precio).toFixed(2)}</span>
+                </div>
             `;
-            // Acción de agregar al carrito
+            
+            // Flujo: Al tocar, se agrega al pedido actual
             div.onclick = () => {
                 if (typeof agregarAlCarrito === 'function') {
                     agregarAlCarrito(prod);
@@ -376,8 +380,8 @@ async function cargarProductos(categoriaId) {
             };
             container.appendChild(div);
         });
-    } catch (e) {
-        console.error("Error cargando productos:", e);
+    } catch (error) {
+        console.error("Error al cargar productos filtrados:", error);
     }
 }
 // Exportar funciones globales
