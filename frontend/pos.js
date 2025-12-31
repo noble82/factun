@@ -217,7 +217,7 @@ async function cargarMesas() {
     if (!container) return;
 
     try {
-        // Usamos la ruta correcta según tu app.py
+        // Usando la ruta confirmada por el README y app.py
         const response = await apiFetch('/api/pos/mesas'); 
         if (!response) return;
         
@@ -226,33 +226,36 @@ async function cargarMesas() {
 
         mesas.forEach(mesa => {
             const div = document.createElement('div');
-            // Clase base + estado
+            // Clases según tu README: mesa-libre o mesa-ocupada
             div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
             div.id = `mesa-${mesa.id}`;
             div.innerHTML = `
                 <i class="bi bi-tablet-landscape"></i>
-                <span>Mesa ${mesa.numero}</span>
+                <span class="d-block">Mesa ${mesa.numero}</span>
             `;
 
             div.onclick = () => {
-                // 1. Quitar rojo de cualquier otra mesa seleccionada
-                document.querySelectorAll('.mesa-card').forEach(m => m.style.backgroundColor = '');
-                document.querySelectorAll('.mesa-card').forEach(m => m.classList.remove('mesa-seleccionada'));
+                // Quitar selección previa de todas las mesas
+                document.querySelectorAll('.mesa-card').forEach(m => {
+                    m.classList.remove('mesa-seleccionada');
+                    m.style.backgroundColor = ''; 
+                    m.style.color = '';
+                });
 
-                // 2. Poner esta mesa en ROJO
-                div.style.backgroundColor = '#ff4444'; // Rojo fuerte
-                div.style.color = 'white';
+                // Aplicar ROJO a la mesa seleccionada
                 div.classList.add('mesa-seleccionada');
+                div.style.backgroundColor = '#d32f2f'; // Rojo Pupusería
+                div.style.color = 'white';
 
-                // 3. Guardar mesa seleccionada globalmente
+                // Guardar en memoria global para el pedido
                 window.mesaSeleccionada = mesa;
-                console.log("Mesa seleccionada:", mesa.numero);
+                console.log("Mesa lista para pedido:", mesa.numero);
             };
 
             container.appendChild(div);
         });
     } catch (error) {
-        console.error("Error cargando mesas:", error);
+        console.error("Error al renderizar mesas:", error);
     }
 }
 
@@ -261,7 +264,6 @@ async function cargarCategorias() {
     if (!container) return;
 
     try {
-        // Ruta corregida con /api/pos/
         const response = await apiFetch('/api/pos/categorias');
         if (!response) return;
 
@@ -270,15 +272,14 @@ async function cargarCategorias() {
 
         categorias.forEach(cat => {
             const btn = document.createElement('button');
-            btn.className = 'btn btn-outline-primary m-1 categoria-btn';
-            btn.innerHTML = cat.nombre;
+            btn.className = 'categoria-tab'; // Clase de tu styles-responsive.css
+            btn.innerHTML = `<i class="bi bi-tag"></i> ${cat.nombre}`;
             
             btn.onclick = () => {
-                // Resaltar botón activo
-                document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 
-                // Cargar productos de esta categoría (Ruta: /api/pos/productos/ID)
+                // Carga los productos de la categoría seleccionada
                 if (typeof cargarProductos === 'function') {
                     cargarProductos(cat.id);
                 }
@@ -286,15 +287,38 @@ async function cargarCategorias() {
             container.appendChild(btn);
         });
 
-        // Clic automático en la primera (ej. "Pupusas") para que no se vea vacío
-        if (categorias.length > 0) {
-            container.firstChild.click();
-        }
+        // Cargar la primera categoría por defecto
+        if (categorias.length > 0) container.firstChild.click();
+        
     } catch (error) {
-        console.error("Error cargando categorías:", error);
+        console.error("Error al cargar menú:", error);
     }
 }
+async function cargarProductos(categoriaId) {
+    const container = document.getElementById('productos-container');
+    if (!container) return;
 
+    try {
+        const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
+        if (!response) return;
+
+        const productos = await response.json();
+        container.innerHTML = '';
+
+        productos.forEach(prod => {
+            const div = document.createElement('div');
+            div.className = 'product-card';
+            div.innerHTML = `
+                <div class="fw-bold">${prod.nombre}</div>
+                <div class="product-price">$${parseFloat(prod.precio).toFixed(2)}</div>
+            `;
+            div.onclick = () => window.agregarAlCarrito ? window.agregarAlCarrito(prod) : null;
+            container.appendChild(div);
+        });
+    } catch (error) {
+        console.error("Error al cargar productos:", error);
+    }
+}
 // Exportar funciones globales
 window.handleCreateClientSubmit = handleCreateClientSubmit;
 window.aplicarPermisosPorRol = aplicarPermisosPorRol;
