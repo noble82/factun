@@ -120,28 +120,31 @@ if (crearClienteForm) {
  */
 function aplicarPermisosPorRol(rol) {
     if (!rol) {
-        console.warn('Rol no especificado. Redirigiendo a login.');
+        console.warn('Rol no especificado. Redirigiendo...');
         if (typeof logout === 'function') logout();
         return;
     }
 
-    // 1. Limpieza inicial
+    console.log(`✅ Aplicando permisos para: ${rol}`);
+
+    // Limpieza física y visual de paneles
     document.querySelectorAll('.work-panel').forEach(el => {
         el.classList.remove('active');
-        el.style.display = 'none'; // Asegura ocultamiento
+        el.style.display = 'none'; 
     });
+
     const roleSelector = document.getElementById('role-selector');
     if (roleSelector) roleSelector.style.display = 'none';
 
-    // 2. Activación de Paneles y CARGA DE DATOS
+    // Lógica de activación y CARGA DE DATOS
     switch (rol) {
         case 'manager':
-            document.getElementById('panel-mesero')?.classList.add('active');
-            document.getElementById('panel-cajero')?.classList.add('active');
-            document.getElementById('panel-cocina')?.classList.add('active');
+            document.querySelectorAll('.work-panel').forEach(el => {
+                el.classList.add('active');
+                el.style.display = 'block';
+            });
             if (roleSelector) roleSelector.style.display = 'block';
-            
-            // ✅ EJECUTAR CARGA DE DATOS
+            // Disparar carga de datos
             if (typeof cargarMesas === 'function') cargarMesas();
             if (typeof cargarCategorias === 'function') cargarCategorias();
             break;
@@ -151,7 +154,7 @@ function aplicarPermisosPorRol(rol) {
             if (pMesero) {
                 pMesero.classList.add('active');
                 pMesero.style.display = 'block';
-                // ✅ EJECUTAR CARGA PARA MESERO
+                // Disparar carga de datos
                 if (typeof cargarMesas === 'function') cargarMesas();
                 if (typeof cargarCategorias === 'function') cargarCategorias();
             }
@@ -159,29 +162,33 @@ function aplicarPermisosPorRol(rol) {
 
         case 'cajero':
             document.getElementById('panel-cajero')?.classList.add('active');
+            if(document.getElementById('panel-cajero')) document.getElementById('panel-cajero').style.display = 'block';
+            
             const pMeseroCajero = document.getElementById('panel-mesero');
             if (pMeseroCajero) {
                 pMeseroCajero.classList.add('active');
-                // Al cajero solo le interesa el menú para pedidos rápidos
+                pMeseroCajero.style.display = 'block';
+                document.getElementById('meseroTabs')?.classList.add('d-none');
                 if (typeof cargarCategorias === 'function') cargarCategorias();
             }
             break;
 
+        case 'cocina':
         case 'cocinero':
-            window.location.href = 'cocina.html';
-            return;
+            document.getElementById('panel-cocina')?.classList.add('active');
+            if(document.getElementById('panel-cocina')) document.getElementById('panel-cocina').style.display = 'block';
+            break;
 
         default:
-            console.error(`Rol no reconocido: ${rol}`);
-            if (typeof logout === 'function') logout();
-            return;
+            console.error(`Rol desconocido: ${rol}`);
+            break;
     }
 
-    // Actualizar badge
-    const currentRole = document.getElementById('current-role');
-    if (currentRole) {
-        currentRole.textContent = rol.toUpperCase();
-        currentRole.classList.remove('d-none');
+    // Actualizar Badge visual
+    const badge = document.getElementById('current-role');
+    if (badge) {
+        badge.textContent = rol.toUpperCase();
+        badge.classList.remove('d-none');
     }
 }
 
@@ -202,6 +209,76 @@ function onAuthVerificado(usuario) {
     } else {
         console.error('onAuthVerificado: usuario sin rol');
         logout();
+    }
+}
+
+async function cargarMesas() {
+    const container = document.getElementById('mesas-container');
+    if (!container) return;
+
+    try {
+        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p>Cargando mesas...</p></div>';
+        
+        const response = await apiFetch('/api/mesas'); 
+        if (!response) return;
+        
+        const mesas = await response.json();
+        container.innerHTML = ''; // Limpiar spinner
+
+        if (mesas.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">No hay mesas configuradas.</p>';
+            return;
+        }
+
+        mesas.forEach(mesa => {
+            const div = document.createElement('div');
+            // Mantenemos tus clases de estilo originales para no romper el CSS
+            div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
+            div.innerHTML = `
+                <i class="bi bi-tablet-landscape"></i>
+                <span class="d-block">Mesa ${mesa.numero}</span>
+                <small class="badge ${mesa.estado === 'libre' ? 'bg-success' : 'bg-danger'}">${mesa.estado}</small>
+            `;
+            div.onclick = () => typeof seleccionarMesa === 'function' ? seleccionarMesa(mesa) : console.log("Seleccionada:", mesa.numero);
+            container.appendChild(div);
+        });
+    } catch (error) {
+        console.error("Error en cargarMesas:", error);
+        container.innerHTML = '<div class="alert alert-danger">Error al conectar con el servidor de mesas.</div>';
+    }
+}
+
+async function cargarCategorias() {
+    const container = document.getElementById('categorias-container');
+    if (!container) return;
+
+    try {
+        const response = await apiFetch('/api/categorias');
+        if (!response) return;
+
+        const categorias = await response.json();
+        container.innerHTML = '';
+
+        categorias.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'categoria-tab';
+            btn.innerHTML = `<i class="bi bi-tag"></i> ${cat.nombre}`;
+            btn.onclick = () => {
+                // Cambiar estado activo visual
+                document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // Cargar los productos de esa categoría
+                if (typeof cargarProductos === 'function') cargarProductos(cat.id);
+            };
+            container.appendChild(btn);
+        });
+
+        // Cargar automáticamente la primera categoría al inicio
+        if (categorias.length > 0) {
+            container.firstElementChild.click();
+        }
+    } catch (error) {
+        console.error("Error en cargarCategorias:", error);
     }
 }
 
