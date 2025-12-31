@@ -217,34 +217,42 @@ async function cargarMesas() {
     if (!container) return;
 
     try {
-        container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p>Cargando mesas...</p></div>';
-        
+        // Usamos la ruta correcta según tu app.py
         const response = await apiFetch('/api/pos/mesas'); 
         if (!response) return;
         
         const mesas = await response.json();
-        container.innerHTML = ''; // Limpiar spinner
-
-        if (mesas.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center">No hay mesas configuradas.</p>';
-            return;
-        }
+        container.innerHTML = ''; 
 
         mesas.forEach(mesa => {
             const div = document.createElement('div');
-            // Mantenemos tus clases de estilo originales para no romper el CSS
+            // Clase base + estado
             div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
+            div.id = `mesa-${mesa.id}`;
             div.innerHTML = `
                 <i class="bi bi-tablet-landscape"></i>
-                <span class="d-block">Mesa ${mesa.numero}</span>
-                <small class="badge ${mesa.estado === 'libre' ? 'bg-success' : 'bg-danger'}">${mesa.estado}</small>
+                <span>Mesa ${mesa.numero}</span>
             `;
-            div.onclick = () => typeof seleccionarMesa === 'function' ? seleccionarMesa(mesa) : console.log("Seleccionada:", mesa.numero);
+
+            div.onclick = () => {
+                // 1. Quitar rojo de cualquier otra mesa seleccionada
+                document.querySelectorAll('.mesa-card').forEach(m => m.style.backgroundColor = '');
+                document.querySelectorAll('.mesa-card').forEach(m => m.classList.remove('mesa-seleccionada'));
+
+                // 2. Poner esta mesa en ROJO
+                div.style.backgroundColor = '#ff4444'; // Rojo fuerte
+                div.style.color = 'white';
+                div.classList.add('mesa-seleccionada');
+
+                // 3. Guardar mesa seleccionada globalmente
+                window.mesaSeleccionada = mesa;
+                console.log("Mesa seleccionada:", mesa.numero);
+            };
+
             container.appendChild(div);
         });
     } catch (error) {
-        console.error("Error en cargarMesas:", error);
-        container.innerHTML = '<div class="alert alert-danger">Error al conectar con el servidor de mesas.</div>';
+        console.error("Error cargando mesas:", error);
     }
 }
 
@@ -253,6 +261,7 @@ async function cargarCategorias() {
     if (!container) return;
 
     try {
+        // Ruta corregida con /api/pos/
         const response = await apiFetch('/api/pos/categorias');
         if (!response) return;
 
@@ -261,24 +270,28 @@ async function cargarCategorias() {
 
         categorias.forEach(cat => {
             const btn = document.createElement('button');
-            btn.className = 'categoria-tab';
-            btn.innerHTML = `<i class="bi bi-tag"></i> ${cat.nombre}`;
+            btn.className = 'btn btn-outline-primary m-1 categoria-btn';
+            btn.innerHTML = cat.nombre;
+            
             btn.onclick = () => {
-                // Cambiar estado activo visual
-                document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
+                // Resaltar botón activo
+                document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                // Cargar los productos de esa categoría
-                if (typeof cargarProductos === 'function') cargarProductos(cat.id);
+                
+                // Cargar productos de esta categoría (Ruta: /api/pos/productos/ID)
+                if (typeof cargarProductos === 'function') {
+                    cargarProductos(cat.id);
+                }
             };
             container.appendChild(btn);
         });
 
-        // Cargar automáticamente la primera categoría al inicio
+        // Clic automático en la primera (ej. "Pupusas") para que no se vea vacío
         if (categorias.length > 0) {
-            container.firstElementChild.click();
+            container.firstChild.click();
         }
     } catch (error) {
-        console.error("Error en cargarCategorias:", error);
+        console.error("Error cargando categorías:", error);
     }
 }
 
