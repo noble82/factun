@@ -219,7 +219,7 @@ async function cargarMesas() {
     try {
         container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p>Cargando mesas...</p></div>';
         
-        const response = await apiFetch('/api/mesas'); 
+        const response = await apiFetch('/api/pos/mesas'); 
         if (!response) return;
         
         const mesas = await response.json();
@@ -253,7 +253,7 @@ async function cargarCategorias() {
     if (!container) return;
 
     try {
-        const response = await apiFetch('/api/categorias');
+        const response = await apiFetch('/api/pos/categorias');
         if (!response) return;
 
         const categorias = await response.json();
