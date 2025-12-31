@@ -118,12 +118,77 @@ if (crearClienteForm) {
  * Control de acceso por rol — Oculta/muestra elementos según permisos
  * @param {string} rol - Rol del usuario autenticado
  */
+f/**
+ * ✅ INTEGRACIÓN TOTAL: Control de acceso, carga de datos y visualización
+ * Basado en app.py (rutas /api/pos/) y README.md
+ */
 function aplicarPermisosPorRol(rol) {
     if (!rol) {
         console.warn('Rol no especificado. Redirigiendo...');
         if (typeof logout === 'function') logout();
         return;
     }
+
+    console.log(`🚀 Sistema listo. Rol detectado: ${rol}`);
+
+    // 1. Limpieza de interfaz (Garantiza que no se mezclen paneles)
+    document.querySelectorAll('.work-panel').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+
+    const roleSelector = document.getElementById('role-selector');
+    if (roleSelector) roleSelector.style.display = 'none';
+
+    // 2. Lógica de activación por Rol
+    switch (rol) {
+        case 'manager':
+        case 'mesero':
+            const panelMesero = document.getElementById('panel-mesero');
+            if (panelMesero) {
+                panelMesero.classList.add('active');
+                panelMesero.style.display = 'block';
+                
+                // ✅ LLAMADAS DINÁMICAS (Deben estar al final del archivo)
+                console.log("Iniciando carga de Mesas y Menú...");
+                cargarMesas();      
+                cargarCategorias(); 
+            }
+            
+            if (rol === 'manager' && roleSelector) {
+                roleSelector.style.display = 'block';
+            }
+            break;
+
+        case 'cajero':
+            document.getElementById('panel-cajero')?.classList.add('active');
+            if(document.getElementById('panel-cajero')) document.getElementById('panel-cajero').style.display = 'block';
+            
+            // El cajero ve el menú para pedidos "Para Llevar"
+            const pMeseroCajero = document.getElementById('panel-mesero');
+            if (pMeseroCajero) {
+                pMeseroCajero.classList.add('active');
+                pMeseroCajero.style.display = 'block';
+                // Ocultamos mesas para el cajero (solo quiere menú)
+                document.getElementById('meseroTabs')?.classList.add('d-none');
+                cargarCategorias();
+            }
+            break;
+
+        case 'cocina':
+        case 'cocinero':
+            document.getElementById('panel-cocina')?.classList.add('active');
+            if(document.getElementById('panel-cocina')) document.getElementById('panel-cocina').style.display = 'block';
+            break;
+    }
+
+    // 3. Actualizar Badge de Rol (UI Superior)
+    const badge = document.getElementById('current-role');
+    if (badge) {
+        badge.textContent = rol.toUpperCase();
+        badge.classList.remove('d-none');
+    }
+}
 
     console.log(`✅ Aplicando permisos para: ${rol}`);
 
@@ -190,7 +255,7 @@ function aplicarPermisosPorRol(rol) {
         badge.textContent = rol.toUpperCase();
         badge.classList.remove('d-none');
     }
-}
+
 
     // ✅ Actualizar badge de rol
     const currentRole = document.getElementById('current-role');
@@ -212,93 +277,68 @@ function onAuthVerificado(usuario) {
     }
 }
 
-/**
- * Carga las categorías del menú desde el servidor
- */
+a// --- FUNCIONES OPERATIVAS (AGREGAR AL FINAL DEL ARCHIVO) ---
+
+async function cargarMesas() {
+    const container = document.getElementById('mesas-container');
+    if (!container) return;
+
+    // Ruta confirmada por app.py: /api/pos/mesas
+    const response = await apiFetch('/api/pos/mesas'); 
+    if (response) {
+        const mesas = await response.json();
+        container.innerHTML = '';
+        mesas.forEach(mesa => {
+            const div = document.createElement('div');
+            div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
+            div.id = `mesa-${mesa.id}`;
+            div.innerHTML = `<i class="bi bi-tablet"></i><span class="d-block">Mesa ${mesa.numero}</span>`;
+            
+            // ✅ LÓGICA DE SELECCIÓN (CAMBIA A ROJO)
+            div.onclick = () => {
+                document.querySelectorAll('.mesa-card').forEach(m => {
+                    m.style.backgroundColor = ''; 
+                    m.classList.remove('seleccionada');
+                });
+                // Color Rojo Forense
+                div.style.backgroundColor = '#d32f2f'; 
+                div.style.color = 'white';
+                div.classList.add('seleccionada');
+                window.mesaSeleccionada = mesa; // Referencia para el pedido
+            };
+            container.appendChild(div);
+        });
+    }
+}
+
 async function cargarCategorias() {
     const container = document.getElementById('categorias-container');
     if (!container) return;
 
-    try {
-        const response = await apiFetch('/api/pos/categorias');
-        if (!response) return;
-
+    const response = await apiFetch('/api/pos/categorias');
+    if (response) {
         let categorias = await response.json();
-
-        // ✅ Lógica: Verificar si "Combos" ya existe, si no, lo manejamos
-        const existeCombos = categorias.some(cat => cat.nombre.toLowerCase() === 'combos');
         
-        container.innerHTML = '';
+        // ✅ AGREGAR OPCIÓN "COMBOS" si no viene de la DB
+        if (!categorias.find(c => c.nombre.toLowerCase() === 'combos')) {
+            categorias.push({ id: 'combos', nombre: 'Combos' });
+        }
 
-        // Renderizar categorías
+        container.innerHTML = '';
         categorias.forEach(cat => {
             const btn = document.createElement('button');
-            btn.className = 'categoria-tab';
-            btn.innerHTML = `<i class="bi bi-tag"></i> ${cat.nombre}`;
-            
+            btn.className = 'categoria-tab'; // Clase de tu styles-responsive.css
+            btn.textContent = cat.nombre;
             btn.onclick = () => {
-                // UI: Cambio de estado activo
                 document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                
-                // FILTRO: Cargar productos específicos de esta categoría
-                cargarProductosPorCategoria(cat.id);
+                // Llamar a la carga de productos con filtro
+                if (typeof cargarProductos === 'function') cargarProductos(cat.id);
             };
             container.appendChild(btn);
         });
-
-        // ✅ Selección inicial: Pupusas por defecto
-        if (categorias.length > 0) {
-            const primera = container.querySelector('.categoria-tab');
-            if (primera) primera.click();
-        }
-        
-    } catch (error) {
-        console.error("Error en cargarCategorias:", error);
-    }
-}
-
-/**
- * Carga productos filtrados por el ID de categoría
- * @param {number|string} categoriaId 
- */
-async function cargarProductosPorCategoria(categoriaId) {
-    const container = document.getElementById('productos-container');
-    if (!container) return;
-
-    try {
-        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm text-warning"></div></div>';
-
-        // ✅ IMPORTANTE: Según la lógica de Flask, pasamos el filtro por query string
-        const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
-        if (!response) return;
-
-        const productos = await response.json();
-        container.innerHTML = '';
-
-        if (productos.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center p-3">No hay productos en esta categoría.</p>';
-            return;
-        }
-
-        productos.forEach(prod => {
-            const div = document.createElement('div');
-            div.className = 'product-card';
-            div.innerHTML = `
-                <div class="fw-bold">${prod.nombre}</div>
-                <div class="product-price">${formatCurrency(prod.precio)}</div>
-            `;
-            
-            div.onclick = () => {
-                if (typeof agregarAlCarrito === 'function') {
-                    agregarAlCarrito(prod);
-                }
-            };
-            container.appendChild(div);
-        });
-    } catch (error) {
-        console.error("Error al cargar productos:", error);
-        container.innerHTML = '<p class="text-danger">Error al cargar productos.</p>';
+        // Click automático en la primera para que no inicie vacío
+        if(categorias.length > 0) container.firstChild.click();
     }
 }
 // Exportar funciones globales
