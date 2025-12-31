@@ -121,50 +121,69 @@ if (crearClienteForm) {
 function aplicarPermisosPorRol(rol) {
     if (!rol) {
         console.warn('Rol no especificado. Redirigiendo a login.');
-        logout();
+        if (typeof logout === 'function') logout();
         return;
     }
 
-    // Ocultar todos los paneles y el selector
-    document.querySelectorAll('.work-panel').forEach(el => el.classList.remove('active'));
+    // 1. Limpieza inicial
+    document.querySelectorAll('.work-panel').forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none'; // Asegura ocultamiento
+    });
     const roleSelector = document.getElementById('role-selector');
     if (roleSelector) roleSelector.style.display = 'none';
 
-    // ✅ Activar paneles según rol
+    // 2. Activación de Paneles y CARGA DE DATOS
     switch (rol) {
         case 'manager':
-            // ✅ Manager: acceso a todos los paneles
             document.getElementById('panel-mesero')?.classList.add('active');
             document.getElementById('panel-cajero')?.classList.add('active');
             document.getElementById('panel-cocina')?.classList.add('active');
-            // Mostrar selector de rol (solo manager puede cambiar)
             if (roleSelector) roleSelector.style.display = 'block';
+            
+            // ✅ EJECUTAR CARGA DE DATOS
+            if (typeof cargarMesas === 'function') cargarMesas();
+            if (typeof cargarCategorias === 'function') cargarCategorias();
             break;
 
         case 'mesero':
-            // ✅ Mesero: solo panel mesero
-            document.getElementById('panel-mesero')?.classList.add('active');
+            const pMesero = document.getElementById('panel-mesero');
+            if (pMesero) {
+                pMesero.classList.add('active');
+                pMesero.style.display = 'block';
+                // ✅ EJECUTAR CARGA PARA MESERO
+                if (typeof cargarMesas === 'function') cargarMesas();
+                if (typeof cargarCategorias === 'function') cargarCategorias();
+            }
             break;
 
         case 'cajero':
-            // ✅ Cajero: panel cajero + acceso a menú (pedido para llevar)
             document.getElementById('panel-cajero')?.classList.add('active');
-            document.getElementById('panel-mesero')?.classList.add('active');
-            // Ocultar tabs no necesarios del panel mesero
-            const meseroTabs = document.getElementById('meseroTabs');
-            if (meseroTabs) meseroTabs.classList.add('d-none');
+            const pMeseroCajero = document.getElementById('panel-mesero');
+            if (pMeseroCajero) {
+                pMeseroCajero.classList.add('active');
+                // Al cajero solo le interesa el menú para pedidos rápidos
+                if (typeof cargarCategorias === 'function') cargarCategorias();
+            }
             break;
 
         case 'cocinero':
-            // ✅ Cocinero: redirigir a cocina.html (mejor experiencia)
             window.location.href = 'cocina.html';
             return;
 
         default:
             console.error(`Rol no reconocido: ${rol}`);
-            logout();
+            if (typeof logout === 'function') logout();
             return;
     }
+
+    // Actualizar badge
+    const currentRole = document.getElementById('current-role');
+    if (currentRole) {
+        currentRole.textContent = rol.toUpperCase();
+        currentRole.classList.remove('d-none');
+    }
+}
 
     // ✅ Actualizar badge de rol
     const currentRole = document.getElementById('current-role');
@@ -174,7 +193,7 @@ function aplicarPermisosPorRol(rol) {
     }
 
     console.log(`✅ Permisos aplicados: rol ${rol}`);
-}
+    
 
 // ✅ Callback para auth-check.js — se llama cuando la autenticación está verificada
 function onAuthVerificado(usuario) {
