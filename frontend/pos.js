@@ -279,11 +279,13 @@ function onAuthVerificado(usuario) {
 
 a// --- FUNCIONES OPERATIVAS (AGREGAR AL FINAL DEL ARCHIVO) ---
 
+// --- FUNCIONES DE CARGA Y SELECCIÓN ---
+
 async function cargarMesas() {
     const container = document.getElementById('mesas-container');
     if (!container) return;
 
-    // Ruta confirmada por app.py: /api/pos/mesas
+    // Ruta correcta según app.py y README
     const response = await apiFetch('/api/pos/mesas'); 
     if (response) {
         const mesas = await response.json();
@@ -292,73 +294,90 @@ async function cargarMesas() {
             const div = document.createElement('div');
             div.className = `mesa-card ${mesa.estado === 'libre' ? 'mesa-libre' : 'mesa-ocupada'}`;
             div.id = `mesa-${mesa.id}`;
-            div.innerHTML = `<i class="bi bi-tablet"></i><span class="d-block">Mesa ${mesa.numero}</span>`;
+            div.innerHTML = `<i class="bi bi-tablet"></i><span>Mesa ${mesa.numero}</span>`;
             
-            // ✅ LÓGICA DE SELECCIÓN (CAMBIA A ROJO)
+            // ✅ SELECCIÓN: Cambia a ROJO al tocar
             div.onclick = () => {
                 document.querySelectorAll('.mesa-card').forEach(m => {
-                    m.style.backgroundColor = ''; 
+                    m.style.backgroundColor = ''; // Limpiar otras mesas
                     m.classList.remove('seleccionada');
                 });
-                // Color Rojo Forense
-                div.style.backgroundColor = '#d32f2f'; 
+                div.style.backgroundColor = '#d32f2f'; // ROJO intenso
                 div.style.color = 'white';
                 div.classList.add('seleccionada');
-                window.mesaSeleccionada = mesa; // Referencia para el pedido
+                
+                window.mesaSeleccionada = mesa; // Guardamos la mesa para el pedido
+                console.log("Mesa seleccionada:", mesa.numero);
             };
             container.appendChild(div);
         });
     }
 }
 
+async function cargarCategorias() {
+    const container = document.getElementById('categorias-container');
+    if (!container) return;
+
+    const response = await apiFetch('/api/pos/categorias');
+    if (response) {
+        let categorias = await response.json();
+        
+        // ✅ AGREGAR "COMBOS" si no viene de la base de datos
+        if (!categorias.find(c => c.nombre.toLowerCase() === 'combos')) {
+            categorias.push({ id: 'combos', nombre: 'Combos' });
+        }
+
+        container.innerHTML = '';
+        categorias.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'categoria-tab';
+            btn.textContent = cat.nombre;
+            btn.onclick = () => {
+                document.querySelectorAll('.categoria-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // ✅ FILTRO: Llama a cargar los productos de esta categoría
+                cargarProductos(cat.id);
+            };
+            container.appendChild(btn);
+        });
+        // Click automático en la primera categoría (Pupusas)
+        if(categorias.length > 0) container.firstChild.click();
+    }
+}
 async function cargarProductos(categoriaId) {
     const container = document.getElementById('productos-container');
     if (!container) return;
 
     try {
-        // Mostramos un indicador de carga para mejor UX
-        container.innerHTML = '<div class="text-center p-3"><div class="spinner-border text-warning" role="status"></div></div>';
-
-        // ✅ IMPORTANTE: Según tu app.py y README, la ruta es /api/pos/productos
-        // Pasamos el ID de la categoría para filtrar
+        // Filtro por ID de categoría mediante query string
         const response = await apiFetch(`/api/pos/productos?categoria_id=${categoriaId}`);
-        
-        if (!response) {
-            container.innerHTML = '<p class="text-danger text-center">Error de conexión.</p>';
-            return;
-        }
+        if (!response) return;
 
         const productos = await response.json();
-        container.innerHTML = ''; // Limpiar contenedor
+        container.innerHTML = '';
 
         if (productos.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center p-4">No hay productos en esta categoría.</p>';
+            container.innerHTML = '<p class="text-muted text-center w-100">No hay productos aquí.</p>';
             return;
         }
 
-        // Renderizado de cada producto
         productos.forEach(prod => {
             const div = document.createElement('div');
-            div.className = 'product-card'; // Clase de tu styles-responsive.css
+            div.className = 'product-card';
             div.innerHTML = `
-                <div class="fw-bold">${escapeHtml(prod.nombre)}</div>
-                <div class="product-price">${formatCurrency(prod.precio)}</div>
+                <div class="fw-bold">${prod.nombre}</div>
+                <div class="product-price">$${parseFloat(prod.precio).toFixed(2)}</div>
             `;
-            
-            // ✅ Lógica de Pedido: Al tocar, se agrega al "Pedido Actual"
+            // Acción de agregar al carrito
             div.onclick = () => {
                 if (typeof agregarAlCarrito === 'function') {
                     agregarAlCarrito(prod);
-                } else {
-                    console.log("Producto seleccionado:", prod.nombre);
-                    // Si no tienes agregarAlCarrito, podemos crear una lógica simple aquí
                 }
             };
             container.appendChild(div);
         });
-    } catch (error) {
-        console.error("Error al cargar productos:", error);
-        container.innerHTML = '<p class="text-danger text-center">Error al cargar el menú.</p>';
+    } catch (e) {
+        console.error("Error cargando productos:", e);
     }
 }
 // Exportar funciones globales
