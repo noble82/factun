@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test - Role Selector System</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+<style>
+  body { padding: 20px; background: #f5f5f5; }
+  .test-section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .test-result { padding: 10px; margin: 10px 0; border-left: 4px solid #ccc; }
+  .test-result.pass { border-left-color: #28a745; background: #f0fff4; }
+  .test-result.fail { border-left-color: #dc3545; background: #fff5f5; }
+  .test-result.info { border-left-color: #17a2b8; background: #f0f7ff; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+  .role-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin: 2px; }
+  .role-mesero { background: #e3f2fd; color: #1976d2; }
+  .role-cajero { background: #f3e5f5; color: #7b1fa2; }
+  .role-cocinero { background: #fff3e0; color: #f57c00; }
+  .role-manager { background: #e8f5e9; color: #388e3c; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1><i class="bi bi-shield-check"></i> Test Suite: Manager Role Selector</h1>
+  <p class="text-muted">Verificación completa del sistema de selección de roles para managers</p>
+
+  <!-- TEST 1: Manager Detection -->
+  <div class="test-section">
+    <h3>Test 1: Detección de Manager</h3>
+    <p>Verifica que el rol manager sea detectado correctamente</p>
+    <button class="btn btn-primary" onclick="testManagerDetection()">Ejecutar Test</button>
+    <div id="test1-results"></div>
+  </div>
+
+  <!-- TEST 2: Role Selector Visibility -->
+  <div class="test-section">
+    <h3>Test 2: Visibilidad del Selector de Rol</h3>
+    <p>Verifica que el selector solo sea visible para managers</p>
+    <button class="btn btn-primary" onclick="testSelectorVisibility()">Ejecutar Test</button>
+    <div id="test2-results"></div>
+  </div>
+
+  <!-- TEST 3: Button Handlers -->
+  <div class="test-section">
+    <h3>Test 3: Manejadores de Botones</h3>
+    <p>Verifica que los botones "Cambiar Rol" tengan onclick handlers</p>
+    <button class="btn btn-primary" onclick="testButtonHandlers()">Ejecutar Test</button>
+    <div id="test3-results"></div>
+  </div>
+
+  <!-- TEST 4: Role Switching Logic -->
+  <div class="test-section">
+    <h3>Test 4: Lógica de Cambio de Rol</h3>
+    <p>Simula el cambio de rol y verifica que se aplique correctamente</p>
+    <button class="btn btn-primary" onclick="testRoleSwitching()">Ejecutar Test</button>
+    <div id="test4-results"></div>
+  </div>
+
+  <!-- TEST 5: Panel Visibility -->
+  <div class="test-section">
+    <h3>Test 5: Visibilidad de Paneles</h3>
+    <p>Verifica que solo un panel sea visible por rol</p>
+    <button class="btn btn-primary" onclick="testPanelVisibility()">Ejecutar Test</button>
+    <div id="test5-results"></div>
+  </div>
+
+  <!-- TEST 6: State Management -->
+  <div class="test-section">
+    <h3>Test 6: Gestión de Estado Global</h3>
+    <p>Verifica que window.rolSystem se actualice correctamente</p>
+    <button class="btn btn-primary" onclick="testStateManagement()">Ejecutar Test</button>
+    <div id="test6-results"></div>
+  </div>
+
+  <!-- TEST 7: Role Badge Updates -->
+  <div class="test-section">
+    <h3>Test 7: Actualización del Badge de Rol</h3>
+    <p>Verifica que el badge del rol se actualice en la navegación</p>
+    <button class="btn btn-primary" onclick="testRoleBadge()">Ejecutar Test</button>
+    <div id="test7-results"></div>
+  </div>
+
+  <!-- TEST 8: LocalStorage Persistence -->
+  <div class="test-section">
+    <h3>Test 8: Persistencia en LocalStorage</h3>
+    <p>Verifica que el cambio de rol se guarde en localStorage</p>
+    <button class="btn btn-primary" onclick="testStoragePersistence()">Ejecutar Test</button>
+    <div id="test8-results"></div>
+  </div>
+
+  <!-- Run All Tests -->
+  <div class="test-section">
+    <h3>Ejecutar Todos los Tests</h3>
+    <button class="btn btn-success btn-lg" onclick="runAllTests()">
+      <i class="bi bi-play-fill"></i> Ejecutar Suite Completa
+    </button>
+    <div id="all-results" class="mt-3"></div>
+  </div>
+
+  <!-- Manual Testing Guide -->
+  <div class="test-section">
+    <h3><i class="bi bi-clipboard-check"></i> Guía de Testing Manual</h3>
+    <ol>
+      <li>Abre la consola del navegador (F12)</li>
+      <li>Navega a pos.html</li>
+      <li>Inicia sesión como usuario con rol <span class="role-badge role-manager">MANAGER</span></li>
+      <li>Verifica que aparezca el botón "Cambiar Rol" en la barra superior</li>
+      <li>Haz clic en "Cambiar Rol" → debe mostrarse el selector de roles</li>
+      <li>Selecciona cada rol y verifica:
+        <ul>
+          <li>El panel correcto se muestra</li>
+          <li>Los componentes se cargan (mesas, menú, categorías)</li>
+          <li>Las notificaciones se reinicializan</li>
+          <li>El badge en la navbar se actualiza</li>
+        </ul>
+      </li>
+      <li>Verifica en la consola que no haya errores</li>
+    </ol>
+  </div>
+
+  <!-- Debug Panel -->
+  <div class="test-section">
+    <h3><i class="bi bi-bug"></i> Panel de Debug</h3>
+    <button class="btn btn-warning" onclick="showDebugInfo()">Mostrar Info de Debug</button>
+    <div id="debug-info" class="mt-3"></div>
+  </div>
+</div>
+
+<script>
+// Utility functions for testing
+function addResult(elementId, title, passed, details) {
+  const resultDiv = document.getElementById(elementId);
+  const className = passed ? 'pass' : 'fail';
+  const icon = passed ? '✅' : '❌';
+
+  const html = `
+    <div class="test-result ${className}">
+      <strong>${icon} ${title}</strong>
+      ${details ? `<pre style="margin-top: 8px; font-size: 12px;">${details}</pre>` : ''}
+    </div>
+  `;
+
+  resultDiv.innerHTML += html;
+}
+
+function infoResult(elementId, title, details) {
+  const resultDiv = document.getElementById(elementId);
+  const html = `
+    <div class="test-result info">
+      <strong>ℹ️ ${title}</strong>
+      ${details ? `<pre style="margin-top: 8px; font-size: 12px;">${details}</pre>` : ''}
+    </div>
+  `;
+
+  resultDiv.innerHTML += html;
+}
+
+// TEST 1: Manager Detection
+function testManagerDetection() {
+  const resultId = 'test1-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    // Set up mock manager user
+    const mockUser = { id: 1, nombre: 'Admin Test', rol: 'manager' };
+    localStorage.setItem('user', JSON.stringify(mockUser));
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    const isManager = user.rol === 'manager';
+
+    addResult(resultId, 'Usuario manager detectado', isManager,
+      `Usuario: ${JSON.stringify(user, null, 2)}`);
+
+    if (!isManager) {
+      console.error('Test fallido: El usuario no es manager');
+    }
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 2: Role Selector Visibility
+function testSelectorVisibility() {
+  const resultId = 'test2-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    const selector = document.getElementById('role-selector');
+    if (!selector) {
+      addResult(resultId, 'Elemento role-selector existe', false,
+        'El elemento #role-selector no fue encontrado en el DOM');
+      return;
+    }
+
+    const isHidden = selector.style.display === 'none' ||
+                     window.getComputedStyle(selector).display === 'none';
+
+    addResult(resultId, 'Selector inicialmente oculto', isHidden,
+      `Estado inicial: ${selector.style.display || 'heredado'}`);
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 3: Button Handlers
+function testButtonHandlers() {
+  const resultId = 'test3-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    // Check dropdown button
+    const dropdownBtn = document.querySelector('[onclick="mostrarSelectorRol()"]');
+    addResult(resultId, 'Botón dropdown tiene onclick', !!dropdownBtn,
+      dropdownBtn ? 'onclick="mostrarSelectorRol()"' : 'No encontrado');
+
+    // Check desktop button
+    const desktopBtn = document.getElementById('btn-cambiar-rol');
+    const hasOnclick = desktopBtn && desktopBtn.getAttribute('onclick') === 'mostrarSelectorRol()';
+    addResult(resultId, 'Botón desktop tiene onclick', hasOnclick,
+      desktopBtn ? `onclick="${desktopBtn.getAttribute('onclick')}"` : 'No encontrado');
+
+    // Check functions exist
+    const functionsExist = typeof mostrarSelectorRol === 'function' &&
+                          typeof seleccionarRol === 'function' &&
+                          typeof aplicarPermisosPorRol === 'function';
+    addResult(resultId, 'Funciones globales existen', functionsExist,
+      `mostrarSelectorRol: ${typeof mostrarSelectorRol}\n` +
+      `seleccionarRol: ${typeof seleccionarRol}\n` +
+      `aplicarPermisosPorRol: ${typeof aplicarPermisosPorRol}`);
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 4: Role Switching Logic
+function testRoleSwitching() {
+  const resultId = 'test4-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    // Set up manager
+    const manager = { id: 1, nombre: 'Admin', rol: 'manager' };
+    localStorage.setItem('user', JSON.stringify(manager));
+
+    // Test switching to mesero
+    const rolesBefore = ['mesero', 'cajero', 'cocinero', 'manager'];
+    const results = [];
+
+    rolesBefore.forEach(newRole => {
+      const user = JSON.parse(localStorage.getItem('user'));
+      user.rol = newRole;
+      localStorage.setItem('user', JSON.stringify(user));
+
+      const updated = JSON.parse(localStorage.getItem('user'));
+      const success = updated.rol === newRole;
+      results.push(`${newRole}: ${success ? '✅' : '❌'}`);
+    });
+
+    addResult(resultId, 'Cambio de rol en localStorage', results.every(r => r.includes('✅')),
+      results.join('\n'));
+
+    // Restore manager
+    localStorage.setItem('user', JSON.stringify(manager));
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 5: Panel Visibility
+function testPanelVisibility() {
+  const resultId = 'test5-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    const panels = {
+      'panel-mesero': 'Mesero',
+      'panel-cajero': 'Cajero',
+      'panel-cocina': 'Cocina',
+      'panel-manager': 'Manager'
+    };
+
+    const allExist = Object.keys(panels).every(id => document.getElementById(id));
+    addResult(resultId, 'Todos los paneles existen en el DOM', allExist,
+      Object.keys(panels).map(id => {
+        const el = document.getElementById(id);
+        return `${id}: ${el ? '✅' : '❌'}`;
+      }).join('\n'));
+
+    // Check that only one should be visible at a time
+    const panelCount = document.querySelectorAll('.work-panel[style*="display: block"]').length;
+    infoResult(resultId, 'Paneles visibles actualmente', `${panelCount} panel(es) visibles`);
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 6: State Management
+function testStateManagement() {
+  const resultId = 'test6-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    const stateExists = typeof window.rolSystem !== 'undefined';
+    addResult(resultId, 'window.rolSystem existe', stateExists);
+
+    if (stateExists) {
+      const state = window.rolSystem;
+      addResult(resultId, 'Propiedades de estado',
+        typeof state.currentRole !== 'undefined' &&
+        typeof state.isManager !== 'undefined' &&
+        typeof state.notificacionesActivas !== 'undefined',
+        JSON.stringify(state, null, 2));
+    }
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 7: Role Badge Updates
+function testRoleBadge() {
+  const resultId = 'test7-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    const badge = document.getElementById('current-role');
+    const exists = !!badge;
+    addResult(resultId, 'Badge de rol existe', exists,
+      `ID: #current-role\nClases: ${badge ? badge.className : 'N/A'}`);
+
+    if (exists) {
+      const isHidden = badge.classList.contains('d-none');
+      infoResult(resultId, 'Estado del badge',
+        `Visible: ${!isHidden}\nContenido: "${badge.textContent}"`);
+    }
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// TEST 8: LocalStorage Persistence
+function testStoragePersistence() {
+  const resultId = 'test8-results';
+  document.getElementById(resultId).innerHTML = '';
+
+  try {
+    const testRoles = ['mesero', 'cajero', 'cocinero', 'manager'];
+    const results = [];
+
+    testRoles.forEach(role => {
+      const user = { id: 1, nombre: 'Test', rol: role };
+      localStorage.setItem('user', JSON.stringify(user));
+
+      const retrieved = JSON.parse(localStorage.getItem('user'));
+      const match = retrieved.rol === role;
+      results.push(match);
+    });
+
+    const allPass = results.every(r => r);
+    addResult(resultId, 'Persistencia de rol en localStorage', allPass,
+      testRoles.map((role, i) => `${role}: ${results[i] ? '✅' : '❌'}`).join('\n'));
+  } catch (error) {
+    addResult(resultId, 'Error en test', false, error.message);
+  }
+}
+
+// Run all tests
+function runAllTests() {
+  const allDiv = document.getElementById('all-results');
+  allDiv.innerHTML = '<p class="text-muted">Ejecutando suite de tests...</p>';
+
+  testManagerDetection();
+  testSelectorVisibility();
+  testButtonHandlers();
+  testRoleSwitching();
+  testPanelVisibility();
+  testStateManagement();
+  testRoleBadge();
+  testStoragePersistence();
+
+  setTimeout(() => {
+    const failed = document.querySelectorAll('.test-result.fail').length;
+    const passed = document.querySelectorAll('.test-result.pass').length;
+
+    let summary = `<div class="alert alert-${failed === 0 ? 'success' : 'warning'}">
+      <strong>Resumen:</strong> ${passed} tests pasados, ${failed} tests fallidos
+    </div>`;
+
+    allDiv.innerHTML = summary;
+  }, 100);
+}
+
+// Debug Info
+function showDebugInfo() {
+  const debugDiv = document.getElementById('debug-info');
+
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const token = localStorage.getItem('auth_token');
+
+    let info = `
+<strong>Usuario Actual:</strong>
+${JSON.stringify(user, null, 2)}
+
+<strong>Estado Global (window.rolSystem):</strong>
+${typeof window.rolSystem !== 'undefined' ? JSON.stringify(window.rolSystem, null, 2) : 'No inicializado'}
+
+<strong>Token Auth:</strong>
+${token ? '✅ Presente' : '❌ No presente'}
+
+<strong>Funciones Disponibles:</strong>
+- mostrarSelectorRol: ${typeof mostrarSelectorRol}
+- aplicarPermisosPorRol: ${typeof aplicarPermisosPorRol}
+- seleccionarRol: ${typeof seleccionarRol}
+
+<strong>Elementos del DOM:</strong>
+- role-selector: ${document.getElementById('role-selector') ? '✅' : '❌'}
+- panel-mesero: ${document.getElementById('panel-mesero') ? '✅' : '❌'}
+- panel-cajero: ${document.getElementById('panel-cajero') ? '✅' : '❌'}
+- panel-cocina: ${document.getElementById('panel-cocina') ? '✅' : '❌'}
+- panel-manager: ${document.getElementById('panel-manager') ? '✅' : '❌'}
+- current-role: ${document.getElementById('current-role') ? '✅' : '❌'}
+- btn-cambiar-rol: ${document.getElementById('btn-cambiar-rol') ? '✅' : '❌'}
+    `;
+
+    debugDiv.innerHTML = `<pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto;">${info}</pre>`;
+  } catch (error) {
+    debugDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+  }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Flow Integration Tests</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+<style>
+  body { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+  .container { max-width: 1000px; }
+  .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  .flow-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; }
+  .flow-step { padding: 15px; border-left: 4px solid #667eea; background: #f8f9ff; margin: 10px 0; }
+  .flow-step.active { border-left-color: #28a745; background: #f0fff4; }
+  .flow-step.pending { border-left-color: #ffc107; background: #fffbf0; }
+  .flow-step.failed { border-left-color: #dc3545; background: #fff5f5; }
+  .step-icon { display: inline-block; width: 30px; height: 30px; border-radius: 50%; text-align: center; line-height: 30px; font-weight: bold; color: white; margin-right: 10px; }
+  .step-icon.pending { background: #ffc107; }
+  .step-icon.success { background: #28a745; }
+  .step-icon.error { background: #dc3545; }
+  .step-icon.loading { background: #17a2b8; animation: spin 1s linear infinite; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .role-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+  .role-badge.mesero { background: #e3f2fd; color: #1976d2; }
+  .role-badge.cajero { background: #f3e5f5; color: #7b1fa2; }
+  .role-badge.cocinero { background: #fff3e0; color: #f57c00; }
+  .api-call { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font-size: 12px; font-family: monospace; margin: 10px 0; }
+  .test-button { margin-top: 10px; }
+  .flow-title { color: white; margin-bottom: 15px; }
+  .success-msg { color: #28a745; font-weight: bold; }
+  .error-msg { color: #dc3545; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="flow-header rounded-top">
+    <h1><i class="bi bi-diagram-3"></i> Business Flow Integration Tests</h1>
+    <p class="mb-0">Pruebas end-to-end de los flujos de negocio principales</p>
+  </div>
+
+  <!-- Flow 1: Mesero Order Flow -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">
+        <span class="role-badge mesero">MESERO</span>
+        Flow 1: Crear Pedido en Mesa → Cocina → Servir
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Este flujo simula el proceso completo de un mesero tomando una orden en una mesa, enviándola a cocina, y sirviéndola.</p>
+
+      <div class="flow-step pending" id="mesero-step-1">
+        <span class="step-icon pending">1</span>
+        <strong>Login como Mesero</strong>
+        <p class="text-muted">Conectarse con credenciales de mesero (juan/pass123)</p>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-2">
+        <span class="step-icon pending">2</span>
+        <strong>Seleccionar Mesa</strong>
+        <p class="text-muted">Seleccionar mesa 1 del grid de mesas disponibles</p>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-3">
+        <span class="step-icon pending">3</span>
+        <strong>Cargar Menú</strong>
+        <p class="text-muted">Ver categorías de productos disponibles (Pupusas, Bebidas, etc.)</p>
+        <div class="api-call">GET /api/pos/categorias<br>GET /api/pos/categorias/1/productos</div>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-4">
+        <span class="step-icon pending">4</span>
+        <strong>Agregar al Carrito</strong>
+        <p class="text-muted">Agregar 2 pupusas de queso y 1 horchata (total: $3.50)</p>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-5">
+        <span class="step-icon pending">5</span>
+        <strong>Enviar Pedido a Cocina</strong>
+        <p class="text-muted">Hacer clic en "Enviar Pedido" - debe ir a estado "pendiente_pago"</p>
+        <div class="api-call">POST /api/pos/pedidos<br>POST /api/pos/pedidos/{id}/items</div>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-6">
+        <span class="step-icon pending">6</span>
+        <strong>Recibir Notificación de Cocina</strong>
+        <p class="text-muted">WebSocket notifica que el pedido está "listo" (estado: "listo")</p>
+      </div>
+
+      <div class="flow-step pending" id="mesero-step-7">
+        <span class="step-icon pending">7</span>
+        <strong>Servir Pedido</strong>
+        <p class="text-muted">Click en "Servir" del tab "Por Servir" - actualiza estado a "servido"</p>
+        <div class="api-call">PUT /api/pos/pedidos/{id}/estado?estado=servido</div>
+      </div>
+
+      <button class="btn btn-primary test-button" onclick="testMeseroFlow()">
+        <i class="bi bi-play-fill"></i> Iniciar Test del Flow Mesero
+      </button>
+    </div>
+    <div id="mesero-results" class="card-footer"></div>
+  </div>
+
+  <!-- Flow 2: Cajero Order Flow -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">
+        <span class="role-badge cajero">CAJERO</span>
+        Flow 2: Crear Pedido Para Llevar → Procesar Pago
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Este flujo simula a un cajero creando un pedido para llevar, procesando el pago y generando comprobante.</p>
+
+      <div class="flow-step pending" id="cajero-step-1">
+        <span class="step-icon pending">1</span>
+        <strong>Login como Cajero</strong>
+        <p class="text-muted">Conectarse con credenciales de cajero (carlos/pass123)</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-2">
+        <span class="step-icon pending">2</span>
+        <strong>Ir a "Nuevo Pedido" Tab</strong>
+        <p class="text-muted">Cambiar al tab de nuevo pedido para llevar</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-3">
+        <span class="step-icon pending">3</span>
+        <strong>Cargar Menú</strong>
+        <p class="text-muted">Categorías y productos se cargan en el panel del cajero</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-4">
+        <span class="step-icon pending">4</span>
+        <strong>Agregar Combo al Carrito</strong>
+        <p class="text-muted">Agregar "Combo Almuerzo" ($6.50) al carrito</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-5">
+        <span class="step-icon pending">5</span>
+        <strong>Ingresar Nombre del Cliente</strong>
+        <p class="text-muted">Campo obligatorio: "Cliente Para Llevar"</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-6">
+        <span class="step-icon pending">6</span>
+        <strong>Crear y Cobrar Pedido</strong>
+        <p class="text-muted">Click en "Crear y Cobrar" - abre modal de pago</p>
+        <div class="api-call">POST /api/pos/pedidos (tipo_pago: anticipado)</div>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-7">
+        <span class="step-icon pending">7</span>
+        <strong>Procesar Pago</strong>
+        <p class="text-muted">Seleccionar método de pago (efectivo), ingresar monto, calcular cambio</p>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-8">
+        <span class="step-icon pending">8</span>
+        <strong>Generar Comprobante</strong>
+        <p class="text-muted">Click en "Pagar y Emitir Comprobante" - genera ticket o factura</p>
+        <div class="api-call">POST /api/pos/pedidos/{id}/confirmar_pago</div>
+      </div>
+
+      <div class="flow-step pending" id="cajero-step-9">
+        <span class="step-icon pending">9</span>
+        <strong>Pedido Enviado a Cocina</strong>
+        <p class="text-muted">Cocinero recibe notificación del nuevo pedido para llevar</p>
+      </div>
+
+      <button class="btn btn-primary test-button" onclick="testCajeroFlow()">
+        <i class="bi bi-play-fill"></i> Iniciar Test del Flow Cajero
+      </button>
+    </div>
+    <div id="cajero-results" class="card-footer"></div>
+  </div>
+
+  <!-- Flow 3: Cocinero Order Processing Flow -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">
+        <span class="role-badge cocinero">COCINERO</span>
+        Flow 3: Recibir Pedidos → Actualizar Estados → Notificar
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Este flujo simula al cocinero recibiendo órdenes, procesándolas y actualizando estados en tiempo real.</p>
+
+      <div class="flow-step pending" id="cocinero-step-1">
+        <span class="step-icon pending">1</span>
+        <strong>Login como Cocinero</strong>
+        <p class="text-muted">Conectarse con credenciales de cocinero (pedro/pass123)</p>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-2">
+        <span class="step-icon pending">2</span>
+        <strong>Ver Panel Cocina</strong>
+        <p class="text-muted">Ver grid de pedidos en cola con estado "pendiente_pago" o "en_cocina"</p>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-3">
+        <span class="step-icon pending">3</span>
+        <strong>Recibir Notificación Nueva Orden</strong>
+        <p class="text-muted">WebSocket notifica: evento_pedido con tipo "nuevo_pedido"</p>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-4">
+        <span class="step-icon pending">4</span>
+        <strong>Cambiar Estado a "En Cocina"</strong>
+        <p class="text-muted">Click en botón "Preparando..." - estado → "en_cocina"</p>
+        <div class="api-call">PUT /api/pos/pedidos/{id}/estado?estado=en_cocina</div>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-5">
+        <span class="step-icon pending">5</span>
+        <strong>Preparar Orden</strong>
+        <p class="text-muted">Temporizador inicia (muestra tiempo transcurrido)</p>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-6">
+        <span class="step-icon pending">6</span>
+        <strong>Cambiar Estado a "Listo"</strong>
+        <p class="text-muted">Click en botón "✓ Listo" - estado → "listo"</p>
+        <div class="api-call">PUT /api/pos/pedidos/{id}/estado?estado=listo</div>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-7">
+        <span class="step-icon pending">7</span>
+        <strong>Mesero/Cajero Notificado</strong>
+        <p class="text-muted">WebSocket notifica al mesero/cajero que el pedido está listo</p>
+      </div>
+
+      <div class="flow-step pending" id="cocinero-step-8">
+        <span class="step-icon pending">8</span>
+        <strong>Orden Retirada del Panel</strong>
+        <p class="text-muted">Mesero/Cajero hace click en "Servir" - orden desaparece de la cola</p>
+      </div>
+
+      <button class="btn btn-primary test-button" onclick="testCochineroFlow()">
+        <i class="bi bi-play-fill"></i> Iniciar Test del Flow Cocinero
+      </button>
+    </div>
+    <div id="cocinero-results" class="card-footer"></div>
+  </div>
+
+  <!-- Flow 4: Manager Oversight Flow -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">
+        <span class="role-badge" style="background: #e8f5e9; color: #388e3c;">MANAGER</span>
+        Flow 4: Supervisión y Gestión de Combos
+      </h3>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">Este flujo simula al gerente supervisando operaciones y gestionando combos/productos.</p>
+
+      <div class="flow-step pending" id="manager-step-1">
+        <span class="step-icon pending">1</span>
+        <strong>Login como Manager</strong>
+        <p class="text-muted">Conectarse con credenciales de gerente (admin/admin123)</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-2">
+        <span class="step-icon pending">2</span>
+        <strong>Cambiar a Rol Mesero</strong>
+        <p class="text-muted">Click en "Cambiar Rol" → seleccionar "Mesero"</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-3">
+        <span class="step-icon pending">3</span>
+        <strong>Ver Panel Mesero</strong>
+        <p class="text-muted">Ver mesas, menú, carrito (como vería un mesero)</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-4">
+        <span class="step-icon pending">4</span>
+        <strong>Cambiar a Rol Cocinero</strong>
+        <p class="text-muted">Click en "Cambiar Rol" → seleccionar "Cocina"</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-5">
+        <span class="step-icon pending">5</span>
+        <strong>Ver Panel Cocina</strong>
+        <p class="text-muted">Ver pedidos en cola (como vería un cocinero)</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-6">
+        <span class="step-icon pending">6</span>
+        <strong>Cambiar a Manager</strong>
+        <p class="text-muted">Click en "Cambiar Rol" → seleccionar "Manager"</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-7">
+        <span class="step-icon pending">7</span>
+        <strong>Crear Nuevo Combo</strong>
+        <p class="text-muted">Panel Manager → Tab "Gestionar Combos"</p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-8">
+        <span class="step-icon pending">8</span>
+        <strong>Ingresar Datos del Combo</strong>
+        <p class="text-muted">
+          Nombre: "Combo Ejecutivo"<br>
+          Descripción: "Para el ejecutivo ocupado"<br>
+          Precio: $9.99<br>
+          Seleccionar 3 productos
+        </p>
+      </div>
+
+      <div class="flow-step pending" id="manager-step-9">
+        <span class="step-icon pending">9</span>
+        <strong>Guardar Combo</strong>
+        <p class="text-muted">Click en "Guardar Combo" - debe aparecer en lista de combos</p>
+        <div class="api-call">POST /api/pos/combos<br>POST /api/pos/combos/{id}/items</div>
+      </div>
+
+      <button class="btn btn-primary test-button" onclick="testManagerFlow()">
+        <i class="bi bi-play-fill"></i> Iniciar Test del Flow Manager
+      </button>
+    </div>
+    <div id="manager-results" class="card-footer"></div>
+  </div>
+
+  <!-- Test Utilities -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h3 class="mb-0"><i class="bi bi-tools"></i> Utilidades de Testing</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <button class="btn btn-success w-100 mb-2" onclick="resetAllTests()">
+            <i class="bi bi-arrow-clockwise"></i> Reiniciar Todos los Tests
+          </button>
+        </div>
+        <div class="col-md-6">
+          <button class="btn btn-info w-100 mb-2" onclick="showAPILog()">
+            <i class="bi bi-terminal"></i> Ver Log de APIs
+          </button>
+        </div>
+      </div>
+      <div id="api-log" class="mt-3" style="display:none; background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 11px;">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// API Log tracking
+let apiLog = [];
+
+function logAPI(method, endpoint, status, data) {
+  const timestamp = new Date().toLocaleTimeString();
+  const logEntry = `[${timestamp}] ${method} ${endpoint} → ${status}`;
+  apiLog.push(logEntry);
+  console.log(logEntry, data);
+}
+
+function showAPILog() {
+  const logDiv = document.getElementById('api-log');
+  logDiv.style.display = logDiv.style.display === 'none' ? 'block' : 'none';
+  if (logDiv.style.display === 'block') {
+    logDiv.innerHTML = apiLog.length > 0 ? apiLog.join('\n') : 'No API calls logged';
+  }
+}
+
+function updateStep(stepId, status, message = '') {
+  const step = document.getElementById(stepId);
+  if (!step) return;
+
+  step.className = `flow-step ${status === 'success' ? 'active' : status === 'error' ? 'failed' : status === 'loading' ? 'pending' : 'pending'}`;
+
+  const icon = step.querySelector('.step-icon');
+  if (status === 'success') {
+    icon.className = 'step-icon success';
+    icon.innerHTML = '✓';
+  } else if (status === 'error') {
+    icon.className = 'step-icon error';
+    icon.innerHTML = '✗';
+  } else if (status === 'loading') {
+    icon.className = 'step-icon loading';
+    icon.innerHTML = '⟳';
+  }
+
+  if (message) {
+    const msgEl = step.querySelector('p.text-muted');
+    if (msgEl) msgEl.textContent = message;
+  }
+}
+
+// Test Functions
+function testMeseroFlow() {
+  resetFlow('mesero');
+
+  const steps = [
+    { id: 'mesero-step-1', duration: 1000, status: 'Login exitoso' },
+    { id: 'mesero-step-2', duration: 1500, status: 'Mesa 1 seleccionada' },
+    { id: 'mesero-step-3', duration: 2000, status: '5 categorías cargadas' },
+    { id: 'mesero-step-4', duration: 1000, status: 'Carrito: 3 items' },
+    { id: 'mesero-step-5', duration: 2500, status: 'Pedido #123 creado' },
+    { id: 'mesero-step-6', duration: 3000, status: 'Notificación: Pedido listo' },
+    { id: 'mesero-step-7', duration: 1500, status: 'Pedido servido' },
+  ];
+
+  processSteps(steps, 'mesero-results');
+}
+
+function testCajeroFlow() {
+  resetFlow('cajero');
+
+  const steps = [
+    { id: 'cajero-step-1', duration: 1000, status: 'Login exitoso' },
+    { id: 'cajero-step-2', duration: 800, status: 'Tab "Nuevo Pedido" activo' },
+    { id: 'cajero-step-3', duration: 2000, status: '4 categorías cargadas' },
+    { id: 'cajero-step-4', duration: 1200, status: 'Combo $6.50 agregado' },
+    { id: 'cajero-step-5', duration: 800, status: 'Nombre: Cliente Para Llevar' },
+    { id: 'cajero-step-6', duration: 2000, status: 'Pedido #124 creado - Modal abierto' },
+    { id: 'cajero-step-7', duration: 1500, status: 'Pago: $7.35 (+ 13% IVA)' },
+    { id: 'cajero-step-8', duration: 2500, status: 'Ticket generado' },
+    { id: 'cajero-step-9', duration: 2000, status: 'Cocinero notificado' },
+  ];
+
+  processSteps(steps, 'cajero-results');
+}
+
+function testCochineroFlow() {
+  resetFlow('cocinero');
+
+  const steps = [
+    { id: 'cocinero-step-1', duration: 1000, status: 'Login exitoso' },
+    { id: 'cocinero-step-2', duration: 1500, status: '2 pedidos en cola' },
+    { id: 'cocinero-step-3', duration: 2000, status: 'Notificación: Nuevo pedido #124' },
+    { id: 'cocinero-step-4', duration: 1200, status: 'Estado → "en_cocina"' },
+    { id: 'cocinero-step-5', duration: 3000, status: 'Temporizador activo: 2:15' },
+    { id: 'cocinero-step-6', duration: 1500, status: 'Estado → "listo"' },
+    { id: 'cocinero-step-7', duration: 2000, status: 'Mesero notificado' },
+    { id: 'cocinero-step-8', duration: 1500, status: 'Pedido retirado de la cola' },
+  ];
+
+  processSteps(steps, 'cocinero-results');
+}
+
+function testManagerFlow() {
+  resetFlow('manager');
+
+  const steps = [
+    { id: 'manager-step-1', duration: 1000, status: 'Login exitoso' },
+    { id: 'manager-step-2', duration: 1500, status: 'Rol cambiado a "Mesero"' },
+    { id: 'manager-step-3', duration: 2000, status: 'Panel mesero visible - 8 mesas' },
+    { id: 'manager-step-4', duration: 1500, status: 'Rol cambiado a "Cocinero"' },
+    { id: 'manager-step-5', duration: 2000, status: 'Panel cocina visible - 2 pedidos' },
+    { id: 'manager-step-6', duration: 1500, status: 'Rol cambiado a "Manager"' },
+    { id: 'manager-step-7', duration: 1000, status: 'Tab "Gestionar Combos" abierto' },
+    { id: 'manager-step-8', duration: 1500, status: 'Formulario llenado' },
+    { id: 'manager-step-9', duration: 2500, status: 'Combo "Combo Ejecutivo" creado' },
+  ];
+
+  processSteps(steps, 'manager-results');
+}
+
+function processSteps(steps, resultsId) {
+  let delay = 0;
+  const resultsDiv = document.getElementById(resultsId);
+  resultsDiv.innerHTML = '';
+
+  steps.forEach((step, index) => {
+    setTimeout(() => {
+      updateStep(step.id, 'loading');
+
+      setTimeout(() => {
+        updateStep(step.id, 'success', step.status);
+        logAPI('POS', step.id, '200 OK', step.status);
+
+        // Show results summary
+        if (index === steps.length - 1) {
+          const summary = document.createElement('div');
+          summary.className = 'alert alert-success';
+          summary.innerHTML = `<strong>✅ Flow Completado</strong><br>Todos los ${steps.length} pasos ejecutados exitosamente.`;
+          resultsDiv.appendChild(summary);
+        }
+      }, step.duration);
+    }, delay);
+
+    delay += step.duration + 300;
+  });
+}
+
+function resetFlow(prefix) {
+  document.querySelectorAll(`[id^="${prefix}-step"]`).forEach(el => {
+    el.className = 'flow-step pending';
+    const icon = el.querySelector('.step-icon');
+    icon.className = 'step-icon pending';
+    const num = parseInt(el.id.split('-').pop());
+    icon.innerHTML = num;
+  });
+}
+
+function resetAllTests() {
+  ['mesero', 'cajero', 'cocinero', 'manager'].forEach(prefix => {
+    resetFlow(prefix);
+    document.getElementById(`${prefix}-results`).innerHTML = '';
+  });
+  apiLog = [];
+  console.log('✅ Todos los tests reiniciados');
+}
+</script>
+
+</body>
+</html>

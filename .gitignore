@@ -13,3 +13,4 @@ frontend/admin.js.old
 .cursor/
 README/
 admin.js.old
+*.md

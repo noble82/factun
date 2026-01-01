@@ -66,7 +66,7 @@
 <a href="admin.html" class="btn btn-outline-light btn-sm">
 <i class="bi bi-gear"></i> <span class="d-none d-xl-inline">Administración</span>
 </a>
-<button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none">
+<button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none" onclick="mostrarSelectorRol()">
 <i class="bi bi-arrow-repeat"></i> <span class="d-none d-xl-inline">Cambiar Rol</span>
 </button>
 </div>
@@ -97,8 +97,8 @@
 </div>
 </div>
 <div class="col-md-4">
-<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocina')">
-<div class="role-icon role-cocina">
+<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocinero')">
+<div class="role-icon role-cocinero">
 <i class="bi bi-fire"></i>
 </div>
 <h4>Cocina</h4>
@@ -776,8 +776,171 @@ onkeyup="buscarClienteFactura(this.value)">
 <script src="js/config.js"></script>
 <script src="js/notificaciones.js"></script>
 
-<!-- 🔄 Script de verificación inicial (usa fetch directo) -->
+<!-- ✅ GLOBAL ROLE MANAGEMENT SYSTEM -->
 <script>
+// Estado global del sistema de roles
+window.rolSystem = {
+  currentRole: null,
+  isManager: false,
+  notificacionesActivas: null
+};
+
+// Mostrar selector de rol (solo para managers)
+function mostrarSelectorRol() {
+  const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+  if (usuario.rol !== 'manager') {
+    alert('⚠️ Solo managers pueden cambiar de rol');
+    return;
+  }
+  const selector = document.getElementById('role-selector');
+  if (selector) {
+    selector.style.display = 'block';
+    // Scroll suave hacia el selector
+    selector.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// Aplicar permisos por rol (versión dinámica)
+function aplicarPermisosPorRol(rol) {
+  console.log('[POS] Aplicando permisos para rol:', rol);
+
+  // Actualizar estado global
+  window.rolSystem.currentRole = rol;
+  window.rolSystem.isManager = (rol === 'manager');
+
+  // Actualizar badge de rol
+  const currentRoleBadge = document.getElementById('current-role');
+  if (currentRoleBadge) {
+    currentRoleBadge.textContent = rol.charAt(0).toUpperCase() + rol.slice(1);
+    currentRoleBadge.classList.remove('d-none');
+  }
+
+  // Actualizar menú de navegación
+  document.getElementById('li-cambiar-rol')?.classList.toggle('d-none', !window.rolSystem.isManager);
+  document.getElementById('li-admin')?.classList.toggle('d-none', !window.rolSystem.isManager);
+  document.getElementById('li-factura')?.classList.toggle('d-none', !window.rolSystem.isManager);
+  document.getElementById('btn-cambiar-rol')?.classList.toggle('d-none', !window.rolSystem.isManager);
+
+  // Botón de reportes detallados
+  const btnReportes = document.getElementById('boton-reportes-detallados');
+  if (btnReportes) {
+    btnReportes.style.display = window.rolSystem.isManager ? 'block' : 'none';
+  }
+
+  // Ocultar selector de rol si está visible
+  const roleSelector = document.getElementById('role-selector');
+  if (roleSelector) {
+    roleSelector.style.display = 'none';
+  }
+
+  // Ocultar todos los paneles
+  document.querySelectorAll('.work-panel').forEach(panel => {
+    panel.style.display = 'none';
+    panel.classList.remove('active');
+  });
+
+  // Mostrar el panel correspondiente al rol
+  // Mapeo de rol a panel ID (cocinero -> panel-cocina)
+  const panelMap = {
+    'mesero': 'panel-mesero',
+    'cajero': 'panel-cajero',
+    'cocinero': 'panel-cocina',
+    'manager': 'panel-manager'
+  };
+
+  const panelId = panelMap[rol];
+  const panelActual = document.getElementById(panelId);
+
+  if (panelActual) {
+    panelActual.style.display = 'block';
+    panelActual.classList.add('active');
+
+    // Inicializar datos según el rol
+    if ((rol === 'mesero' || rol === 'manager') && typeof cargarMesas === 'function') {
+      cargarMesas();
+    }
+
+    if ((rol === 'mesero' || rol === 'cajero' || rol === 'manager') && typeof cargarCategorias === 'function') {
+      cargarCategorias();
+    }
+
+    if ((rol === 'cajero' || rol === 'manager') && typeof cargarPedidosCajero === 'function') {
+      cargarPedidosCajero();
+    }
+
+    if ((rol === 'cocinero' || rol === 'manager') && typeof cargarPedidosCocina === 'function') {
+      cargarPedidosCocina();
+    }
+  } else {
+    console.warn(`[POS] Panel no encontrado: ${panelId}`);
+  }
+
+  // Reinicializar notificaciones
+  reinicializarNotificaciones(rol);
+}
+
+// Reinicializar sistema de notificaciones
+function reinicializarNotificaciones(rol) {
+  try {
+    const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+
+    // Detener notificaciones anteriores
+    if (window.notificacionesCliente) {
+      window.notificacionesCliente.desconectar();
+    }
+
+    // Crear nueva instancia
+    const rolMapa = {
+      'cocina': 'cocinero',
+      'manager': 'manager',
+      'mesero': 'mesero',
+      'cajero': 'cajero'
+    };
+
+    const notif = new ClienteNotificaciones({
+      rol: rolMapa[rol] || rol,
+      usuario_id: usuario.id,
+      username: usuario.nombre,
+      debug: true
+    });
+
+    notif.conectar();
+
+    // Registrar handlers
+    notif.on('evento_pedido', (evento) => {
+      manejarEventoPedido(rol, evento);
+    });
+
+    window.notificacionesCliente = notif;
+    console.log(`[POS] Notificaciones inicializadas para: ${rol}`);
+  } catch (error) {
+    console.error('[POS] Error inicializando notificaciones:', error);
+  }
+}
+
+// Manejador centralizado de eventos
+function manejarEventoPedido(rol, evento) {
+  console.log(`[POS-${rol}] Evento:`, evento.tipo, evento);
+
+  if (rol === 'mesero' && evento.tipo === 'cambio_estado' && evento.estado === 'listo') {
+    mostrarNotificacionToast('Pedido Listo', `Pedido #${evento.pedido_id} está listo`, 'success');
+    if (typeof actualizarPedidosPorServir === 'function') actualizarPedidosPorServir();
+  }
+
+  if (rol === 'cajero') {
+    if (evento.tipo === 'cambio_estado') {
+      mostrarNotificacionToast('Estado', `Pedido #${evento.pedido_id}: ${evento.estado}`, 'info');
+    }
+    if (typeof cargarPedidosCajero === 'function') cargarPedidosCajero();
+  }
+
+  if (rol === 'cocina' && evento.tipo === 'nuevo_pedido') {
+    mostrarNotificacionToast('Nuevo Pedido', `Mesa ${evento.pedido.mesa_numero || 'Llevar'}`, 'warning');
+    if (typeof cargarPedidosCocina === 'function') cargarPedidosCocina();
+  }
+}
+
+// 🔄 Script de verificación inicial (usa fetch directo)
 // Verificación de sesión activa al cargar
 document.addEventListener('DOMContentLoaded', async () => {
   const token = localStorage.getItem('auth_token');
@@ -791,8 +954,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const user = await response.json();
         // Actualizar UI con datos del usuario
         document.getElementById('usuario-nombre-display').textContent = user.nombre || '';
-        // Mostrar opciones según rol
-        actualizarInterfazPorRol(user.rol);
+        // Aplicar permisos por rol
+        aplicarPermisosPorRol(user.rol);
         return;
       }
     } catch (e) {
@@ -808,115 +971,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// Función auxiliar: mostrar UI según rol
-function actualizarInterfazPorRol(rol) {
-  // 1. Definir si es manager
-  const isManager = rol === 'manager';
-
-  // 2. Gestionar visibilidad de elementos del menú superior
-  document.getElementById('li-cambiar-rol')?.classList.toggle('d-none', !isManager);
-  document.getElementById('li-admin')?.classList.toggle('d-none', !isManager);
-  document.getElementById('li-factura')?.classList.toggle('d-none', !isManager);
-  document.getElementById('btn-cambiar-rol')?.classList.toggle('d-none', !isManager);
-
-  // 3. CORRECCIÓN: Definir la variable btnReportes correctamente
-  const btnReportes = document.getElementById('boton-reportes-detallados');
-  if (btnReportes) {
-    btnReportes.style.display = isManager ? 'block' : 'none';
-  }
-
-  // 4. Limpieza: Ocultar TODOS los paneles antes de activar el correspondiente
-  // Esto evita que se encimen vistas de otros roles
-  document.querySelectorAll('.work-panel').forEach(panel => {
-    panel.classList.remove('active');
-    panel.style.display = 'none'; // Aseguramos que se oculte físicamente
-  });
-
-  // 5. Activar panel según rol
-  if (['mesero', 'cajero', 'cocina', 'manager'].includes(rol)) {
-    const panelId = `panel-${rol}`;
-    const panelActual = document.getElementById(panelId);
-
-    if (panelActual) {
-      panelActual.classList.add('active');
-      panelActual.style.display = 'block'; // Fuerza la visibilidad
-
-      // ✅ IMPORTANTE: Si es mesero, disparar la carga de mesas y menú
-      if (rol === 'mesero' || rol === 'manager') {
-          console.log("Activando vista de mesero: Cargando componentes...");
-          if (typeof cargarMesas === 'function') cargarMesas();
-          if (typeof cargarCategorias === 'function') cargarCategorias();
-      }
-    }
-  } else {
-    const selector = document.getElementById('role-selector');
-    if (selector) selector.style.display = 'block';
-  }
-
-  // 6. Inicializar/reinicializar notificaciones según el rol
-  try {
-    const usuario = JSON.parse(localStorage.getItem('user') || '{}');
-
-    // Detener notificaciones anteriores si existen
-    if (window.notificacionesCliente) {
-      window.notificacionesCliente.desconectar();
-    }
-
-    // Crear nueva instancia de notificaciones
-    const notif = new ClienteNotificaciones({
-      rol: rol === 'cocina' ? 'cocinero' : (rol === 'manager' ? 'manager' : rol),
-      usuario_id: usuario.id,
-      username: usuario.nombre,
-      debug: true
-    });
-
-    notif.conectar();
-
-    // Registrar handlers según el rol
-    notif.on('evento_pedido', (evento) => {
-      console.log(`[POS-${rol}] Evento recibido:`, evento.tipo, evento);
-
-      // Mesero: notificaciones cuando pedidos están listos
-      if (rol === 'mesero' && evento.tipo === 'cambio_estado' && evento.estado === 'listo') {
-        mostrarNotificacionToast('Pedido Listo', `Pedido #${evento.pedido_id} está listo para servir`, 'success');
-        if (typeof actualizarPedidosPorServir === 'function') {
-          actualizarPedidosPorServir();
-        }
-      }
-
-      // Cajero: notificaciones de cambios de estado y facturación
-      if (rol === 'cajero') {
-        if (evento.tipo === 'cambio_estado') {
-          mostrarNotificacionToast('Cambio de Estado', `Pedido #${evento.pedido_id} cambió a ${evento.estado}`, 'info');
-        } else if (evento.tipo === 'factura_generada' || evento.tipo === 'ticket_generado') {
-          mostrarNotificacionToast('Comprobante', `Comprobante generado para pedido #${evento.pedido_id}`, 'success');
-        }
-        if (typeof cargarPedidosCajero === 'function') {
-          cargarPedidosCajero();
-        }
-      }
-
-      // Cocina: notificaciones de nuevos pedidos
-      if (rol === 'cocina' && evento.tipo === 'nuevo_pedido') {
-        mostrarNotificacionToast('Nuevo Pedido', `Mesa ${evento.pedido.mesa_numero || 'Para Llevar'}`, 'warning');
-        if (typeof cargarPedidosCocina === 'function') {
-          cargarPedidosCocina();
-        }
-      }
-
-      // Manager: todas las notificaciones
-      if (rol === 'manager') {
-        console.log('[Manager] Evento de negocio:', evento.tipo, evento);
-      }
-    });
-
-    window.notificacionesCliente = notif;
-    console.log(`[POS] Notificaciones inicializadas para rol: ${rol}`);
-  } catch (error) {
-    console.error('[POS] Error inicializando notificaciones:', error);
-  }
-}
-// Función de logout segura
+// ✅ Función de logout segura
 function logout() {
   if (typeof window.limpiarSesion === 'function') {
     window.limpiarSesion();
@@ -928,7 +983,7 @@ function logout() {
   window.location.href = 'login.html';
 }
 
-// Función para mostrar notificaciones toast
+// ✅ Función para mostrar notificaciones toast
 function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
   try {
     const toastEl = document.getElementById('toast-notification');
@@ -940,7 +995,6 @@ function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
     toastTitle.textContent = titulo;
     toastBody.textContent = mensaje;
 
-    // Cambiar color del header según tipo
     const toastHeader = toastEl.querySelector('.toast-header');
     if (toastHeader) {
       toastHeader.className = 'toast-header';
@@ -955,12 +1009,46 @@ function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
       }
     }
 
-    // Mostrar toast
     const bsToast = new bootstrap.Toast(toastEl, { delay: 5000 });
     bsToast.show();
   } catch (error) {
     console.error('Error mostrando notificación:', error);
   }
+}
+
+// ✅ Cambio de rol (solo para manager)
+function seleccionarRol(nuevoRol) {
+  const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Check if user's ORIGINAL role is manager (for manager users who switched roles)
+  const rolOriginal = usuario.rol_original || usuario.rol;
+  const esManager = usuario.rol === 'manager' || rolOriginal === 'manager';
+
+  if (!esManager) {
+    mostrarNotificacionToast('Acceso Denegado', 'Solo managers pueden cambiar de rol', 'danger');
+    return;
+  }
+
+  const rolesPermitidos = ['mesero', 'cajero', 'cocinero', 'manager'];
+  if (!rolesPermitidos.includes(nuevoRol)) {
+    console.error('❌ Rol no válido:', nuevoRol);
+    return;
+  }
+
+  // Preserve original role for managers
+  if (!usuario.rol_original && usuario.rol === 'manager') {
+    usuario.rol_original = 'manager';
+  }
+
+  // Update display role (simulate role)
+  usuario.rol = nuevoRol;
+  localStorage.setItem('user', JSON.stringify(usuario));
+
+  // Apply UI changes
+  aplicarPermisosPorRol(nuevoRol);
+  mostrarNotificacionToast('Rol Simulado', `Viendo como ${nuevoRol}`, 'success');
+
+  console.log(`✅ Rol simulado a: ${nuevoRol} (rol original: ${usuario.rol_original})`);
 }
 </script>
 
@@ -968,40 +1056,6 @@ function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
 <script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
 <script src="js/pos.js?v=16"></script>
-
-<!-- ✅ Manejo de cambio de rol (solo para manager) -->
-<script>
-function seleccionarRol(nuevoRol) {
-    const usuario = JSON.parse(localStorage.getItem('user') || '{}');
-    if (usuario.rol !== 'manager') {
-        if (typeof window.mostrarNotificacion === 'function') {
-            window.mostrarNotificacion('Acceso denegado', 'Solo el manager puede cambiar de rol.', 'warning');
-        } else {
-            alert('⚠️ Solo el manager puede cambiar de rol.');
-        }
-        return;
-    }
-
-    const rolesPermitidos = ['mesero', 'cajero', 'cocina', 'manager'];
-    if (!rolesPermitidos.includes(nuevoRol)) {
-        console.error('Rol no válido:', nuevoRol);
-        return;
-    }
-
-    usuario.rol = nuevoRol;
-    localStorage.setItem('user', JSON.stringify(usuario));
-
-    // Aplicar cambios sin recargar
-    if (typeof window.aplicarPermisosPorRol === 'function') {
-        window.aplicarPermisosPorRol(nuevoRol);
-        if (typeof window.mostrarNotificacion === 'function') {
-            window.mostrarNotificacion('Éxito', `Rol cambiado a: ${nuevoRol}`, 'success');
-        }
-    } else {
-        location.reload();
-    }
-}
-</script>
 
 </body>
 </html>
