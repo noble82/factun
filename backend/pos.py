@@ -853,9 +853,9 @@ def obtener_productos_categoria(categoria_id):
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id, nombre, precio, categoria_id
+            SELECT id, nombre, precio, categoria_id, disponible
             FROM productos
-            WHERE categoria_id = ? AND activo = 1
+            WHERE categoria_id = ? AND disponible = 1
             ORDER BY nombre
         ''', (categoria_id,))
 

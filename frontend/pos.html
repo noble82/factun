@@ -452,6 +452,81 @@ placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
 <h4 class="mb-3"><i class="bi bi-fire"></i> Pedidos en Cola</h4>
 <div class="row" id="pedidos-cocina-container"></div>
 </div>
+
+<!-- Panel Manager -->
+<div id="panel-manager" class="work-panel">
+<ul class="nav nav-tabs mb-3" id="managerTabs">
+<li class="nav-item">
+<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#manager-combos-tab">
+<i class="bi bi-basket"></i> Gestionar Combos
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#manager-productos-tab">
+<i class="bi bi-box"></i> Productos
+</button>
+</li>
+<li class="nav-item">
+<button class="nav-link" data-bs-toggle="tab" data-bs-target="#manager-categorias-tab">
+<i class="bi bi-tag"></i> Categorías
+</button>
+</li>
+</ul>
+
+<div class="tab-content">
+<!-- Tab Combos -->
+<div class="tab-pane fade show active" id="manager-combos-tab">
+<div class="row">
+<div class="col-lg-6">
+<h5><i class="bi bi-plus-circle"></i> Crear Nuevo Combo</h5>
+<div class="card p-3">
+<div class="mb-3">
+<label class="form-label">Nombre del Combo</label>
+<input type="text" class="form-control" id="combo-nombre" placeholder="Ej: Combo Almuerzo">
+</div>
+<div class="mb-3">
+<label class="form-label">Descripción</label>
+<textarea class="form-control" id="combo-descripcion" placeholder="Descripción del combo"></textarea>
+</div>
+<div class="mb-3">
+<label class="form-label">Precio</label>
+<input type="number" class="form-control" id="combo-precio" placeholder="0.00" step="0.01">
+</div>
+<div class="mb-3">
+<label class="form-label">Seleccionar Productos</label>
+<div id="combo-productos-lista" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+</div>
+<div class="mb-3">
+<h6>Productos Seleccionados:</h6>
+<div id="combo-productos-seleccionados" class="list-group"></div>
+</div>
+<button class="btn btn-primary w-100" onclick="guardarCombo()">
+<i class="bi bi-save"></i> Guardar Combo
+</button>
+</div>
+</div>
+
+<div class="col-lg-6">
+<h5><i class="bi bi-list"></i> Combos Existentes</h5>
+<div id="combos-lista" class="list-group"></div>
+</div>
+</div>
+</div>
+
+<!-- Tab Productos -->
+<div class="tab-pane fade" id="manager-productos-tab">
+<h5>Gestión de Productos</h5>
+<div id="productos-admin-container"></div>
+</div>
+
+<!-- Tab Categorías -->
+<div class="tab-pane fade" id="manager-categorias-tab">
+<h5>Gestión de Categorías</h5>
+<div id="categorias-admin-container"></div>
+</div>
+</div>
+</div>
+
 </div>
 <!-- Modal Confirmar Pago -->
 <div class="modal fade" id="modalPago" tabindex="-1">
@@ -890,6 +965,7 @@ function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
 </script>
 
 <!-- Scripts principales -->
+<script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
 <script src="js/pos.js?v=16"></script>
 

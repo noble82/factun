@@ -671,9 +671,163 @@ async function marcarServido(pedidoId) {
     }
 }
 
+// ============ GESTIÓN DE COMBOS (MANAGER) ============
+
+let productosParaCombo = [];
+let productosSeleccionadosCombo = [];
+
+async function cargarProductosParaCombo() {
+    try {
+        const response = await apiFetch(`${API_POS}/productos`);
+        if (!response || !response.ok) return;
+
+        productosParaCombo = await response.json();
+        renderizarProductosCombo();
+    } catch (error) {
+        console.error('Error cargarProductosParaCombo:', error);
+    }
+}
+
+function renderizarProductosCombo() {
+    const container = document.getElementById('combo-productos-lista');
+    if (!container) return;
+
+    container.innerHTML = productosParaCombo.map(prod => `
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+                <span>${prod.nombre} - $${parseFloat(prod.precio).toFixed(2)}</span>
+                <button class="btn btn-sm btn-primary"
+                        onclick="agregarProductoACombo(${prod.id}, '${prod.nombre}', ${prod.precio})">
+                    Agregar
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function agregarProductoACombo(productoId, nombre, precio) {
+    const existe = productosSeleccionadosCombo.find(p => p.id === productoId);
+
+    if (!existe) {
+        productosSeleccionadosCombo.push({
+            id: productoId,
+            nombre: nombre,
+            precio: parseFloat(precio)
+        });
+        renderizarProductosSeleccionadosCombo();
+    } else {
+        mostrarNotificacion('Aviso', 'Este producto ya está en el combo', 'info');
+    }
+}
+
+function renderizarProductosSeleccionadosCombo() {
+    const container = document.getElementById('combo-productos-seleccionados');
+    if (!container) return;
+
+    container.innerHTML = productosSeleccionadosCombo.map((prod, idx) => `
+        <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span>${prod.nombre} - $${prod.precio.toFixed(2)}</span>
+            <button class="btn btn-sm btn-danger"
+                    onclick="removerProductoDeCombo(${idx})">
+                Remover
+            </button>
+        </div>
+    `).join('');
+}
+
+function removerProductoDeCombo(idx) {
+    productosSeleccionadosCombo.splice(idx, 1);
+    renderizarProductosSeleccionadosCombo();
+}
+
+async function guardarCombo() {
+    const nombre = document.getElementById('combo-nombre')?.value;
+    const descripcion = document.getElementById('combo-descripcion')?.value;
+    const precio = parseFloat(document.getElementById('combo-precio')?.value);
+
+    if (!nombre || !precio || productosSeleccionadosCombo.length === 0) {
+        mostrarNotificacion('Error', 'Completa todos los campos y agrega productos', 'danger');
+        return;
+    }
+
+    const combo = {
+        nombre,
+        descripcion,
+        precio,
+        productos: productosSeleccionadosCombo.map(p => ({
+            producto_id: p.id,
+            cantidad: 1
+        }))
+    };
+
+    try {
+        const response = await apiFetch(`${API_POS}/combos`, {
+            method: 'POST',
+            body: JSON.stringify(combo)
+        });
+
+        if (response && response.ok) {
+            mostrarNotificacion('Éxito', 'Combo creado exitosamente', 'success');
+            // Limpiar formulario
+            document.getElementById('combo-nombre').value = '';
+            document.getElementById('combo-descripcion').value = '';
+            document.getElementById('combo-precio').value = '';
+            productosSeleccionadosCombo = [];
+            renderizarProductosSeleccionadosCombo();
+            cargarCombosExistentes();
+        }
+    } catch (error) {
+        console.error('Error guardarCombo:', error);
+        mostrarNotificacion('Error', 'No se pudo guardar el combo', 'danger');
+    }
+}
+
+async function cargarCombosExistentes() {
+    try {
+        const response = await apiFetch(`${API_POS}/combos`);
+        if (!response || !response.ok) return;
+
+        const combos = await response.json();
+        const container = document.getElementById('combos-lista');
+        if (!container) return;
+
+        container.innerHTML = combos.map(combo => `
+            <div class="list-group-item">
+                <h6>${combo.nombre}</h6>
+                <small class="text-muted">${combo.descripcion}</small>
+                <p class="mb-2"><strong>$${parseFloat(combo.precio).toFixed(2)}</strong></p>
+                <button class="btn btn-sm btn-danger" onclick="eliminarCombo(${combo.id})">
+                    Eliminar
+                </button>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargarCombosExistentes:', error);
+    }
+}
+
+async function eliminarCombo(comboId) {
+    if (!confirm('¿Estás seguro?')) return;
+
+    try {
+        const response = await apiFetch(`${API_POS}/combos/${comboId}`, {
+            method: 'DELETE'
+        });
+
+        if (response && response.ok) {
+            mostrarNotificacion('Éxito', 'Combo eliminado', 'success');
+            cargarCombosExistentes();
+        }
+    } catch (error) {
+        console.error('Error eliminarCombo:', error);
+    }
+}
+
 // ============ INICIALIZACIÓN ============
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarMesas();
     cargarCategorias();
+    cargarProductosParaCombo();
+    cargarCombosExistentes();
 });
