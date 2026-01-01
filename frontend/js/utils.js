@@ -250,28 +250,36 @@ function getSecureHeaders(contentType, explicitCsrfToken) {
 /**
  * Actualiza el CSRF token desde la respuesta (header o body).
  * @param {Response} response - Respuesta del fetch.
+ * @returns {Promise<void>} Promesa que se resuelve cuando el token está guardado.
  */
 function updateCsrfTokenFromResponse(response) {
-    // --- Priorizar token del Header ---
-    var tokenFromHeader = response.headers.get('X-CSRF-Token');
-    if (tokenFromHeader) {
-        saveCsrfToken(tokenFromHeader);
-        console.log('CSRF token actualizado desde el header de respuesta.');
-        return;
-    }
+    return new Promise(function(resolve) {
+        // --- Priorizar token del Header ---
+        var tokenFromHeader = response.headers.get('X-CSRF-Token');
+        if (tokenFromHeader) {
+            saveCsrfToken(tokenFromHeader);
+            console.log('CSRF token actualizado desde el header de respuesta.');
+            resolve();
+            return;
+        }
 
-    // --- Intentar obtener token del body si es JSON ---
-    var contentType = response.headers.get('content-type');
-    if (contentType && contentType.indexOf('application/json') !== -1) {
-        response.clone().json().then(function(data) {
-            if (data && data._csrf_token) {
-                saveCsrfToken(data._csrf_token);
-                console.log('CSRF token actualizado desde el body de respuesta JSON.');
-            }
-        }).catch(function(e) {
-            console.warn('Error al intentar obtener CSRF token del body JSON:', e);
-        });
-    }
+        // --- Intentar obtener token del body si es JSON ---
+        var contentType = response.headers.get('content-type');
+        if (contentType && contentType.indexOf('application/json') !== -1) {
+            response.clone().json().then(function(data) {
+                if (data && data._csrf_token) {
+                    saveCsrfToken(data._csrf_token);
+                    console.log('CSRF token actualizado desde el body de respuesta JSON.');
+                }
+                resolve();
+            }).catch(function(e) {
+                console.warn('Error al intentar obtener CSRF token del body JSON:', e);
+                resolve();
+            });
+        } else {
+            resolve();
+        }
+    });
 }
 
 /**
