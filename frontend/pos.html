@@ -9,705 +9,8 @@
 <title>POS Pupusería - Sistema de Pedidos</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-<link rel="stylesheet" href="styles-responsive.css">
-<style>
-:root {
---primary-color: #e65100;
---secondary-color: #ff9800;
---success-color: #4caf50;
---warning-color: #ffc107;
---danger-color: #f44336;
---info-color: #2196f3;
-}
-body {
-background-color: #f5f5f5;
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-.navbar-pos {
-background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-}
-.role-selector {
-background: white;
-border-radius: 15px;
-padding: 2rem;
-box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-.role-card {
-cursor: pointer;
-transition: all 0.3s ease;
-border: 2px solid transparent;
-border-radius: 15px;
-}
-.role-card:hover {
-transform: translateY(-5px);
-box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-.role-card.selected {
-border-color: var(--primary-color);
-background-color: #fff3e0;
-}
-.role-icon {
-font-size: 3rem;
-margin-bottom: 1rem;
-}
-.role-mesero { color: var(--info-color); }
-.role-cajero { color: var(--success-color); }
-.role-cocina { color: var(--danger-color); }
-/* Panel de trabajo */
-.work-panel {
-display: none;
-}
-.work-panel.active {
-display: block;
-}
-/* Menú de productos */
-.menu-grid {
-display: grid;
-grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-gap: 1rem;
-}
-.product-card {
-background: white;
-border-radius: 10px;
-padding: 1rem;
-text-align: center;
-cursor: pointer;
-transition: all 0.2s;
-border: 2px solid #eee;
-touch-action: manipulation;
--webkit-tap-highlight-color: rgba(230, 81, 0, 0.2);
-user-select: none;
-}
-.product-card:hover, .product-card:active {
-border-color: var(--primary-color);
-transform: scale(1.02);
-background: #fff5e6;
-}
-.product-card.disabled {
-opacity: 0.5;
-pointer-events: none;
-}
-.product-price {
-font-size: 1.2rem;
-font-weight: bold;
-color: var(--primary-color);
-}
-/* Carrito */
-.cart-panel {
-background: white;
-border-radius: 15px;
-height: calc(100vh - 180px);
-display: flex;
-flex-direction: column;
-}
-.cart-items {
-flex: 1;
-overflow-y: auto;
-padding: 1rem;
-}
-.cart-item {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 0.5rem;
-border-bottom: 1px solid #eee;
-}
-.cart-total {
-background: #f5f5f5;
-padding: 1rem;
-border-radius: 0 0 15px 15px;
-}
-/* Mesas */
-.mesa-grid {
-display: grid;
-grid-template-columns: repeat(5, 1fr);
-gap: 1rem;
-}
-.mesa-card {
-aspect-ratio: 1;
-display: flex;
-flex-direction: column;
-justify-content: center;
-align-items: center;
-border-radius: 10px;
-cursor: pointer;
-transition: all 0.2s;
-font-weight: bold;
-}
-.mesa-libre {
-background: #e8f5e9;
-border: 2px solid var(--success-color);
-color: var(--success-color);
-}
-.mesa-ocupada {
-background: #ffebee;
-border: 2px solid var(--danger-color);
-color: var(--danger-color);
-}
-.mesa-card:hover {
-transform: scale(1.05);
-}
-/* Pedidos */
-.pedido-card {
-background: white;
-border-radius: 10px;
-margin-bottom: 1rem;
-overflow: hidden;
-box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.pedido-header {
-padding: 1rem;
-color: white;
-display: flex;
-justify-content: space-between;
-align-items: center;
-}
-.pedido-header.pendiente_pago { background: var(--warning-color); color: #333; }
-.pedido-header.pagado { background: var(--success-color); }
-.pedido-header.en_cocina { background: var(--danger-color); }
-.pedido-header.listo { background: var(--info-color); }
-.pedido-header.en_mesa { background: #9c27b0; }
-.pedido-body {
-padding: 1rem;
-}
-.pedido-item {
-display: flex;
-justify-content: space-between;
-padding: 0.25rem 0;
-}
-/* Categorías */
-.categoria-tabs {
-display: flex;
-gap: 0.5rem;
-overflow-x: auto;
-padding-bottom: 0.5rem;
-margin-bottom: 1rem;
-}
-.categoria-tab {
-padding: 0.5rem 1rem;
-border-radius: 20px;
-background: white;
-border: 2px solid #ddd;
-cursor: pointer;
-white-space: nowrap;
-transition: all 0.2s;
-}
-.categoria-tab.active {
-background: var(--primary-color);
-border-color: var(--primary-color);
-color: white;
-}
-/* Animaciones */
-@keyframes pulse {
-0%, 100% { transform: scale(1); }
-50% { transform: scale(1.05); }
-}
-.pedido-nuevo {
-animation: pulse 0.5s ease-in-out 3;
-}
-/* Notificaciones de sonido visual */
-.notification-badge {
-position: absolute;
-top: -5px;
-right: -5px;
-background: var(--danger-color);
-color: white;
-border-radius: 50%;
-width: 24px;
-height: 24px;
-display: flex;
-align-items: center;
-justify-content: center;
-font-size: 0.75rem;
-font-weight: bold;
-}
-/* ============ ESTILOS RESPONSIVOS POS ============ */
-/* Tablet */
-@media (max-width: 992px) {
-.mesa-grid {
-grid-template-columns: repeat(4, 1fr);
-gap: 0.75rem;
-}
-.cart-panel {
-height: auto;
-max-height: 50vh;
-}
-}
-/* Mobile */
-@media (max-width: 768px) {
-body {
-padding-top: 0;
-}
-/* Navbar móvil compacto */
-.navbar-pos {
-padding: 0.4rem 0.5rem;
-position: sticky;
-top: 0;
-z-index: 1030;
-}
-.navbar-brand {
-font-size: 0.9rem;
-}
-.navbar-pos .gap-3 {
-gap: 0.5rem !important;
-}
-#current-time {
-display: none;
-}
-#manager-nav-links {
-display: none !important;
-}
-#usuario-info {
-display: none !important;
-}
-/* Container sin márgenes en móvil */
-.container-fluid {
-padding-left: 0.5rem;
-padding-right: 0.5rem;
-}
-.container-fluid.mt-4 {
-margin-top: 0.75rem !important;
-}
-/* Tabs de navegación compactos */
-.nav-tabs {
-border: none;
-background: white;
-border-radius: 10px;
-padding: 0.25rem;
-margin-bottom: 0.75rem !important;
-box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-.nav-tabs .nav-link {
-border: none;
-border-radius: 8px;
-padding: 0.5rem 0.75rem;
-font-size: 0.8rem;
-color: #666;
-}
-.nav-tabs .nav-link.active {
-background: var(--primary-color);
-color: white;
-}
-.nav-tabs .nav-link i {
-font-size: 1rem;
-}
-.nav-tabs .nav-item {
-flex: 1;
-text-align: center;
-}
-/* Mesas grid móvil */
-.mesa-grid {
-grid-template-columns: repeat(3, 1fr);
-gap: 0.5rem;
-}
-.mesa-card {
-font-size: 0.8rem;
-padding: 0.75rem 0.5rem;
-min-height: 70px;
-}
-.mesa-card i {
-font-size: 1.5rem;
-}
-/* Productos grid móvil */
-.menu-grid {
-grid-template-columns: repeat(2, 1fr);
-gap: 0.5rem;
-padding-bottom: 100px;
-}
-.product-card {
-padding: 0.75rem 0.5rem;
-min-height: 80px;
-}
-.product-card .fw-bold {
-font-size: 0.8rem;
-line-height: 1.2;
-margin-bottom: 0.25rem;
-}
-.product-card small {
-display: none;
-}
-.product-price {
-font-size: 1.1rem;
-}
-/* Categorías scroll horizontal */
-.categoria-tabs {
-padding: 0.5rem 0;
-margin-bottom: 0.5rem;
-gap: 0.4rem;
--webkit-overflow-scrolling: touch;
-scrollbar-width: none;
-}
-.categoria-tabs::-webkit-scrollbar {
-display: none;
-}
-.categoria-tab {
-padding: 0.5rem 1rem;
-font-size: 0.85rem;
-border-radius: 25px;
-min-height: 38px;
-}
-/* Ocultar carrito lateral en móvil */
-#panel-mesero > .row > .col-lg-4,
-#cajero-pedido-tab > .row > .col-lg-4 {
-display: none;
-}
-#panel-mesero > .row > .col-lg-8,
-#cajero-pedido-tab > .row > .col-lg-8 {
-width: 100%;
-max-width: 100%;
-flex: 0 0 100%;
-}
-/* Pedidos cards móvil */
-.pedido-card {
-margin-bottom: 0.5rem;
-border-radius: 12px;
-}
-.pedido-header {
-padding: 0.75rem;
-border-radius: 12px 12px 0 0;
-}
-.pedido-body {
-padding: 0.75rem;
-}
-/* Role selector móvil */
-.role-selector {
-padding: 1rem;
-border-radius: 15px;
-margin: 0 !important;
-}
-.role-selector h3 {
-font-size: 1.2rem;
-margin-bottom: 1rem !important;
-}
-.role-card {
-padding: 1rem !important;
-margin-bottom: 0.5rem;
-}
-.role-icon {
-font-size: 2.5rem;
-margin-bottom: 0.5rem;
-}
-.role-card h4 {
-font-size: 1.1rem;
-margin-bottom: 0.25rem;
-}
-.role-card p {
-font-size: 0.8rem;
-margin-bottom: 0;
-}
-/* Alertas compactas */
-.alert {
-padding: 0.75rem;
-font-size: 0.85rem;
-border-radius: 10px;
-}
-/* Cards compactas */
-.card {
-border-radius: 12px;
-margin-bottom: 0.75rem;
-}
-.card-header {
-padding: 0.75rem;
-border-radius: 12px 12px 0 0 !important;
-}
-.card-header h5 {
-font-size: 0.95rem;
-}
-.card-body {
-padding: 0.75rem;
-}
-}
-/* Mobile pequeño */
-@media (max-width: 576px) {
-.mesa-grid {
-grid-template-columns: repeat(2, 1fr);
-}
-.menu-grid {
-grid-template-columns: repeat(2, 1fr);
-}
-.product-card .fw-bold {
-font-size: 0.75rem;
-}
-.role-selector .row {
-flex-direction: column;
-}
-.role-selector .col-md-4 {
-width: 100%;
-}
-}
-/* ============ CARRITO FLOTANTE MÓVIL ============ */
-.cart-fab {
-display: none;
-position: fixed;
-bottom: 20px;
-right: 15px;
-width: 60px;
-height: 60px;
-border-radius: 50%;
-background: var(--primary-color);
-color: white;
-border: none;
-box-shadow: 0 4px 15px rgba(230, 81, 0, 0.4);
-z-index: 1040;
-font-size: 1.5rem;
-transition: transform 0.2s;
-}
-.cart-fab:active {
-transform: scale(0.95);
-}
-.cart-fab .badge {
-position: absolute;
-top: -5px;
-right: -5px;
-background: var(--danger-color);
-border-radius: 50%;
-width: 24px;
-height: 24px;
-font-size: 0.75rem;
-display: flex;
-align-items: center;
-justify-content: center;
-}
-.cart-fab.pulse {
-animation: pulse-animation 0.3s ease;
-}
-@keyframes pulse-animation {
-0% { transform: scale(1); }
-50% { transform: scale(1.2); }
-100% { transform: scale(1); }
-}
-@media (max-width: 768px) {
-.cart-fab {
-display: flex;
-align-items: center;
-justify-content: center;
-}
-}
-/* Clases para forzar visibilidad en móvil (JS las agrega/remueve) */
-.cart-fab.mobile-active {
-display: flex !important;
-align-items: center !important;
-justify-content: center !important;
-}
-.cart-fab.mobile-hidden {
-display: none !important;
-}
-.bottom-nav.mobile-active {
-display: block !important;
-visibility: visible !important;
-}
-.bottom-nav.mobile-hidden {
-display: none !important;
-}
-/* ============ BOTTOM SHEET CARRITO ============ */
-.cart-sheet {
-display: none;
-position: fixed;
-bottom: 0;
-left: 0;
-right: 0;
-background: white;
-border-radius: 20px 20px 0 0;
-box-shadow: 0 -5px 25px rgba(0,0,0,0.2);
-z-index: 1050;
-max-height: 85vh;
-overflow: hidden;
-transform: translateY(100%);
-transition: transform 0.3s ease-out;
-}
-.cart-sheet.show {
-display: block;
-transform: translateY(0);
-}
-.cart-sheet-header {
-padding: 1rem;
-border-bottom: 1px solid #eee;
-display: flex;
-justify-content: space-between;
-align-items: center;
-background: #f8f9fa;
-border-radius: 20px 20px 0 0;
-}
-.cart-sheet-header .drag-handle {
-width: 40px;
-height: 4px;
-background: #ddd;
-border-radius: 2px;
-position: absolute;
-top: 8px;
-left: 50%;
-transform: translateX(-50%);
-}
-.cart-sheet-body {
-max-height: 30vh;
-overflow-y: auto;
-padding: 0.5rem 0.75rem;
-}
-.cart-sheet-footer {
-padding: 0.75rem;
-background: #f8f9fa;
-border-top: 1px solid #eee;
-}
-.cart-sheet-footer .mb-2 {
-margin-bottom: 0.4rem !important;
-}
-.cart-sheet-footer .form-control,
-.cart-sheet-footer .form-select {
-padding: 0.4rem 0.75rem;
-font-size: 0.9rem;
-}
-.cart-sheet-footer .btn-lg {
-padding: 0.6rem 1rem;
-font-size: 1rem;
-}
-.cart-sheet-overlay {
-display: none;
-position: fixed;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-background: rgba(0,0,0,0.5);
-z-index: 1045;
-}
-.cart-sheet-overlay.show {
-display: block;
-}
-/* ============ BOTTOM NAVIGATION ============ */
-.bottom-nav {
-display: none;
-position: fixed;
-bottom: 0;
-left: 0;
-right: 0;
-background: white;
-box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-z-index: 1030;
-padding: 0.5rem 0;
-padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-}
-.bottom-nav-items {
-display: flex;
-justify-content: space-around;
-align-items: center;
-}
-.bottom-nav-item {
-display: flex;
-flex-direction: column;
-align-items: center;
-padding: 0.25rem 1rem;
-color: #666;
-text-decoration: none;
-font-size: 0.7rem;
-border: none;
-background: none;
-cursor: pointer;
-transition: color 0.2s;
-}
-.bottom-nav-item i {
-font-size: 1.3rem;
-margin-bottom: 0.15rem;
-}
-.bottom-nav-item.active {
-color: var(--primary-color);
-}
-.bottom-nav-item:active {
-transform: scale(0.95);
-}
-.mesa-seleccionada {
-    background-color: #ff4444 !important;
-    color: white !important;
-    border: 2px solid darkred !important;
-    transform: scale(1.05);
-    transition: all 0.2s ease;
-}
-/* Bottom nav deshabilitado - las opciones están en los tabs superiores */
-/*
-@media (max-width: 768px) {
-.bottom-nav {
-display: block;
-}
-}
-*/
-/* ============ MODAL FULLSCREEN MÓVIL ============ */
-@media (max-width: 768px) {
-.modal-dialog {
-margin: 0;
-max-width: 100%;
-min-height: 100vh;
-}
-.modal-content {
-border: none;
-border-radius: 0;
-min-height: 100vh;
-}
-.modal-header {
-border-radius: 0;
-}
-.modal-body {
-padding: 1rem;
-overflow-y: auto;
-}
-.modal-body .row {
-flex-direction: column;
-}
-.modal-body .col-md-6 {
-width: 100%;
-margin-bottom: 1rem;
-}
-.modal-footer {
-flex-direction: column;
-gap: 0.5rem;
-padding: 1rem;
-padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-}
-.modal-footer .btn {
-width: 100%;
-min-height: 48px;
-}
-}
-/* ============ MEJORAS TÁCTILES ============ */
-.mesa-card:active,
-.product-card:active,
-.categoria-tab:active,
-.btn:active {
-transform: scale(0.97);
-opacity: 0.9;
-}
-.btn {
--webkit-tap-highlight-color: transparent;
-}
-/* Inputs más grandes en móvil */
-@media (max-width: 768px) {
-.form-control, .form-select {
-min-height: 48px;
-font-size: 16px !important;
-}
-.form-control-sm, .form-select-sm {
-min-height: 44px;
-}
-.btn {
-min-height: 44px;
-}
-.btn-lg {
-min-height: 52px;
-}
-}
-/* Scroll suave */
-.categoria-tabs,
-.cart-sheet-body,
-#pedidos-cajero-container,
-#pedidos-cocina-container {
--webkit-overflow-scrolling: touch;
-}
-/* Ocultar scrollbar pero mantener funcionalidad */
-.categoria-tabs::-webkit-scrollbar {
-display: none;
-}
-.categoria-tabs {
-scrollbar-width: none;
-}
-</style>
+<link rel="stylesheet" href="css/styles-responsive.css">
+<link rel="stylesheet" href="css/pos.css">
 </head>
 <body>
 <!-- Navbar -->
@@ -1393,8 +696,10 @@ onkeyup="buscarClienteFactura(this.value)">
 
 <!-- ✅ Scripts en orden crítico -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="utils.js"></script>
-<script src="config.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/config.js"></script>
+<script src="js/notificaciones.js"></script>
 
 <!-- 🔄 Script de verificación inicial (usa fetch directo) -->
 <script>
@@ -1456,11 +761,11 @@ function actualizarInterfazPorRol(rol) {
   if (['mesero', 'cajero', 'cocina', 'manager'].includes(rol)) {
     const panelId = `panel-${rol}`;
     const panelActual = document.getElementById(panelId);
-    
+
     if (panelActual) {
       panelActual.classList.add('active');
       panelActual.style.display = 'block'; // Fuerza la visibilidad
-      
+
       // ✅ IMPORTANTE: Si es mesero, disparar la carga de mesas y menú
       if (rol === 'mesero' || rol === 'manager') {
           console.log("Activando vista de mesero: Cargando componentes...");
@@ -1471,6 +776,69 @@ function actualizarInterfazPorRol(rol) {
   } else {
     const selector = document.getElementById('role-selector');
     if (selector) selector.style.display = 'block';
+  }
+
+  // 6. Inicializar/reinicializar notificaciones según el rol
+  try {
+    const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+
+    // Detener notificaciones anteriores si existen
+    if (window.notificacionesCliente) {
+      window.notificacionesCliente.desconectar();
+    }
+
+    // Crear nueva instancia de notificaciones
+    const notif = new ClienteNotificaciones({
+      rol: rol === 'cocina' ? 'cocinero' : (rol === 'manager' ? 'manager' : rol),
+      usuario_id: usuario.id,
+      username: usuario.nombre,
+      debug: true
+    });
+
+    notif.conectar();
+
+    // Registrar handlers según el rol
+    notif.on('evento_pedido', (evento) => {
+      console.log(`[POS-${rol}] Evento recibido:`, evento.tipo, evento);
+
+      // Mesero: notificaciones cuando pedidos están listos
+      if (rol === 'mesero' && evento.tipo === 'cambio_estado' && evento.estado === 'listo') {
+        mostrarNotificacionToast('Pedido Listo', `Pedido #${evento.pedido_id} está listo para servir`, 'success');
+        if (typeof actualizarPedidosPorServir === 'function') {
+          actualizarPedidosPorServir();
+        }
+      }
+
+      // Cajero: notificaciones de cambios de estado y facturación
+      if (rol === 'cajero') {
+        if (evento.tipo === 'cambio_estado') {
+          mostrarNotificacionToast('Cambio de Estado', `Pedido #${evento.pedido_id} cambió a ${evento.estado}`, 'info');
+        } else if (evento.tipo === 'factura_generada' || evento.tipo === 'ticket_generado') {
+          mostrarNotificacionToast('Comprobante', `Comprobante generado para pedido #${evento.pedido_id}`, 'success');
+        }
+        if (typeof cargarPedidosCajero === 'function') {
+          cargarPedidosCajero();
+        }
+      }
+
+      // Cocina: notificaciones de nuevos pedidos
+      if (rol === 'cocina' && evento.tipo === 'nuevo_pedido') {
+        mostrarNotificacionToast('Nuevo Pedido', `Mesa ${evento.pedido.mesa_numero || 'Para Llevar'}`, 'warning');
+        if (typeof cargarPedidosCocina === 'function') {
+          cargarPedidosCocina();
+        }
+      }
+
+      // Manager: todas las notificaciones
+      if (rol === 'manager') {
+        console.log('[Manager] Evento de negocio:', evento.tipo, evento);
+      }
+    });
+
+    window.notificacionesCliente = notif;
+    console.log(`[POS] Notificaciones inicializadas para rol: ${rol}`);
+  } catch (error) {
+    console.error('[POS] Error inicializando notificaciones:', error);
   }
 }
 // Función de logout segura
@@ -1484,11 +852,46 @@ function logout() {
   }
   window.location.href = 'login.html';
 }
+
+// Función para mostrar notificaciones toast
+function mostrarNotificacionToast(titulo, mensaje, tipo = 'info') {
+  try {
+    const toastEl = document.getElementById('toast-notification');
+    const toastTitle = document.getElementById('toast-title');
+    const toastBody = document.getElementById('toast-message');
+
+    if (!toastEl || !toastTitle || !toastBody) return;
+
+    toastTitle.textContent = titulo;
+    toastBody.textContent = mensaje;
+
+    // Cambiar color del header según tipo
+    const toastHeader = toastEl.querySelector('.toast-header');
+    if (toastHeader) {
+      toastHeader.className = 'toast-header';
+      if (tipo === 'success') {
+        toastHeader.classList.add('bg-success', 'text-white');
+      } else if (tipo === 'warning') {
+        toastHeader.classList.add('bg-warning', 'text-dark');
+      } else if (tipo === 'danger') {
+        toastHeader.classList.add('bg-danger', 'text-white');
+      } else {
+        toastHeader.classList.add('bg-info', 'text-white');
+      }
+    }
+
+    // Mostrar toast
+    const bsToast = new bootstrap.Toast(toastEl, { delay: 5000 });
+    bsToast.show();
+  } catch (error) {
+    console.error('Error mostrando notificación:', error);
+  }
+}
 </script>
 
 <!-- Scripts principales -->
-<script src="auth-check.js?v=5"></script>
-<script src="pos.js?v=16"></script>
+<script src="js/auth-check.js?v=5"></script>
+<script src="js/pos.js?v=16"></script>
 
 <!-- ✅ Manejo de cambio de rol (solo para manager) -->
 <script>

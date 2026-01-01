@@ -11,8 +11,17 @@ import json
 from facturacion import GeneradorDTE, ControlCorrelativo
 from inventario import descontar_stock_pedido, inicializar_inventario_productos
 from database import get_db
+from notificaciones import NotificadorPedidos
 
 pos_bp = Blueprint('pos', __name__)
+
+# Global socketio instance (inicializado desde app.py)
+socketio = None
+
+def init_socketio(socket_instance):
+    """Inicializa la instancia de socketio para este blueprint"""
+    global socketio
+    socketio = socket_instance
 
 def init_db():
     """Inicializa la base de datos con las tablas necesarias"""
@@ -25,6 +34,32 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT NOT NULL,
             orden INTEGER DEFAULT 0
+        )
+    ''')
+
+    # Tabla de combos (bundles de múltiples productos)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS combos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            descripcion TEXT,
+            precio_combo REAL NOT NULL,
+            imagen TEXT,
+            activo INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Tabla de items dentro de combos (relación M:M)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS combo_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            combo_id INTEGER NOT NULL,
+            producto_id INTEGER NOT NULL,
+            cantidad INTEGER NOT NULL,
+            FOREIGN KEY (combo_id) REFERENCES combos(id),
+            FOREIGN KEY (producto_id) REFERENCES productos(id)
         )
     ''')
 
@@ -187,18 +222,43 @@ def init_db():
     except:
         pass
 
+    # Migración: agregar combo_id a pedido_items (para soporte de combos)
+    try:
+        cursor.execute('ALTER TABLE pedido_items ADD COLUMN combo_id INTEGER')
+    except:
+        pass
+
+    # Migraciones: agregar columnas para IVA desglosado
+    try:
+        cursor.execute('ALTER TABLE pedido_items ADD COLUMN iva_porcentaje REAL DEFAULT 13.0')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE pedido_items ADD COLUMN iva_monto REAL DEFAULT 0')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE pedido_items ADD COLUMN total_item REAL DEFAULT 0')
+    except:
+        pass
+
     # Tabla de items del pedido
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS pedido_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pedido_id INTEGER NOT NULL,
             producto_id INTEGER NOT NULL,
+            combo_id INTEGER,
             cantidad INTEGER DEFAULT 1,
             precio_unitario REAL NOT NULL,
             subtotal REAL NOT NULL,
+            iva_porcentaje REAL DEFAULT 13.0,
+            iva_monto REAL DEFAULT 0,
+            total_item REAL DEFAULT 0,
             notas TEXT,
             FOREIGN KEY (pedido_id) REFERENCES pedidos(id),
-            FOREIGN KEY (producto_id) REFERENCES productos(id)
+            FOREIGN KEY (producto_id) REFERENCES productos(id),
+            FOREIGN KEY (combo_id) REFERENCES combos(id)
         )
     ''')
 
@@ -260,6 +320,14 @@ def init_db():
         pass
 
     # ============ ÍNDICES PARA OPTIMIZAR CONSULTAS ============
+    # Índices en combos
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_combos_activo ON combos(activo)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_combos_nombre ON combos(nombre)')
+
+    # Índices en combo_items
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_combo_items_combo_id ON combo_items(combo_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_combo_items_producto_id ON combo_items(producto_id)')
+
     # Índices en pedidos (tabla más consultada)
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_mesa_id ON pedidos(mesa_id)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_pedidos_cliente_id ON pedidos(cliente_id)')
@@ -352,6 +420,136 @@ def insertar_datos_iniciales(conn):
 init_db()
 # Inicializar inventario para los productos
 inicializar_inventario_productos()
+
+# ============ FUNCIONES HELPER PARA COMBOS ============
+
+def obtener_combo(combo_id):
+    """Obtiene un combo por ID"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT c.*, COUNT(ci.id) as cantidad_items
+        FROM combos c
+        LEFT JOIN combo_items ci ON c.id = ci.combo_id
+        WHERE c.id = ?
+        GROUP BY c.id
+    ''', (combo_id,))
+    resultado = cursor.fetchone()
+    conn.close()
+    return resultado
+
+
+def obtener_items_combo(combo_id):
+    """Obtiene todos los productos dentro de un combo"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT ci.*, p.nombre, p.precio
+        FROM combo_items ci
+        JOIN productos p ON ci.producto_id = p.id
+        WHERE ci.combo_id = ?
+    ''', (combo_id,))
+    items = cursor.fetchall()
+    conn.close()
+    return items
+
+
+def validar_combo(nombre, precio_combo, items):
+    """
+    Valida que un combo sea válido:
+    - Debe tener al menos 2 productos
+    - El precio del combo <= suma de productos individuales
+    - Todos los productos deben existir y estar disponibles
+
+    Returns: (valido: bool, mensaje: str)
+    """
+    # Validación 1: al menos 2 items
+    if not items or len(items) < 2:
+        return False, "Combo debe tener al menos 2 productos"
+
+    # Validación 2: todos los productos deben existir y estar disponibles
+    conn = get_db()
+    cursor = conn.cursor()
+    suma_precios = 0
+
+    for item in items:
+        if not item.get('producto_id') or not item.get('cantidad'):
+            conn.close()
+            return False, "Cada item debe tener producto_id y cantidad"
+
+        cursor.execute('SELECT precio FROM productos WHERE id = ? AND disponible = 1',
+                      (item['producto_id'],))
+        producto = cursor.fetchone()
+
+        if not producto:
+            conn.close()
+            return False, f"Producto {item['producto_id']} no existe o no está disponible"
+
+        suma_precios += float(producto['precio']) * float(item['cantidad'])
+
+    # Validación 3: precio del combo <= suma de productos individuales
+    if float(precio_combo) > suma_precios:
+        conn.close()
+        return False, f"Precio del combo (${precio_combo}) no puede ser mayor a suma de productos (${suma_precios})"
+
+    conn.close()
+    return True, "OK"
+
+
+def recalcular_totales_pedido(pedido_id):
+    """
+    Recalcula subtotal, IVA desglosado y total de un pedido
+
+    - Calcula IVA por cada item (13% El Salvador)
+    - Actualiza iva_porcentaje, iva_monto, total_item en cada item
+    - Suma solo items principales (NO desgloces de combo)
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Obtener todos los items principales (NO desgloces)
+    cursor.execute('''
+        SELECT id, subtotal
+        FROM pedido_items
+        WHERE pedido_id = ? AND (combo_id IS NULL OR combo_id = 0)
+    ''', (pedido_id,))
+
+    items = cursor.fetchall()
+    subtotal_total = 0.0
+    iva_total = 0.0
+
+    # Calcular IVA para cada item
+    for item in items:
+        item_id = item[0]
+        subtotal_item = float(item[1]) if item[1] else 0.0
+
+        # IVA: 13% (El Salvador)
+        iva_porcentaje = 13.0
+        iva_monto = round(subtotal_item * (iva_porcentaje / 100), 2)
+        total_item = round(subtotal_item + iva_monto, 2)
+
+        # Actualizar el item con IVA desglosado
+        cursor.execute('''
+            UPDATE pedido_items
+            SET iva_porcentaje = ?, iva_monto = ?, total_item = ?
+            WHERE id = ?
+        ''', (iva_porcentaje, iva_monto, total_item, item_id))
+
+        subtotal_total += subtotal_item
+        iva_total += iva_monto
+
+    total_general = round(subtotal_total + iva_total, 2)
+
+    # Actualizar totales en el pedido
+    cursor.execute('''
+        UPDATE pedidos
+        SET subtotal = ?, impuesto = ?, total = ?, updated_at = ?
+        WHERE id = ?
+    ''', (round(subtotal_total, 2), round(iva_total, 2), total_general,
+          datetime.now().isoformat(), pedido_id))
+
+    conn.commit()
+    conn.close()
 
 # ============ FUNCIONES DE REPORTES ============
 
@@ -724,6 +922,232 @@ def eliminar_categoria(id):
     return jsonify({'success': True})
 
 
+# ============ ENDPOINTS DE COMBOS ============
+
+@pos_bp.route('/combos', methods=['GET'])
+@role_required('mesero', 'cajero', 'manager')
+def listar_combos():
+    """Listar todos los combos activos con sus productos"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT c.*, COUNT(ci.id) as cantidad_items
+        FROM combos c
+        LEFT JOIN combo_items ci ON c.id = ci.combo_id
+        WHERE c.activo = 1
+        GROUP BY c.id
+        ORDER BY c.nombre
+    ''')
+    combos = [dict(row) for row in cursor.fetchall()]
+
+    # Obtener items para cada combo
+    resultado = []
+    for combo in combos:
+        items = obtener_items_combo(combo['id'])
+        resultado.append({
+            'id': combo['id'],
+            'nombre': combo['nombre'],
+            'descripcion': combo['descripcion'],
+            'precio_combo': combo['precio_combo'],
+            'imagen': combo['imagen'],
+            'activo': combo['activo'],
+            'cantidad_items': combo['cantidad_items'],
+            'items': [
+                {
+                    'id': item[0],
+                    'producto_id': item[1],
+                    'producto_nombre': item[3],
+                    'cantidad': item[2],
+                    'precio_unitario': item[4]
+                } for item in items
+            ]
+        })
+
+    conn.close()
+    return jsonify(resultado)
+
+
+@pos_bp.route('/combos', methods=['POST'])
+@role_required('manager')
+def crear_combo():
+    """Crear nuevo combo"""
+    data = request.get_json()
+
+    # Validar datos obligatorios
+    if not data.get('nombre') or data.get('precio_combo') is None:
+        return jsonify({'error': 'nombre y precio_combo son requeridos'}), 400
+
+    items = data.get('items', [])
+
+    # Validar combo
+    valido, mensaje = validar_combo(data['nombre'], data['precio_combo'], items)
+    if not valido:
+        return jsonify({'error': mensaje}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # Insertar combo
+        cursor.execute('''
+            INSERT INTO combos (nombre, descripcion, precio_combo, imagen, activo)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            data['nombre'],
+            data.get('descripcion', ''),
+            float(data['precio_combo']),
+            data.get('imagen'),
+            data.get('activo', 1)
+        ))
+
+        combo_id = cursor.lastrowid
+
+        # Insertar items del combo
+        for item in items:
+            cursor.execute('''
+                INSERT INTO combo_items (combo_id, producto_id, cantidad)
+                VALUES (?, ?, ?)
+            ''', (combo_id, item['producto_id'], item['cantidad']))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'id': combo_id,
+            'nombre': data['nombre'],
+            'precio_combo': data['precio_combo'],
+            'mensaje': f"Combo '{data['nombre']}' creado exitosamente"
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@pos_bp.route('/combos/<int:combo_id>', methods=['GET'])
+@role_required('mesero', 'cajero', 'manager')
+def obtener_combo_detalle(combo_id):
+    """Obtener detalle de un combo"""
+    combo = obtener_combo(combo_id)
+    if not combo:
+        return jsonify({'error': 'Combo no encontrado'}), 404
+
+    items = obtener_items_combo(combo_id)
+
+    return jsonify({
+        'id': combo['id'],
+        'nombre': combo['nombre'],
+        'descripcion': combo['descripcion'],
+        'precio_combo': combo['precio_combo'],
+        'imagen': combo['imagen'],
+        'activo': combo['activo'],
+        'cantidad_items': combo['cantidad_items'],
+        'items': [
+            {
+                'id': item[0],
+                'producto_id': item[1],
+                'producto_nombre': item[3],
+                'cantidad': item[2],
+                'precio_unitario': item[4]
+            } for item in items
+        ]
+    })
+
+
+@pos_bp.route('/combos/<int:combo_id>', methods=['PUT'])
+@role_required('manager')
+def actualizar_combo(combo_id):
+    """Actualizar combo y sus items"""
+    data = request.get_json()
+
+    combo = obtener_combo(combo_id)
+    if not combo:
+        return jsonify({'error': 'Combo no encontrado'}), 404
+
+    # Obtener valores existentes si no se proporcionan nuevos
+    nombre = data.get('nombre', combo['nombre'])
+    precio_combo = data.get('precio_combo', combo['precio_combo'])
+    items = data.get('items')
+
+    # Si se proporcionan items, validar combo completo
+    if items:
+        valido, mensaje = validar_combo(nombre, precio_combo, items)
+        if not valido:
+            return jsonify({'error': mensaje}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # Actualizar combo
+        cursor.execute('''
+            UPDATE combos
+            SET nombre = ?, descripcion = ?, precio_combo = ?, imagen = ?,
+                activo = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (
+            nombre,
+            data.get('descripcion', combo['descripcion']),
+            float(precio_combo),
+            data.get('imagen', combo['imagen']),
+            data.get('activo', combo['activo']),
+            combo_id
+        ))
+
+        # Actualizar items si se proporcionan
+        if items:
+            cursor.execute('DELETE FROM combo_items WHERE combo_id = ?', (combo_id,))
+            for item in items:
+                cursor.execute('''
+                    INSERT INTO combo_items (combo_id, producto_id, cantidad)
+                    VALUES (?, ?, ?)
+                ''', (combo_id, item['producto_id'], item['cantidad']))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'id': combo_id,
+            'mensaje': f"Combo actualizado exitosamente"
+        })
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@pos_bp.route('/combos/<int:combo_id>', methods=['DELETE'])
+@role_required('manager')
+def desactivar_combo(combo_id):
+    """Desactivar combo (soft delete)"""
+    combo = obtener_combo(combo_id)
+    if not combo:
+        return jsonify({'error': 'Combo no encontrado'}), 404
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            'UPDATE combos SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            (combo_id,)
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'mensaje': 'Combo desactivado exitosamente'
+        })
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
 # ============ ENDPOINTS DE MESAS ============
 
 @pos_bp.route('/mesas', methods=['GET'])
@@ -868,6 +1292,70 @@ def get_pedido(id):
     conn.close()
     return jsonify(pedido)
 
+
+@pos_bp.route('/pedidos/<int:id>/desglose-iva', methods=['GET'])
+@role_required('manager', 'mesero', 'cajero')
+def get_pedido_desglose_iva(id):
+    """
+    Obtiene un pedido con desglose completo de IVA por item
+
+    Retorna:
+    - Información del pedido
+    - Items con: cantidad, precio_unitario, subtotal, iva_porcentaje, iva_monto, total_item
+    - Resumen: subtotal_total, iva_total, total_general
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT p.*, m.numero as mesa_numero
+        FROM pedidos p
+        LEFT JOIN mesas m ON p.mesa_id = m.id
+        WHERE p.id = ?
+    ''', (id,))
+
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+
+    pedido = dict(row)
+
+    # Obtener solo items principales (NO desgloces)
+    cursor.execute('''
+        SELECT pi.id, pi.combo_id, pi.producto_id, pi.cantidad,
+               pi.precio_unitario, pi.subtotal, pi.iva_porcentaje,
+               pi.iva_monto, pi.total_item, pi.notas,
+               COALESCE(pr.nombre, c.nombre) as item_nombre,
+               CASE WHEN pi.combo_id IS NOT NULL THEN 'combo' ELSE 'producto' END as tipo_item
+        FROM pedido_items pi
+        LEFT JOIN productos pr ON pi.producto_id = pr.id
+        LEFT JOIN combos c ON pi.combo_id = c.id
+        WHERE pi.pedido_id = ? AND (pi.combo_id IS NULL OR pi.combo_id = 0)
+        ORDER BY pi.id
+    ''', (id,))
+
+    items = [dict(row) for row in cursor.fetchall()]
+
+    # Calcular totales para validación
+    subtotal_total = sum(float(item.get('subtotal', 0)) for item in items)
+    iva_total = sum(float(item.get('iva_monto', 0)) for item in items)
+    total_general = round(subtotal_total + iva_total, 2)
+
+    conn.close()
+
+    return jsonify({
+        'pedido': pedido,
+        'items': items,
+        'resumen': {
+            'subtotal': round(subtotal_total, 2),
+            'iva_total': round(iva_total, 2),
+            'total': total_general,
+            'cantidad_items': len(items)
+        }
+    })
+
+
 @pos_bp.route('/pedidos', methods=['POST'])
 @role_required('mesero', 'cajero', 'manager')
 def crear_pedido():
@@ -934,7 +1422,36 @@ def crear_pedido():
         cursor.execute('UPDATE mesas SET estado = ? WHERE id = ?', ('ocupada', mesa_id))
 
     conn.commit()
+
+    # Obtener detalles del pedido para notificación
+    cursor.execute('SELECT * FROM pedidos WHERE id = ?', (pedido_id,))
+    pedido_creado = cursor.fetchone()
     conn.close()
+
+    # ===== NOTIFICAR NUEVO PEDIDO A COCINA =====
+    if socketio and pedido_creado:
+        try:
+            # Preparar datos del pedido para notificación
+            pedido_notif = {
+                "id": pedido_id,
+                "mesa_numero": pedido_creado['mesa_id'] or None,
+                "mesa_id": pedido_creado['mesa_id'],
+                "items": items,
+                "tipo": tipo_pago,
+                "cliente_nombre": cliente_nombre,
+                "mesero": mesero,
+                "subtotal": subtotal,
+                "impuesto": impuesto,
+                "total": total,
+                "estado": estado_inicial,
+                "timestamp": datetime.now().isoformat()
+            }
+
+            # Solo notificar si está en estado pendiente_pago (listo para cocina)
+            if estado_inicial in ['pendiente_pago', 'en_mesa']:
+                NotificadorPedidos.notificar_nuevo_pedido(socketio, pedido_notif)
+        except Exception as e:
+            print(f"Error notificando nuevo pedido {pedido_id}: {e}")
 
     return jsonify({
         'success': True,
@@ -1004,6 +1521,14 @@ def actualizar_estado_pedido(id):
             cursor.execute('UPDATE mesas SET estado = ? WHERE id = ?', ('libre', pedido['mesa_id']))
 
     conn.commit()
+
+    # ===== NOTIFICAR CAMBIO DE ESTADO =====
+    if socketio:
+        try:
+            NotificadorPedidos.notificar_cambio_estado_pedido(socketio, id, nuevo_estado)
+        except Exception as e:
+            print(f"Error notificando cambio de estado del pedido {id}: {e}")
+
     conn.close()
 
     # Descontar stock cuando el pedido se marca como pagado
@@ -1073,14 +1598,35 @@ def actualizar_pago_pedido(id):
     })
 
 @pos_bp.route('/pedidos/<int:id>/items', methods=['POST'])
+@role_required('mesero', 'cajero', 'manager')
 def agregar_item_pedido(id):
-    """Agrega un item a un pedido existente"""
+    """
+    Agrega un item (producto o combo) a un pedido existente
+
+    Request body:
+    - Si es producto: {"producto_id": 1, "cantidad": 2, "notas": "..."}
+    - Si es combo: {"combo_id": 1, "cantidad": 1}
+
+    Al agregar combo:
+    - Crea 1 item del combo en pedido_items (para facturación)
+    - Crea N items individuales desglosados (para cocina)
+    """
     data = request.get_json()
+
+    # Validar que se proporcione producto_id O combo_id
+    producto_id = data.get('producto_id')
+    combo_id = data.get('combo_id')
+
+    if not producto_id and not combo_id:
+        return jsonify({'error': 'Se requiere producto_id o combo_id'}), 400
+
+    if producto_id and combo_id:
+        return jsonify({'error': 'Proporciona producto_id O combo_id, no ambos'}), 400
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # Verificar que el pedido existe y no está cerrado
+    # Verificar que el pedido existe y no está pagado
     cursor.execute('SELECT * FROM pedidos WHERE id = ?', (id,))
     pedido = cursor.fetchone()
 
@@ -1088,43 +1634,294 @@ def agregar_item_pedido(id):
         conn.close()
         return jsonify({'error': 'Pedido no encontrado'}), 404
 
-    if pedido['estado'] in ['cerrado', 'cancelado']:
+    if pedido['estado'] == 'pagado':
         conn.close()
-        return jsonify({'error': 'No se puede modificar un pedido cerrado'}), 400
-
-    # Obtener precio del producto
-    cursor.execute('SELECT precio FROM productos WHERE id = ?', (data['producto_id'],))
-    producto = cursor.fetchone()
-
-    if not producto:
-        conn.close()
-        return jsonify({'error': 'Producto no encontrado'}), 404
+        return jsonify({'error': 'No se puede agregar items a pedido pagado'}), 400
 
     cantidad = data.get('cantidad', 1)
-    precio_unitario = producto['precio']
-    subtotal_item = precio_unitario * cantidad
 
-    # Agregar item
+    try:
+        if combo_id:
+            # ===== AGREGAR COMBO =====
+            combo = obtener_combo(combo_id)
+            if not combo:
+                conn.close()
+                return jsonify({'error': 'Combo no encontrado'}), 404
+
+            precio_combo = combo['precio_combo']
+            subtotal_combo = precio_combo * cantidad
+
+            # 1. Crear item del combo (para facturación)
+            cursor.execute('''
+                INSERT INTO pedido_items
+                (pedido_id, combo_id, cantidad, precio_unitario, subtotal, notas)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (id, combo_id, cantidad, precio_combo, subtotal_combo, 'Combo'))
+
+            # 2. Obtener items del combo y crear items desglosados (para cocina)
+            items_combo = obtener_items_combo(combo_id)
+            for combo_item in items_combo:
+                producto_id_item = combo_item[1]
+                cantidad_producto = combo_item[2] * cantidad  # cantidad del combo x cantidad del producto en combo
+                precio_producto = combo_item[4]
+                subtotal_desglosado = precio_producto * cantidad_producto
+
+                cursor.execute('''
+                    INSERT INTO pedido_items
+                    (pedido_id, producto_id, combo_id, cantidad, precio_unitario, subtotal, notas)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (id, producto_id_item, combo_id, cantidad_producto, precio_producto,
+                      subtotal_desglosado, f'Desglose de combo'))
+
+        else:
+            # ===== AGREGAR PRODUCTO INDIVIDUAL =====
+            cursor.execute('SELECT precio FROM productos WHERE id = ? AND disponible = 1', (producto_id,))
+            producto = cursor.fetchone()
+
+            if not producto:
+                conn.close()
+                return jsonify({'error': 'Producto no encontrado o no disponible'}), 404
+
+            precio_unitario = producto['precio']
+            subtotal_item = precio_unitario * cantidad
+
+            # Crear item
+            cursor.execute('''
+                INSERT INTO pedido_items (pedido_id, producto_id, cantidad, precio_unitario, subtotal, notas)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (id, producto_id, cantidad, precio_unitario, subtotal_item, data.get('notas', '')))
+
+        # Recalcular totales del pedido (solo items sin desglose)
+        recalcular_totales_pedido(id)
+
+        # Obtener nuevos totales
+        cursor.execute('SELECT subtotal, impuesto, total FROM pedidos WHERE id = ?', (id,))
+        resultado = cursor.fetchone()
+        nuevo_total = resultado['total'] if resultado else 0
+
+        # ===== NOTIFICAR ITEM AGREGADO =====
+        if socketio:
+            try:
+                item_type = 'combo' if combo_id else 'producto'
+                cambios = {
+                    "tipo_cambio": "item_agregado",
+                    "item_type": item_type,
+                    "item_id": combo_id if combo_id else producto_id,
+                    "cantidad": cantidad,
+                    "nuevo_total": nuevo_total
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, id, combo_id or producto_id, cambios)
+            except Exception as e:
+                print(f"Error notificando item agregado al pedido {id}: {e}")
+
+        conn.close()
+
+        item_type = 'combo' if combo_id else 'producto'
+        return jsonify({
+            'success': True,
+            'item_type': item_type,
+            'item_id': combo_id if combo_id else producto_id,
+            'cantidad': cantidad,
+            'total': nuevo_total
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@pos_bp.route('/pedidos/<int:pedido_id>/items/<int:item_id>', methods=['DELETE'])
+@role_required('mesero', 'cajero', 'manager')
+def remover_item_pedido(pedido_id, item_id):
+    """
+    Remueve un item de un pedido (solo si no está pagado)
+
+    Si el item es un combo, remueve:
+    - El item del combo
+    - Todos los items desglosados del combo
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Validar pedido
+    cursor.execute('SELECT estado FROM pedidos WHERE id = ?', (pedido_id,))
+    pedido = cursor.fetchone()
+    if not pedido:
+        conn.close()
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+
+    if pedido['estado'] == 'pagado':
+        conn.close()
+        return jsonify({'error': 'No se puede remover items de pedido pagado'}), 400
+
+    # Validar item
+    cursor.execute('SELECT combo_id FROM pedido_items WHERE id = ? AND pedido_id = ?',
+                  (item_id, pedido_id))
+    item = cursor.fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Item no encontrado en este pedido'}), 404
+
+    combo_id = item['combo_id']
+
+    try:
+        if combo_id:
+            # Si es combo, remover el item del combo Y todos sus desgloces
+            cursor.execute('DELETE FROM pedido_items WHERE id = ? AND pedido_id = ?',
+                          (item_id, pedido_id))
+            # Remover desgloces del combo
+            cursor.execute('''
+                DELETE FROM pedido_items
+                WHERE pedido_id = ? AND combo_id = ? AND notas = 'Desglose de combo'
+            ''', (pedido_id, combo_id))
+        else:
+            # Remover item individual
+            cursor.execute('DELETE FROM pedido_items WHERE id = ? AND pedido_id = ?',
+                          (item_id, pedido_id))
+
+        # Recalcular totales
+        recalcular_totales_pedido(pedido_id)
+
+        conn.commit()
+
+        # ===== NOTIFICAR ITEM REMOVIDO =====
+        if socketio:
+            try:
+                cambios = {
+                    "tipo_cambio": "item_removido",
+                    "item_id": item_id,
+                    "combo_id": combo_id
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, pedido_id, item_id, cambios)
+            except Exception as e:
+                print(f"Error notificando item removido del pedido {pedido_id}: {e}")
+
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'mensaje': 'Item removido exitosamente'
+        })
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
+
+
+@pos_bp.route('/pedidos/<int:pedido_id>/items/<int:item_id>', methods=['PUT'])
+@role_required('mesero', 'cajero', 'manager')
+def modificar_item_pedido(pedido_id, item_id):
+    """
+    Modifica la cantidad de un item del pedido (solo si no está pagado)
+
+    Request body: {"cantidad": 2}
+    """
+    data = request.get_json()
+    nueva_cantidad = data.get('cantidad')
+
+    if not nueva_cantidad or nueva_cantidad < 1:
+        return jsonify({'error': 'cantidad debe ser >= 1'}), 400
+
+    nueva_cantidad = int(nueva_cantidad)
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Validar pedido
+    cursor.execute('SELECT estado FROM pedidos WHERE id = ?', (pedido_id,))
+    pedido = cursor.fetchone()
+    if not pedido:
+        conn.close()
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+
+    if pedido['estado'] == 'pagado':
+        conn.close()
+        return jsonify({'error': 'No se puede modificar items de pedido pagado'}), 400
+
+    # Validar item
     cursor.execute('''
-        INSERT INTO pedido_items (pedido_id, producto_id, cantidad, precio_unitario, subtotal, notas)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (id, data['producto_id'], cantidad, precio_unitario, subtotal_item, data.get('notas', '')))
+        SELECT id, combo_id, cantidad, precio_unitario, subtotal
+        FROM pedido_items WHERE id = ? AND pedido_id = ?
+    ''', (item_id, pedido_id))
+    item = cursor.fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Item no encontrado en este pedido'}), 404
 
-    # Recalcular totales del pedido
-    cursor.execute('SELECT SUM(subtotal) FROM pedido_items WHERE pedido_id = ?', (id,))
-    nuevo_subtotal = cursor.fetchone()[0] or 0
-    nuevo_impuesto = round(nuevo_subtotal * 0.13, 2)
-    nuevo_total = round(nuevo_subtotal + nuevo_impuesto, 2)
+    combo_id = item['combo_id']
 
-    cursor.execute('''
-        UPDATE pedidos SET subtotal = ?, impuesto = ?, total = ?, updated_at = ?
-        WHERE id = ?
-    ''', (nuevo_subtotal, nuevo_impuesto, nuevo_total, datetime.now().isoformat(), id))
+    try:
+        if combo_id:
+            # Si es un combo, actualizar el item del combo y todos sus desgloces
+            precio_unitario = item['precio_unitario']
+            cantidad_anterior = item['cantidad']
+            ratio = nueva_cantidad / cantidad_anterior
 
-    conn.commit()
-    conn.close()
+            # Actualizar item del combo
+            cursor.execute('''
+                UPDATE pedido_items
+                SET cantidad = ?, subtotal = ?
+                WHERE id = ?
+            ''', (nueva_cantidad, precio_unitario * nueva_cantidad, item_id))
 
-    return jsonify({'success': True, 'total': nuevo_total})
+            # Actualizar desgloces (multiplicar por el ratio)
+            cursor.execute('''
+                SELECT id, cantidad, precio_unitario
+                FROM pedido_items
+                WHERE pedido_id = ? AND combo_id = ? AND notas = 'Desglose de combo'
+            ''', (pedido_id, combo_id))
+
+            desgloces = cursor.fetchall()
+            for desglose in desgloces:
+                nueva_cant_desglose = desglose['cantidad'] * ratio
+                cursor.execute('''
+                    UPDATE pedido_items
+                    SET cantidad = ?, subtotal = ?
+                    WHERE id = ?
+                ''', (nueva_cant_desglose,
+                      desglose['precio_unitario'] * nueva_cant_desglose,
+                      desglose['id']))
+        else:
+            # Item individual: solo actualizar cantidad y subtotal
+            precio_unitario = item['precio_unitario']
+            cursor.execute('''
+                UPDATE pedido_items
+                SET cantidad = ?, subtotal = ?
+                WHERE id = ?
+            ''', (nueva_cantidad, precio_unitario * nueva_cantidad, item_id))
+
+        # Recalcular totales
+        recalcular_totales_pedido(pedido_id)
+
+        conn.commit()
+
+        # ===== NOTIFICAR MODIFICACIÓN DE ITEM =====
+        if socketio:
+            try:
+                cambios = {
+                    "tipo_cambio": "cantidad_modificada",
+                    "item_id": item_id,
+                    "cantidad_anterior": item['cantidad'],
+                    "cantidad_nueva": nueva_cantidad,
+                    "combo_id": combo_id
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, pedido_id, item_id, cambios)
+            except Exception as e:
+                print(f"Error notificando modificación de item en pedido {pedido_id}: {e}")
+
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'mensaje': 'Item modificado exitosamente',
+            'cantidad_anterior': item['cantidad'],
+            'cantidad_nueva': nueva_cantidad
+        })
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
 
 # ============ ENDPOINTS ESPECÍFICOS POR ROL ============
 
@@ -1865,6 +2662,20 @@ def facturar_pedido(id):
         ))
 
         conn.commit()
+
+        # ===== NOTIFICAR FACTURA GENERADA =====
+        if socketio:
+            try:
+                cambios = {
+                    "tipo_cambio": "factura_generada",
+                    "tipo_comprobante": "dte",
+                    "numero_control": resultado['numero_control'],
+                    "codigo_generacion": resultado['codigo_generacion']
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, id, 0, cambios)
+            except Exception as e:
+                print(f"Error notificando factura generada del pedido {id}: {e}")
+
         conn.close()
 
         return jsonify({
@@ -1900,6 +2711,19 @@ def facturar_pedido(id):
         ))
 
         conn.commit()
+
+        # ===== NOTIFICAR TICKET GENERADO =====
+        if socketio:
+            try:
+                cambios = {
+                    "tipo_cambio": "ticket_generado",
+                    "tipo_comprobante": "ticket",
+                    "numero": resultado['numero']
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, id, 0, cambios)
+            except Exception as e:
+                print(f"Error notificando ticket generado del pedido {id}: {e}")
+
         conn.close()
 
         return jsonify({
@@ -1982,6 +2806,17 @@ def enviar_dte_pedido(id):
 
     dte_json = json.loads(pedido['dte_json'])
 
+    # ===== NOTIFICAR ENVÍO A DIGIFACT =====
+    if socketio:
+        try:
+            cambios = {
+                "tipo_cambio": "dte_enviando",
+                "numero_control": pedido.get('dte_numero_control')
+            }
+            NotificadorPedidos.notificar_item_modificado(socketio, id, 0, cambios)
+        except Exception as e:
+            print(f"Error notificando envío de DTE del pedido {id}: {e}")
+
     # Obtener el endpoint de certificación del backend principal
     from flask import current_app
     try:
@@ -1991,6 +2826,32 @@ def enviar_dte_pedido(id):
             json={'dte': dte_json},
             timeout=30
         )
-        return jsonify(response.json()), response.status_code
+
+        resp_json = response.json()
+
+        # ===== NOTIFICAR RESULTADO DE DIGIFACT =====
+        if socketio and response.status_code == 200:
+            try:
+                cambios = {
+                    "tipo_cambio": "dte_certificado",
+                    "dte_numero": resp_json.get('dte_numero'),
+                    "estado_envio": "exitoso"
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, id, 0, cambios)
+            except Exception as e:
+                print(f"Error notificando certificación de DTE del pedido {id}: {e}")
+
+        return jsonify(resp_json), response.status_code
     except Exception as e:
+        # ===== NOTIFICAR ERROR EN ENVÍO =====
+        if socketio:
+            try:
+                cambios = {
+                    "tipo_cambio": "dte_error",
+                    "error": str(e)
+                }
+                NotificadorPedidos.notificar_item_modificado(socketio, id, 0, cambios)
+            except Exception as err:
+                print(f"Error notificando error de DTE del pedido {id}: {err}")
+
         return jsonify({'error': f'Error al enviar DTE: {str(e)}'}), 500

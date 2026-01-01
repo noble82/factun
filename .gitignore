@@ -10,3 +10,6 @@ docker-compose.yml
 backend/*.db
 backend/backend.log
 frontend/admin.js.old
+.cursor/
+README/
+admin.js.old

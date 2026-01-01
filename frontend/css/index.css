@@ -1,0 +1,51 @@
+/* Estilos responsivos para facturación */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.5rem;
+    }
+    .navbar-brand {
+        font-size: 0.9rem;
+        max-width: 50%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .navbar .d-flex {
+        flex-wrap: wrap;
+        gap: 0.5rem !important;
+    }
+    .navbar .btn {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    .navbar .btn span {
+        display: none;
+    }
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+    .card-header h5 {
+        font-size: 1rem;
+    }
+    .container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+}
+@media (max-width: 576px) {
+    .navbar .d-flex > a:not(:first-child) {
+        display: none;
+    }
+    .nav-tabs .nav-link i {
+        display: block;
+        text-align: center;
+        margin-bottom: 0.25rem;
+    }
+}

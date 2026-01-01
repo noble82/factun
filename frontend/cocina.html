@@ -10,194 +10,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="styles-responsive.css">
-    <style>
-        :root {
-            --primary-color: #e67e22;
-            --secondary-color: #d35400;
-        }
-        body {
-            background-color: #1a1a2e;
-            color: white;
-            min-height: 100vh;
-        }
-        .navbar-cocina {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        }
-        .pedido-card {
-            background: #16213e;
-            border-radius: 15px;
-            border-left: 5px solid var(--primary-color);
-            margin-bottom: 15px;
-            transition: all 0.3s;
-        }
-        .pedido-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        .pedido-card.urgente {
-            border-left-color: #e74c3c;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-            50% { box-shadow: 0 0 20px 10px rgba(231, 76, 60, 0.2); }
-        }
-        .pedido-card.listo {
-            border-left-color: #27ae60;
-            opacity: 0.7;
-        }
-        .pedido-card.preparando {
-            border-left-color: #f39c12;
-            background: #1a2744;
-        }
-        .mesa-badge {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-        .item-producto {
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px;
-            margin: 5px 0;
-        }
-        .item-producto .cantidad {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        .btn-listo {
-            background: #27ae60;
-            border: none;
-            font-size: 1.2rem;
-            padding: 15px 30px;
-        }
-        .btn-listo:hover {
-            background: #219a52;
-        }
-        .tiempo-espera {
-            font-size: 0.9rem;
-        }
-        .tiempo-espera.alerta {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        .stats-bar {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .stat-item {
-            text-align: center;
-        }
-        .stat-numero {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 100px 20px;
-        }
-        .empty-state i {
-            font-size: 5rem;
-            color: #27ae60;
-            margin-bottom: 20px;
-        }
-
-        /* Estilos responsivos para cocina */
-        @media (max-width: 768px) {
-            .navbar-cocina .navbar-brand {
-                font-size: 1.2rem;
-            }
-            .navbar-cocina .d-flex {
-                flex-wrap: wrap;
-                gap: 0.5rem !important;
-            }
-            .navbar-cocina .btn {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.8rem;
-            }
-            .stats-bar {
-                padding: 8px;
-            }
-            .stat-item {
-                padding: 5px;
-            }
-            .stat-numero {
-                font-size: 1.5rem;
-            }
-            .stat-item small {
-                font-size: 0.7rem;
-            }
-            .pedido-card {
-                margin-bottom: 10px;
-            }
-            .mesa-badge {
-                font-size: 1.3rem;
-            }
-            .item-producto {
-                padding: 8px;
-            }
-            .item-producto .cantidad {
-                font-size: 1.2rem;
-            }
-            .btn-listo, .btn-warning.btn-lg {
-                font-size: 1rem;
-                padding: 12px 20px;
-            }
-            .empty-state {
-                padding: 50px 15px;
-            }
-            .empty-state i {
-                font-size: 3.5rem;
-            }
-            .empty-state h3 {
-                font-size: 1.3rem;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .navbar-cocina {
-                padding: 0.5rem;
-            }
-            .navbar-cocina .navbar-brand {
-                font-size: 1rem;
-            }
-            #manager-nav-links .btn span {
-                display: none;
-            }
-            .stats-bar .row {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 5px;
-            }
-            .stat-numero {
-                font-size: 1.2rem;
-            }
-            .pedido-card {
-                border-radius: 10px;
-            }
-            .mesa-badge {
-                font-size: 1.1rem;
-            }
-            .tiempo-espera {
-                font-size: 0.8rem;
-            }
-            .item-producto .cantidad {
-                font-size: 1rem;
-                min-width: 35px;
-            }
-            .items-lista strong {
-                font-size: 0.9rem;
-            }
-        }
-
-        /* Touch-friendly buttons */
-        .btn-listo, .btn-warning.btn-lg {
-            min-height: 50px;
-            -webkit-tap-highlight-color: transparent;
-        }
-    </style>
+    <link rel="stylesheet" href="css/cocina.css">
 </head>
 <body>
     <!-- Navbar -->
@@ -266,9 +79,11 @@
     </audio>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="config.js"></script>
-    <script src="utils.js"></script>
-    <script src="auth-check.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/auth-check.js"></script>
+    <script src="js/notificaciones.js"></script>
     <script>
         const API_POS = '/api/pos';
         let pedidosActuales = [];
@@ -442,6 +257,43 @@
                 if (managerNavLinks) {
                     managerNavLinks.classList.remove('d-none');
                 }
+            }
+
+            // Inicializar notificaciones en tiempo real
+            try {
+                const notif = new ClienteNotificaciones({
+                    rol: 'cocinero',
+                    usuario_id: usuario.id,
+                    username: usuario.nombre,
+                    debug: true
+                });
+
+                // Conectar a servidor WebSocket/polling
+                notif.conectar();
+
+                // Escuchar nuevos pedidos y cambios
+                notif.on('evento_pedido', (evento) => {
+                    console.log('[Cocina] Evento recibido:', evento.tipo, evento);
+
+                    if (evento.tipo === 'nuevo_pedido') {
+                        // Reproducir sonido de alerta
+                        reproducirSonido();
+                        // Recargar pedidos para mostrar el nuevo
+                        cargarPedidos();
+                    } else if (evento.tipo === 'cambio_estado') {
+                        // Actualizar pedidos si cambió estado
+                        cargarPedidos();
+                    } else if (evento.tipo === 'item_modificado') {
+                        // Recargar para ver cambios en items
+                        cargarPedidos();
+                    }
+                });
+
+                // Guardar instancia global para debugging
+                window.notificacionesCliente = notif;
+                console.log('[Cocina] Sistema de notificaciones inicializado');
+            } catch (error) {
+                console.error('[Cocina] Error inicializando notificaciones:', error);
             }
         };
 

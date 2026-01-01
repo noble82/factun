@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_socketio import SocketIO
 import requests
 import os
 from datetime import datetime
@@ -10,12 +11,25 @@ import json
 from io import BytesIO
 from dotenv import load_dotenv
 from csrf import generate_csrf_token, validate_csrf_token
+from notificaciones import NotificadorPedidos, registrar_socketio_handlers
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'pupuseria-secret-key-2024')
 CORS(app, supports_credentials=True)
+
+# Inicializar WebSocket con Socket.IO (para notificaciones en tiempo real)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    ping_timeout=60,
+    ping_interval=25,
+    async_mode='threading'
+)
+
+# Registrar handlers de Socket.IO
+registrar_socketio_handlers(socketio)
 
 # Inicializar rate limiting
 limiter = Limiter(
@@ -88,8 +102,11 @@ def add_csrf_token(response):
     return response
 
 # Registrar Blueprint del POS
-from pos import pos_bp
+from pos import pos_bp, init_socketio
 app.register_blueprint(pos_bp, url_prefix='/api/pos')
+
+# Pasar la instancia de socketio a pos.py para notificaciones
+init_socketio(socketio)
 
 # Registrar Blueprint de Inventario
 from inventario import inventario_bp
@@ -384,5 +401,69 @@ def download_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ============ NOTIFICACIONES EN TIEMPO REAL ============
+
+@app.route('/api/notificaciones/polling/<rol>', methods=['GET'])
+@role_required(['cocinero', 'mesero', 'cajero', 'manager'])
+def obtener_notificaciones_polling(rol):
+    """
+    Endpoint de polling para clientes que no pueden usar WebSocket
+    Retorna eventos pendientes para el rol del usuario
+
+    Parámetro:
+        rol: Rol del usuario (cocina, meseros, etc.)
+
+    Respuesta:
+        {
+            "eventos": [
+                {
+                    "tipo": "nuevo_pedido|pedido_listo|cambio_estado|...",
+                    "datos": {...},
+                    "timestamp": "ISO-8601"
+                },
+                ...
+            ],
+            "timestamp": "ISO-8601"
+        }
+    """
+    try:
+        eventos = NotificadorPedidos.obtener_eventos_pendientes(rol)
+
+        return jsonify({
+            "eventos": eventos,
+            "timestamp": datetime.now().isoformat(),
+            "total": len(eventos)
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/notificaciones/estado', methods=['GET'])
+@role_required(['manager'])
+def obtener_estado_notificaciones():
+    """
+    Endpoint para debugging: retorna el estado de conexiones WebSocket activas
+    Solo disponible para managers
+
+    Respuesta:
+        {
+            "total_conexiones": int,
+            "conexiones": [...]
+        }
+    """
+    try:
+        estado = NotificadorPedidos.obtener_estado_conexiones()
+        return jsonify(estado), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Usar socketio.run() para soporte WebSocket
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=5000,
+        debug=True,
+        allow_unsafe_werkzeug=True
+    )

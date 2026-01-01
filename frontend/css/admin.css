@@ -1,0 +1,201 @@
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+}
+body {
+    background-color: #f8f9fa;
+}
+.navbar-admin {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+}
+.sidebar {
+    min-height: calc(100vh - 56px);
+    background: white;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+.sidebar .nav-link {
+    color: #333;
+    padding: 12px 20px;
+    border-left: 3px solid transparent;
+}
+.sidebar .nav-link:hover {
+    background: #f8f9fa;
+    border-left-color: var(--secondary-color);
+}
+.sidebar .nav-link.active {
+    background: #e3f2fd;
+    border-left-color: var(--secondary-color);
+    font-weight: 600;
+}
+.sidebar .nav-link i {
+    width: 24px;
+}
+.stat-card {
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+.stat-card .stat-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+}
+.stat-card.bg-primary { background: linear-gradient(135deg, #667eea, #764ba2) !important; }
+.stat-card.bg-success { background: linear-gradient(135deg, #11998e, #38ef7d) !important; }
+.stat-card.bg-warning { background: linear-gradient(135deg, #f093fb, #f5576c) !important; }
+.stat-card.bg-info { background: linear-gradient(135deg, #4facfe, #00f2fe) !important; }
+
+.table-container {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    padding: 20px;
+}
+.badge-stock-ok { background-color: var(--success-color); }
+.badge-stock-bajo { background-color: var(--warning-color); }
+.badge-stock-agotado { background-color: var(--danger-color); }
+
+.content-section {
+    display: none;
+}
+.content-section.active {
+    display: block;
+}
+
+/* ============ ESTILOS RESPONSIVOS ADMIN ============ */
+/* Botón toggle sidebar en móvil */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1060;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    font-size: 1.25rem;
+}
+
+@media (max-width: 992px) {
+    .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 56px;
+        bottom: 0;
+        width: 280px;
+        z-index: 1050;
+        transition: left 0.3s ease;
+        overflow-y: auto;
+    }
+    .sidebar.show {
+        left: 0;
+    }
+    .sidebar-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+        display: none;
+    }
+    .sidebar-backdrop.show {
+        display: block;
+    }
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    .col-md-10 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-admin {
+        padding: 0.5rem 1rem;
+    }
+    .navbar-brand {
+        font-size: 1rem;
+    }
+    .stat-card {
+        margin-bottom: 0.75rem;
+    }
+    .stat-card h3 {
+        font-size: 1.5rem;
+    }
+    .stat-card .stat-icon {
+        font-size: 1.5rem;
+    }
+    .table-container {
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    .table {
+        font-size: 0.85rem;
+    }
+    .table th, .table td {
+        padding: 0.5rem 0.4rem;
+    }
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.8rem;
+    }
+    .modal-lg {
+        max-width: calc(100vw - 1rem);
+        margin: 0.5rem;
+    }
+    .content-section h4 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .row.g-4 {
+        --bs-gutter-x: 0.75rem;
+        --bs-gutter-y: 0.75rem;
+    }
+    .stat-card h3 {
+        font-size: 1.25rem;
+    }
+    .btn {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.75rem;
+    }
+    h4 {
+        font-size: 1.1rem;
+    }
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    /* Ocultar columnas menos importantes */
+    .hide-sm {
+        display: none !important;
+    }
+}
+
+/* Mejoras visuales */
+.sidebar .nav-link {
+    transition: all 0.2s ease;
+}
+.sidebar .nav-link:active {
+    background: #e3f2fd;
+    transform: scale(0.98);
+}
+.table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
