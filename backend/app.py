@@ -40,7 +40,7 @@ limiter = Limiter(
 )
 
 # Registrar Blueprint de Autenticación
-from auth import auth_bp, init_auth_db, role_required, set_limiter
+from auth import auth_bp, init_auth_db, role_required, set_limiter, login_required
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 # Pasar el limiter a auth.py para rate limiting en login
@@ -404,7 +404,7 @@ def download_pdf():
 # ============ NOTIFICACIONES EN TIEMPO REAL ============
 
 @app.route('/api/notificaciones/polling/<rol>', methods=['GET'])
-@role_required(['cocinero', 'mesero', 'cajero', 'manager'])
+@login_required
 def obtener_notificaciones_polling(rol):
     """
     Endpoint de polling para clientes que no pueden usar WebSocket

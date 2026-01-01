@@ -85,12 +85,14 @@ function renderizarCategorias(categorias) {
 async function cargarProductosPorCategoria(categoriaId) {
     try {
         const response = await apiFetch(`${API_POS}/categorias/${categoriaId}/productos`);
+        if (!response) throw new Error('Error cargando productos');
         if (!response.ok) throw new Error('Error cargando productos');
 
         productosDisponibles = await response.json();
         renderizarProductos(productosDisponibles);
     } catch (error) {
         console.error('Error cargarProductosPorCategoria:', error);
+        mostrarNotificacion('Error', 'No se pudieron cargar los productos', 'danger');
     }
 }
 

@@ -846,6 +846,26 @@ def get_categorias():
     return jsonify(categorias)
 
 
+@pos_bp.route('/categorias/<int:categoria_id>/productos', methods=['GET'])
+def obtener_productos_categoria(categoria_id):
+    """Obtiene los productos de una categoría"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, nombre, precio, categoria_id
+            FROM productos
+            WHERE categoria_id = ? AND activo = 1
+            ORDER BY nombre
+        ''', (categoria_id,))
+
+        productos = cursor.fetchall()
+        conn.close()
+
+        return jsonify([dict(p) for p in productos])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @pos_bp.route('/categorias', methods=['POST'])
 @role_required('manager')
 def crear_categoria():
