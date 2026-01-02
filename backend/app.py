@@ -458,6 +458,22 @@ def obtener_estado_notificaciones():
         return jsonify({"error": str(e)}), 500
 
 
+# ============ SERVIR IMÁGENES ============
+
+@app.route('/uploads/<path:filename>')
+def serve_image(filename):
+    """Sirve imágenes de productos y combos"""
+    try:
+        return send_file(
+            os.path.join(os.path.dirname(__file__), 'uploads', filename),
+            mimetype='image/jpeg'
+        )
+    except FileNotFoundError:
+        return jsonify({"error": "Image not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     # Usar socketio.run() para soporte WebSocket
     socketio.run(

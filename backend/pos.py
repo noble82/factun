@@ -12,6 +12,7 @@ from facturacion import GeneradorDTE, ControlCorrelativo
 from inventario import descontar_stock_pedido, inicializar_inventario_productos
 from database import get_db
 from notificaciones import NotificadorPedidos
+from upload_handler import save_image, delete_image
 
 pos_bp = Blueprint('pos', __name__)
 
@@ -725,37 +726,81 @@ def get_producto(id):
 @pos_bp.route('/productos/<int:id>', methods=['PUT'])
 @role_required('manager')
 def update_producto(id):
-    """Actualiza un producto completo"""
-    data = request.get_json()
+    """Actualiza un producto completo con soporte para imagen"""
     conn = get_db()
     cursor = conn.cursor()
 
     # Si solo viene 'disponible', es el toggle simple
-    if len(data) == 1 and 'disponible' in data:
-        cursor.execute(
-            'UPDATE productos SET disponible = ? WHERE id = ?',
-            (data.get('disponible', 1), id)
-        )
+    if request.is_json:
+        data = request.get_json()
+        if len(data) == 1 and 'disponible' in data:
+            cursor.execute(
+                'UPDATE productos SET disponible = ? WHERE id = ?',
+                (data.get('disponible', 1), id)
+            )
+        else:
+            # Actualización completa del producto
+            cursor.execute('''
+                UPDATE productos SET
+                    nombre = COALESCE(?, nombre),
+                    descripcion = ?,
+                    precio = COALESCE(?, precio),
+                    categoria_id = ?,
+                    disponible = COALESCE(?, disponible),
+                    materia_prima_id = ?
+                WHERE id = ?
+            ''', (
+                data.get('nombre'),
+                data.get('descripcion'),
+                data.get('precio'),
+                data.get('categoria_id'),
+                data.get('disponible'),
+                data.get('materia_prima_id'),
+                id
+            ))
     else:
-        # Actualización completa del producto
-        cursor.execute('''
-            UPDATE productos SET
-                nombre = COALESCE(?, nombre),
-                descripcion = ?,
-                precio = COALESCE(?, precio),
-                categoria_id = ?,
-                disponible = COALESCE(?, disponible),
-                materia_prima_id = ?
-            WHERE id = ?
-        ''', (
-            data.get('nombre'),
-            data.get('descripcion'),
-            data.get('precio'),
-            data.get('categoria_id'),
-            data.get('disponible'),
-            data.get('materia_prima_id'),
-            id
-        ))
+        # Manejar multipart/form-data (con imagen)
+        update_fields = []
+        update_values = []
+
+        if 'nombre' in request.form:
+            update_fields.append('nombre = ?')
+            update_values.append(request.form['nombre'])
+        if 'descripcion' in request.form:
+            update_fields.append('descripcion = ?')
+            update_values.append(request.form['descripcion'])
+        if 'precio' in request.form:
+            update_fields.append('precio = ?')
+            update_values.append(float(request.form['precio']))
+        if 'categoria_id' in request.form:
+            update_fields.append('categoria_id = ?')
+            update_values.append(request.form['categoria_id'])
+        if 'disponible' in request.form:
+            update_fields.append('disponible = ?')
+            update_values.append(request.form['disponible'])
+
+        # Procesar imagen si se proporciona
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename:
+                success, result = save_image(file, 'productos')
+                if not success:
+                    conn.close()
+                    return jsonify({'error': result}), 400
+
+                # Eliminar imagen anterior si existe
+                cursor.execute('SELECT imagen FROM productos WHERE id = ?', (id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    delete_image(row[0])
+
+                update_fields.append('imagen = ?')
+                update_values.append(result)
+
+        if update_fields:
+            update_values.append(id)
+            query = f"UPDATE productos SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, update_values)
 
     conn.commit()
     conn.close()
@@ -765,26 +810,40 @@ def update_producto(id):
 @pos_bp.route('/productos', methods=['POST'])
 @role_required('manager')
 def crear_producto():
-    """Crea un nuevo producto"""
-    data = request.get_json()
+    """Crea un nuevo producto con soporte para imagen"""
+    # Manejar multipart/form-data
+    nombre = request.form.get('nombre')
+    precio = request.form.get('precio')
 
-    if not data.get('nombre') or not data.get('precio'):
+    if not nombre or not precio:
         return jsonify({'error': 'Nombre y precio son requeridos'}), 400
+
+    imagen_path = None
+
+    # Procesar imagen si se proporciona
+    if 'imagen' in request.files:
+        file = request.files['imagen']
+        if file and file.filename:
+            success, result = save_image(file, 'productos')
+            if not success:
+                return jsonify({'error': result}), 400
+            imagen_path = result
 
     conn = get_db()
     cursor = conn.cursor()
 
     try:
         cursor.execute('''
-            INSERT INTO productos (nombre, descripcion, precio, categoria_id, disponible, materia_prima_id)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO productos (nombre, descripcion, precio, categoria_id, disponible, materia_prima_id, imagen)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('nombre'),
-            data.get('descripcion'),
-            float(data.get('precio')),
-            data.get('categoria_id'),
-            data.get('disponible', 1),
-            data.get('materia_prima_id')
+            nombre,
+            request.form.get('descripcion', ''),
+            float(precio),
+            request.form.get('categoria_id'),
+            request.form.get('disponible', 1),
+            request.form.get('materia_prima_id'),
+            imagen_path or ''
         ))
 
         producto_id = cursor.lastrowid
@@ -794,7 +853,8 @@ def crear_producto():
         return jsonify({
             'success': True,
             'producto_id': producto_id,
-            'mensaje': f"Producto '{data.get('nombre')}' creado exitosamente"
+            'imagen': imagen_path,
+            'mensaje': f"Producto '{nombre}' creado exitosamente"
         })
     except Exception as e:
         conn.close()
@@ -991,17 +1051,45 @@ def listar_combos():
 @pos_bp.route('/combos', methods=['POST'])
 @role_required('manager')
 def crear_combo():
-    """Crear nuevo combo"""
-    data = request.get_json()
+    """Crear nuevo combo con soporte para imagen"""
+    # Manejar tanto JSON como multipart/form-data
+    if request.is_json:
+        data = request.get_json()
+        nombre = data.get('nombre')
+        precio_combo = data.get('precio_combo')
+        descripcion = data.get('descripcion', '')
+        items_data = data.get('productos', data.get('items', []))
+        imagen_path = data.get('imagen')
+    else:
+        nombre = request.form.get('nombre')
+        precio_combo = request.form.get('precio_combo')
+        descripcion = request.form.get('descripcion', '')
+
+        # Parse items JSON desde form
+        import json as json_module
+        items_data = []
+        try:
+            items_str = request.form.get('productos', request.form.get('items', '[]'))
+            items_data = json_module.loads(items_str) if items_str else []
+        except:
+            items_data = []
+
+        imagen_path = None
+        # Procesar imagen si se proporciona
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename:
+                success, result = save_image(file, 'combos')
+                if not success:
+                    return jsonify({'error': result}), 400
+                imagen_path = result
 
     # Validar datos obligatorios
-    if not data.get('nombre') or data.get('precio_combo') is None:
+    if not nombre or precio_combo is None:
         return jsonify({'error': 'nombre y precio_combo son requeridos'}), 400
 
-    items = data.get('items', [])
-
     # Validar combo
-    valido, mensaje = validar_combo(data['nombre'], data['precio_combo'], items)
+    valido, mensaje = validar_combo(nombre, float(precio_combo), items_data)
     if not valido:
         return jsonify({'error': mensaje}), 400
 
@@ -1014,17 +1102,17 @@ def crear_combo():
             INSERT INTO combos (nombre, descripcion, precio_combo, imagen, activo)
             VALUES (?, ?, ?, ?, ?)
         ''', (
-            data['nombre'],
-            data.get('descripcion', ''),
-            float(data['precio_combo']),
-            data.get('imagen'),
-            data.get('activo', 1)
+            nombre,
+            descripcion,
+            float(precio_combo),
+            imagen_path or '',
+            request.form.get('activo', 1) if not request.is_json else request.get_json().get('activo', 1)
         ))
 
         combo_id = cursor.lastrowid
 
         # Insertar items del combo
-        for item in items:
+        for item in items_data:
             cursor.execute('''
                 INSERT INTO combo_items (combo_id, producto_id, cantidad)
                 VALUES (?, ?, ?)
@@ -1036,9 +1124,10 @@ def crear_combo():
         return jsonify({
             'success': True,
             'id': combo_id,
-            'nombre': data['nombre'],
-            'precio_combo': data['precio_combo'],
-            'mensaje': f"Combo '{data['nombre']}' creado exitosamente"
+            'nombre': nombre,
+            'precio_combo': precio_combo,
+            'imagen': imagen_path,
+            'mensaje': f"Combo '{nombre}' creado exitosamente"
         }), 201
     except Exception as e:
         conn.rollback()
@@ -1079,21 +1168,52 @@ def obtener_combo_detalle(combo_id):
 @pos_bp.route('/combos/<int:combo_id>', methods=['PUT'])
 @role_required('manager')
 def actualizar_combo(combo_id):
-    """Actualizar combo y sus items"""
-    data = request.get_json()
+    """Actualizar combo y sus items con soporte para imagen"""
+    # Manejar tanto JSON como multipart/form-data
+    if request.is_json:
+        data = request.get_json()
+        nombre = data.get('nombre')
+        precio_combo = data.get('precio_combo')
+        descripcion = data.get('descripcion')
+        items = data.get('items', data.get('productos'))
+        imagen_path = data.get('imagen')
+    else:
+        nombre = request.form.get('nombre')
+        precio_combo = request.form.get('precio_combo')
+        descripcion = request.form.get('descripcion')
+
+        # Parse items JSON desde form
+        import json as json_module
+        items = []
+        try:
+            items_str = request.form.get('items', request.form.get('productos', '[]'))
+            items = json_module.loads(items_str) if items_str else []
+        except:
+            items = []
+
+        imagen_path = None
+        # Procesar imagen si se proporciona
+        if 'imagen' in request.files:
+            file = request.files['imagen']
+            if file and file.filename:
+                success, result = save_image(file, 'combos')
+                if not success:
+                    return jsonify({'error': result}), 400
+                imagen_path = result
 
     combo = obtener_combo(combo_id)
     if not combo:
         return jsonify({'error': 'Combo no encontrado'}), 404
 
     # Obtener valores existentes si no se proporcionan nuevos
-    nombre = data.get('nombre', combo['nombre'])
-    precio_combo = data.get('precio_combo', combo['precio_combo'])
-    items = data.get('items')
+    nombre = nombre or combo['nombre']
+    precio_combo = precio_combo or combo['precio_combo']
+    descripcion = descripcion if descripcion is not None else combo['descripcion']
+    imagen_path = imagen_path if imagen_path is not None else combo['imagen']
 
     # Si se proporcionan items, validar combo completo
     if items:
-        valido, mensaje = validar_combo(nombre, precio_combo, items)
+        valido, mensaje = validar_combo(nombre, float(precio_combo), items)
         if not valido:
             return jsonify({'error': mensaje}), 400
 
@@ -1101,6 +1221,11 @@ def actualizar_combo(combo_id):
     cursor = conn.cursor()
 
     try:
+        # Si se sube nueva imagen, eliminar la anterior
+        if imagen_path and imagen_path != combo['imagen']:
+            if combo['imagen']:
+                delete_image(combo['imagen'])
+
         # Actualizar combo
         cursor.execute('''
             UPDATE combos
@@ -1109,10 +1234,10 @@ def actualizar_combo(combo_id):
             WHERE id = ?
         ''', (
             nombre,
-            data.get('descripcion', combo['descripcion']),
+            descripcion,
             float(precio_combo),
-            data.get('imagen', combo['imagen']),
-            data.get('activo', combo['activo']),
+            imagen_path,
+            request.form.get('activo', combo['activo']) if not request.is_json else request.get_json().get('activo', combo['activo']),
             combo_id
         ))
 
@@ -1131,6 +1256,7 @@ def actualizar_combo(combo_id):
         return jsonify({
             'success': True,
             'id': combo_id,
+            'imagen': imagen_path,
             'mensaje': f"Combo actualizado exitosamente"
         })
     except Exception as e:
