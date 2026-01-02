@@ -13,96 +13,84 @@
 <link rel="stylesheet" href="css/pos.css">
 </head>
 <body>
-<!-- Navbar -->
+<!-- Navbar Principal -->
 <nav class="navbar navbar-pos navbar-dark">
 <div class="container-fluid">
 <span class="navbar-brand mb-0 h1">
 <i class="bi bi-shop"></i> POS Pupusería
 </span>
-<div class="d-flex align-items-center gap-3 flex-wrap">
-<span id="current-role" class="badge bg-light text-dark d-none"></span>
+<div class="d-flex align-items-center gap-2">
+<span id="current-role" class="badge bg-warning text-dark d-none" style="font-size: 0.85rem;"></span>
 <span class="text-white d-none d-md-inline" id="usuario-info">
 <i class="bi bi-person-circle"></i>
 <span id="usuario-nombre-display"></span>
 </span>
-<span id="current-time" class="text-white d-none d-md-inline"></span>
-<!-- Menú desplegable para navegación (responsive) -->
-<div class="dropdown">
-<button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="navDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-<i class="bi bi-list"></i> <span class="d-md-none">Menú</span><span class="d-none d-md-inline">Opciones</span>
+<span id="current-time" class="text-white-50 d-none d-lg-inline small"></span>
+<button class="btn btn-outline-light btn-sm" onclick="logout()">
+<i class="bi bi-box-arrow-right"></i>
 </button>
-<ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navDropdown" style="min-width: 180px;">
-<!-- Cambiar Rol - Solo para Manager -->
-<li id="li-cambiar-rol" class="d-none">
-<button class="dropdown-item" onclick="mostrarSelectorRol()">
-<i class="bi bi-arrow-repeat"></i> Cambiar Rol
-</button>
-</li>
-<!-- Administración - Solo para Manager -->
-<li id="li-admin" class="d-none">
-<a class="dropdown-item" href="admin.html">
-<i class="bi bi-gear"></i> Administración
-</a>
-</li>
-<!-- Facturación - Solo para Manager -->
-<li id="li-factura" class="d-none">
-<a class="dropdown-item" href="index.html">
-<i class="bi bi-receipt"></i> Facturación
-</a>
-</li>
-<li><hr class="dropdown-divider"></li>
-<li>
-<button class="dropdown-item" onclick="logout()">
-<i class="bi bi-box-arrow-right"></i> Salir
-</button>
-</li>
-</ul>
-</div>
-<!-- Botones en desktop (ocultos en móvil) -->
-<div id="manager-nav-links" class="d-none d-lg-flex gap-2">
-<a href="index.html" class="btn btn-outline-light btn-sm">
-<i class="bi bi-receipt"></i> <span class="d-none d-xl-inline">Facturación</span>
-</a>
-<a href="admin.html" class="btn btn-outline-light btn-sm">
-<i class="bi bi-gear"></i> <span class="d-none d-xl-inline">Administración</span>
-</a>
-<button id="btn-cambiar-rol" class="btn btn-outline-light btn-sm d-none" onclick="mostrarSelectorRol()">
-<i class="bi bi-arrow-repeat"></i> <span class="d-none d-xl-inline">Cambiar Rol</span>
-</button>
-</div>
 </div>
 </div>
 </nav>
+<!-- Barra Manager (visible solo para managers) -->
+<div id="manager-toolbar" class="manager-toolbar d-none">
+<div class="d-flex align-items-center gap-2">
+<span class="role-indicator">
+<i class="bi bi-shield-check"></i> Manager
+</span>
+<span id="viewing-as-role" class="badge bg-light text-dark"></span>
+</div>
+<div class="d-flex align-items-center gap-2">
+<a href="index.html" class="btn btn-light btn-sm">
+<i class="bi bi-receipt"></i> <span class="d-none d-md-inline">Facturación</span>
+</a>
+<a href="admin.html" class="btn btn-light btn-sm">
+<i class="bi bi-gear"></i> <span class="d-none d-md-inline">Administración</span>
+</a>
+<button class="btn btn-warning btn-sm" onclick="mostrarSelectorRol()">
+<i class="bi bi-arrow-repeat"></i> <span class="d-none d-md-inline">Cambiar Rol</span>
+</button>
+</div>
+</div>
 <div class="container-fluid mt-4">
 <!-- Selector de Rol (oculto por defecto, solo visible para managers) -->
-<div id="role-selector" class="role-selector mx-auto" style="max-width: 800px; display: none;">
-<h3 class="text-center mb-4">Selecciona tu rol</h3>
-<div class="row g-4">
-<div class="col-md-4">
-<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('mesero')">
+<div id="role-selector" class="role-selector mx-auto" style="max-width: 1000px; display: none;">
+<h3 class="text-center mb-4">Selecciona tu rol de trabajo</h3>
+<div class="row g-3">
+<div class="col-6 col-md-3">
+<div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('mesero')">
 <div class="role-icon role-mesero">
 <i class="bi bi-person-badge"></i>
 </div>
-<h4>Mesero</h4>
-<p class="text-muted">Tomar pedidos y servir mesas</p>
+<h5>Mesero</h5>
+<p class="text-muted small mb-0">Tomar pedidos y servir</p>
 </div>
 </div>
-<div class="col-md-4">
-<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cajero')">
+<div class="col-6 col-md-3">
+<div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('cajero')">
 <div class="role-icon role-cajero">
 <i class="bi bi-cash-register"></i>
 </div>
-<h4>Cajero</h4>
-<p class="text-muted">Procesar pagos y facturar</p>
+<h5>Cajero</h5>
+<p class="text-muted small mb-0">Cobros y facturación</p>
 </div>
 </div>
-<div class="col-md-4">
-<div class="card role-card h-100 text-center p-4" onclick="seleccionarRol('cocinero')">
+<div class="col-6 col-md-3">
+<div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('cocinero')">
 <div class="role-icon role-cocinero">
 <i class="bi bi-fire"></i>
 </div>
-<h4>Cocina</h4>
-<p class="text-muted">Preparar pedidos</p>
+<h5>Cocina</h5>
+<p class="text-muted small mb-0">Preparar pedidos</p>
+</div>
+</div>
+<div class="col-6 col-md-3">
+<div class="card role-card h-100 text-center p-3 border-primary" onclick="window.location.href='admin.html'">
+<div class="role-icon" style="color: #6f42c1;">
+<i class="bi bi-gear-fill"></i>
+</div>
+<h5>Administración</h5>
+<p class="text-muted small mb-0">Gestión del sistema</p>
 </div>
 </div>
 </div>
@@ -453,80 +441,6 @@ placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
 <div class="row" id="pedidos-cocina-container"></div>
 </div>
 
-<!-- Panel Manager -->
-<div id="panel-manager" class="work-panel">
-<ul class="nav nav-tabs mb-3" id="managerTabs">
-<li class="nav-item">
-<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#manager-combos-tab">
-<i class="bi bi-basket"></i> Gestionar Combos
-</button>
-</li>
-<li class="nav-item">
-<button class="nav-link" data-bs-toggle="tab" data-bs-target="#manager-productos-tab">
-<i class="bi bi-box"></i> Productos
-</button>
-</li>
-<li class="nav-item">
-<button class="nav-link" data-bs-toggle="tab" data-bs-target="#manager-categorias-tab">
-<i class="bi bi-tag"></i> Categorías
-</button>
-</li>
-</ul>
-
-<div class="tab-content">
-<!-- Tab Combos -->
-<div class="tab-pane fade show active" id="manager-combos-tab">
-<div class="row">
-<div class="col-lg-6">
-<h5><i class="bi bi-plus-circle"></i> Crear Nuevo Combo</h5>
-<div class="card p-3">
-<div class="mb-3">
-<label class="form-label">Nombre del Combo</label>
-<input type="text" class="form-control" id="combo-nombre" placeholder="Ej: Combo Almuerzo">
-</div>
-<div class="mb-3">
-<label class="form-label">Descripción</label>
-<textarea class="form-control" id="combo-descripcion" placeholder="Descripción del combo"></textarea>
-</div>
-<div class="mb-3">
-<label class="form-label">Precio</label>
-<input type="number" class="form-control" id="combo-precio" placeholder="0.00" step="0.01">
-</div>
-<div class="mb-3">
-<label class="form-label">Seleccionar Productos</label>
-<div id="combo-productos-lista" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
-</div>
-<div class="mb-3">
-<h6>Productos Seleccionados:</h6>
-<div id="combo-productos-seleccionados" class="list-group"></div>
-</div>
-<button class="btn btn-primary w-100" onclick="guardarCombo()">
-<i class="bi bi-save"></i> Guardar Combo
-</button>
-</div>
-</div>
-
-<div class="col-lg-6">
-<h5><i class="bi bi-list"></i> Combos Existentes</h5>
-<div id="combos-lista" class="list-group"></div>
-</div>
-</div>
-</div>
-
-<!-- Tab Productos -->
-<div class="tab-pane fade" id="manager-productos-tab">
-<h5>Gestión de Productos</h5>
-<div id="productos-admin-container"></div>
-</div>
-
-<!-- Tab Categorías -->
-<div class="tab-pane fade" id="manager-categorias-tab">
-<h5>Gestión de Categorías</h5>
-<div id="categorias-admin-container"></div>
-</div>
-</div>
-</div>
-
 </div>
 <!-- Modal Confirmar Pago -->
 <div class="modal fade" id="modalPago" tabindex="-1">
@@ -788,10 +702,20 @@ window.rolSystem = {
 // Mostrar selector de rol (solo para managers)
 function mostrarSelectorRol() {
   const usuario = JSON.parse(localStorage.getItem('user') || '{}');
-  if (usuario.rol !== 'manager') {
+  const rolOriginal = usuario.rol_original || usuario.rol;
+
+  if (rolOriginal !== 'manager') {
     alert('⚠️ Solo managers pueden cambiar de rol');
     return;
   }
+
+  // Ocultar todos los paneles de trabajo
+  document.querySelectorAll('.work-panel').forEach(panel => {
+    panel.style.display = 'none';
+    panel.classList.remove('active');
+  });
+
+  // Mostrar selector de rol
   const selector = document.getElementById('role-selector');
   if (selector) {
     selector.style.display = 'block';
@@ -804,9 +728,13 @@ function mostrarSelectorRol() {
 function aplicarPermisosPorRol(rol) {
   console.log('[POS] Aplicando permisos para rol:', rol);
 
+  // Verificar si el usuario original es manager
+  const usuario = JSON.parse(localStorage.getItem('user') || '{}');
+  const rolOriginal = usuario.rol_original || usuario.rol;
+
   // Actualizar estado global
   window.rolSystem.currentRole = rol;
-  window.rolSystem.isManager = (rol === 'manager');
+  window.rolSystem.isManager = (rolOriginal === 'manager');
 
   // Actualizar badge de rol
   const currentRoleBadge = document.getElementById('current-role');
@@ -815,11 +743,20 @@ function aplicarPermisosPorRol(rol) {
     currentRoleBadge.classList.remove('d-none');
   }
 
-  // Actualizar menú de navegación
-  document.getElementById('li-cambiar-rol')?.classList.toggle('d-none', !window.rolSystem.isManager);
-  document.getElementById('li-admin')?.classList.toggle('d-none', !window.rolSystem.isManager);
-  document.getElementById('li-factura')?.classList.toggle('d-none', !window.rolSystem.isManager);
-  document.getElementById('btn-cambiar-rol')?.classList.toggle('d-none', !window.rolSystem.isManager);
+  // Mostrar/ocultar barra de manager
+  const managerToolbar = document.getElementById('manager-toolbar');
+  const viewingAsRole = document.getElementById('viewing-as-role');
+  if (managerToolbar) {
+    if (window.rolSystem.isManager) {
+      managerToolbar.classList.remove('d-none');
+      if (viewingAsRole) {
+        const rolDisplay = rol === 'cocinero' ? 'Cocina' : rol.charAt(0).toUpperCase() + rol.slice(1);
+        viewingAsRole.textContent = `Vista: ${rolDisplay}`;
+      }
+    } else {
+      managerToolbar.classList.add('d-none');
+    }
+  }
 
   // Botón de reportes detallados
   const btnReportes = document.getElementById('boton-reportes-detallados');
@@ -844,10 +781,10 @@ function aplicarPermisosPorRol(rol) {
   const panelMap = {
     'mesero': 'panel-mesero',
     'cajero': 'panel-cajero',
-    'cocinero': 'panel-cocina',
-    'manager': 'panel-manager'
+    'cocinero': 'panel-cocina'
   };
 
+  // Manager no tiene panel en POS, debe ir a admin.html para gestión
   const panelId = panelMap[rol];
   const panelActual = document.getElementById(panelId);
 

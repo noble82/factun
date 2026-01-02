@@ -48,6 +48,9 @@
                     <a class="nav-link" href="#" onclick="showSection('productos')">
                         <i class="bi bi-basket"></i> Productos
                     </a>
+                    <a class="nav-link" href="#" onclick="showSection('combos')">
+                        <i class="bi bi-collection"></i> Combos
+                    </a>
                     <a class="nav-link" href="#" onclick="showSection('inventario')">
                         <i class="bi bi-box-seam"></i> Inventario
                     </a>
@@ -208,6 +211,53 @@
                                 </thead>
                                 <tbody></tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gestión de Combos -->
+                <div id="section-combos" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-collection"></i> Gestión de Combos</h4>
+                        <button class="btn btn-primary" onclick="mostrarModalCombo()">
+                            <i class="bi bi-plus-circle"></i> Nuevo Combo
+                        </button>
+                    </div>
+
+                    <div class="row">
+                        <!-- Lista de Combos -->
+                        <div class="col-12">
+                            <div class="table-container">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control" id="buscar-combo" placeholder="Buscar combo..." oninput="filtrarCombos()">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="filtro-estado-combo" onchange="filtrarCombos()">
+                                            <option value="">Todos</option>
+                                            <option value="1">Activos</option>
+                                            <option value="0">Inactivos</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="tabla-combos">
+                                        <thead>
+                                            <tr>
+                                                <th>Imagen</th>
+                                                <th>Nombre</th>
+                                                <th>Productos</th>
+                                                <th>Precio Original</th>
+                                                <th>Precio Combo</th>
+                                                <th>Ahorro</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="combos-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1040,6 +1090,18 @@
                             </select>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Imagen del Producto</label>
+                            <input type="file" class="form-control" id="producto-imagen" accept="image/jpeg,image/png">
+                            <small class="text-muted">JPG o PNG, m&aacute;x 2MB</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div id="producto-imagen-preview" class="text-center">
+                                <img id="producto-img-preview" src="" alt="Preview" style="max-width: 100%; max-height: 100px; display: none; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1070,6 +1132,123 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-info" onclick="guardarCategoria()">
                         <i class="bi bi-check-circle"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Combo -->
+    <div class="modal fade" id="modalCombo" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-collection"></i> <span id="modal-combo-titulo">Nuevo Combo</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="combo-id">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre del Combo *</label>
+                                <input type="text" class="form-control" id="combo-nombre" required placeholder="Ej: Combo Familiar">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Descripci&oacute;n</label>
+                                <textarea class="form-control" id="combo-descripcion" rows="2" placeholder="Descripci&oacute;n del combo"></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Precio del Combo *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="combo-precio" step="0.01" min="0" required placeholder="0.00">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Estado</label>
+                                    <select class="form-select" id="combo-activo">
+                                        <option value="1">Activo</option>
+                                        <option value="0">Inactivo</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Imagen del Combo</label>
+                                <input type="file" class="form-control" id="combo-imagen" accept="image/jpeg,image/png">
+                                <small class="text-muted">JPG o PNG, m&aacute;x 2MB</small>
+                                <div id="combo-imagen-preview" class="mt-2 text-center">
+                                    <img id="combo-img-preview" src="" alt="Preview" style="max-width: 100%; max-height: 150px; display: none; border-radius: 8px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6><i class="bi bi-basket"></i> Productos del Combo (m&iacute;nimo 2)</h6>
+                    <div class="alert alert-info py-2 mb-3">
+                        <small><i class="bi bi-info-circle"></i> El precio del combo debe ser menor que la suma de los productos individuales.</small>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <select class="form-select" id="combo-producto-select">
+                                <option value="">Seleccionar producto...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="number" class="form-control" id="combo-producto-cantidad" value="1" min="1" placeholder="Cantidad">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100" onclick="agregarProductoCombo()">
+                                <i class="bi bi-plus"></i> Agregar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="tabla-productos-combo">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Cantidad</th>
+                                    <th>Precio Unit.</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="combo-productos-tbody"></tbody>
+                            <tfoot>
+                                <tr class="table-secondary">
+                                    <td colspan="3" class="text-end"><strong>Precio Original:</strong></td>
+                                    <td><strong id="combo-precio-original">$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-success">
+                                    <td colspan="3" class="text-end"><strong>Precio Combo:</strong></td>
+                                    <td><strong id="combo-precio-final">$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td colspan="3" class="text-end"><strong>Ahorro Cliente:</strong></td>
+                                    <td><strong id="combo-ahorro">$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div id="combo-validacion-error" class="alert alert-danger d-none">
+                        <i class="bi bi-exclamation-triangle"></i> <span id="combo-error-mensaje"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="guardarCombo()">
+                        <i class="bi bi-check-circle"></i> Guardar Combo
                     </button>
                 </div>
             </div>

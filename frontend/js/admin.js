@@ -114,6 +114,9 @@ function showSection(section) {
             cargarClientes();
             cargarEstadisticasClientes();
             break;
+        case 'combos':
+            cargarCombos();
+            break;
     }
 }
 
@@ -366,6 +369,12 @@ function mostrarModalProducto() {
     document.getElementById('producto-disponible').value = '1';
     document.getElementById('modal-producto-titulo').textContent = 'Nuevo Producto';
 
+    // Limpiar imagen
+    const imagenInput = document.getElementById('producto-imagen');
+    const imgPreview = document.getElementById('producto-img-preview');
+    if (imagenInput) imagenInput.value = '';
+    if (imgPreview) imgPreview.style.display = 'none';
+
     // Actualizar select de materia prima (solo productos de consumo)
     const selectMateria = document.getElementById('producto-materia-prima');
     if (selectMateria) {
@@ -397,6 +406,19 @@ async function editarProducto(id) {
         document.getElementById('producto-disponible').value = prod.disponible ? '1' : '0';
         document.getElementById('modal-producto-titulo').textContent = 'Editar Producto';
 
+        // Mostrar imagen existente
+        const imagenInput = document.getElementById('producto-imagen');
+        const imgPreview = document.getElementById('producto-img-preview');
+        if (imagenInput) imagenInput.value = '';
+        if (imgPreview) {
+            if (prod.imagen) {
+                imgPreview.src = '/' + prod.imagen;
+                imgPreview.style.display = 'block';
+            } else {
+                imgPreview.style.display = 'none';
+            }
+        }
+
         // Actualizar select de materia prima
         const selectMateria = document.getElementById('producto-materia-prima');
         if (selectMateria) {
@@ -418,22 +440,18 @@ async function editarProducto(id) {
 
 async function guardarProducto() {
     const id = document.getElementById('producto-id').value;
-    const data = {
-        nombre: document.getElementById('producto-nombre').value.trim(),
-        precio: parseFloat(document.getElementById('producto-precio').value),
-        descripcion: document.getElementById('producto-descripcion').value.trim(),
-        categoria_id: parseInt(document.getElementById('producto-categoria').value) || null,
-        materia_prima_id: parseInt(document.getElementById('producto-materia-prima').value) || null,
-        tiempo_preparacion: parseInt(document.getElementById('producto-tiempo').value) || 5,
-        disponible: document.getElementById('producto-disponible').value === '1'
-    };
+    const imagenInput = document.getElementById('producto-imagen');
 
-    if (!data.nombre || !data.precio) {
+    const nombre = document.getElementById('producto-nombre').value.trim();
+    const precio = parseFloat(document.getElementById('producto-precio').value);
+    const categoria_id = parseInt(document.getElementById('producto-categoria').value) || null;
+
+    if (!nombre || !precio) {
         mostrarNotificacion('Error', 'Nombre y precio son requeridos', 'danger');
         return;
     }
 
-    if (!data.categoria_id) {
+    if (!categoria_id) {
         mostrarNotificacion('Error', 'Debe seleccionar una categoría', 'danger');
         return;
     }
@@ -442,10 +460,24 @@ async function guardarProducto() {
         const url = id ? `${API_POS}/productos/${id}` : `${API_POS}/productos`;
         const method = id ? 'PUT' : 'POST';
 
+        // Usar FormData para soportar imagen
+        const formData = new FormData();
+        formData.append('nombre', nombre);
+        formData.append('precio', precio);
+        formData.append('descripcion', document.getElementById('producto-descripcion').value.trim());
+        formData.append('categoria_id', categoria_id);
+        formData.append('materia_prima_id', parseInt(document.getElementById('producto-materia-prima').value) || '');
+        formData.append('tiempo_preparacion', parseInt(document.getElementById('producto-tiempo').value) || 5);
+        formData.append('disponible', document.getElementById('producto-disponible').value === '1' ? '1' : '0');
+
+        // Agregar imagen si existe
+        if (imagenInput && imagenInput.files[0]) {
+            formData.append('imagen', imagenInput.files[0]);
+        }
+
         const response = await apiFetch(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: formData
         });
 
         const result = await response.json();
@@ -1987,4 +2019,404 @@ window.toggleCamposContribuyente = toggleCamposContribuyente;
 window.exportarClientes = exportarClientes;
 window.verHistorialCliente = verHistorialCliente;
 window.verCreditoCliente = verCreditoCliente;
+
+// ============ GESTIÓN DE COMBOS ============
+
+let todosProductos = [];
+let productosComboSeleccionados = [];
+
+async function cargarCombos() {
+    try {
+        const response = await apiFetch(`${API_POS}/combos`);
+        const combos = await response.json();
+        renderizarTablaCombos(combos);
+    } catch (error) {
+        console.error('Error cargando combos:', error);
+        mostrarNotificacion('Error', 'No se pudieron cargar los combos', 'danger');
+    }
+}
+
+function renderizarTablaCombos(combos) {
+    const tbody = document.getElementById('combos-tbody');
+    if (!tbody) return;
+
+    if (combos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay combos registrados</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = combos.map(combo => {
+        const precioOriginal = combo.precio_original || 0;
+        const ahorro = precioOriginal - (combo.precio_combo || 0);
+        const porcentajeAhorro = precioOriginal > 0 ? ((ahorro / precioOriginal) * 100).toFixed(0) : 0;
+
+        return `
+            <tr>
+                <td>
+                    ${combo.imagen ?
+                        `<img src="/${combo.imagen}" alt="${combo.nombre}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px;">` :
+                        `<div style="width: 50px; height: 50px; background: #eee; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-collection text-muted"></i>
+                        </div>`
+                    }
+                </td>
+                <td><strong>${combo.nombre}</strong></td>
+                <td>
+                    <small class="text-muted">${combo.productos ? combo.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(', ') : '-'}</small>
+                </td>
+                <td>$${precioOriginal.toFixed(2)}</td>
+                <td><strong class="text-success">$${(combo.precio_combo || 0).toFixed(2)}</strong></td>
+                <td><span class="badge bg-warning text-dark">${porcentajeAhorro}% off</span></td>
+                <td>
+                    ${combo.activo ?
+                        '<span class="badge bg-success">Activo</span>' :
+                        '<span class="badge bg-secondary">Inactivo</span>'
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editarCombo(${combo.id})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarCombo(${combo.id})" title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function mostrarModalCombo(comboId = null) {
+    // Limpiar formulario
+    document.getElementById('combo-id').value = '';
+    document.getElementById('combo-nombre').value = '';
+    document.getElementById('combo-descripcion').value = '';
+    document.getElementById('combo-precio').value = '';
+    document.getElementById('combo-activo').value = '1';
+    document.getElementById('combo-imagen').value = '';
+    document.getElementById('combo-img-preview').style.display = 'none';
+    productosComboSeleccionados = [];
+    actualizarTablaProductosCombo();
+    ocultarErrorCombo();
+
+    // Cargar productos para el selector
+    await cargarProductosParaCombo();
+
+    document.getElementById('modal-combo-titulo').textContent = comboId ? 'Editar Combo' : 'Nuevo Combo';
+
+    if (comboId) {
+        await cargarDatosCombo(comboId);
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalCombo'));
+    modal.show();
+}
+
+async function cargarProductosParaCombo() {
+    try {
+        const response = await apiFetch(`${API_POS}/productos`);
+        todosProductos = await response.json();
+
+        const select = document.getElementById('combo-producto-select');
+        select.innerHTML = '<option value="">Seleccionar producto...</option>';
+        select.innerHTML += todosProductos
+            .filter(p => p.disponible)
+            .map(p => `<option value="${p.id}" data-precio="${p.precio}">${p.nombre} - $${p.precio.toFixed(2)}</option>`)
+            .join('');
+    } catch (error) {
+        console.error('Error cargando productos:', error);
+    }
+}
+
+async function cargarDatosCombo(comboId) {
+    try {
+        const response = await apiFetch(`${API_POS}/combos/${comboId}`);
+        const combo = await response.json();
+
+        document.getElementById('combo-id').value = combo.id;
+        document.getElementById('combo-nombre').value = combo.nombre;
+        document.getElementById('combo-descripcion').value = combo.descripcion || '';
+        document.getElementById('combo-precio').value = combo.precio_combo;
+        document.getElementById('combo-activo').value = combo.activo ? '1' : '0';
+
+        if (combo.imagen) {
+            document.getElementById('combo-img-preview').src = '/' + combo.imagen;
+            document.getElementById('combo-img-preview').style.display = 'block';
+        }
+
+        // Cargar productos del combo
+        productosComboSeleccionados = (combo.productos || []).map(p => ({
+            id: p.producto_id,
+            nombre: p.nombre,
+            precio: p.precio_unitario,
+            cantidad: p.cantidad
+        }));
+        actualizarTablaProductosCombo();
+
+    } catch (error) {
+        console.error('Error cargando combo:', error);
+        mostrarNotificacion('Error', 'No se pudo cargar el combo', 'danger');
+    }
+}
+
+function agregarProductoCombo() {
+    const select = document.getElementById('combo-producto-select');
+    const cantidadInput = document.getElementById('combo-producto-cantidad');
+
+    const productoId = parseInt(select.value);
+    const cantidad = parseInt(cantidadInput.value) || 1;
+
+    if (!productoId) {
+        mostrarNotificacion('Atención', 'Selecciona un producto', 'warning');
+        return;
+    }
+
+    const producto = todosProductos.find(p => p.id === productoId);
+    if (!producto) return;
+
+    // Verificar si ya existe
+    const existente = productosComboSeleccionados.find(p => p.id === productoId);
+    if (existente) {
+        existente.cantidad += cantidad;
+    } else {
+        productosComboSeleccionados.push({
+            id: producto.id,
+            nombre: producto.nombre,
+            precio: producto.precio,
+            cantidad: cantidad
+        });
+    }
+
+    // Limpiar selección
+    select.value = '';
+    cantidadInput.value = '1';
+
+    actualizarTablaProductosCombo();
+}
+
+function quitarProductoCombo(productoId) {
+    productosComboSeleccionados = productosComboSeleccionados.filter(p => p.id !== productoId);
+    actualizarTablaProductosCombo();
+}
+
+function actualizarTablaProductosCombo() {
+    const tbody = document.getElementById('combo-productos-tbody');
+    const precioOriginalEl = document.getElementById('combo-precio-original');
+    const precioFinalEl = document.getElementById('combo-precio-final');
+    const ahorroEl = document.getElementById('combo-ahorro');
+
+    if (!tbody) return;
+
+    let precioOriginal = 0;
+
+    if (productosComboSeleccionados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Sin productos</td></tr>';
+    } else {
+        tbody.innerHTML = productosComboSeleccionados.map(p => {
+            const subtotal = p.precio * p.cantidad;
+            precioOriginal += subtotal;
+            return `
+                <tr>
+                    <td>${p.nombre}</td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm" style="width: 70px;"
+                            value="${p.cantidad}" min="1"
+                            onchange="actualizarCantidadProductoCombo(${p.id}, this.value)">
+                    </td>
+                    <td>$${p.precio.toFixed(2)}</td>
+                    <td>$${subtotal.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="quitarProductoCombo(${p.id})">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    precioOriginalEl.textContent = `$${precioOriginal.toFixed(2)}`;
+
+    const precioCombo = parseFloat(document.getElementById('combo-precio').value) || 0;
+    precioFinalEl.textContent = `$${precioCombo.toFixed(2)}`;
+
+    const ahorro = precioOriginal - precioCombo;
+    ahorroEl.textContent = ahorro > 0 ? `$${ahorro.toFixed(2)}` : '$0.00';
+}
+
+function actualizarCantidadProductoCombo(productoId, nuevaCantidad) {
+    const producto = productosComboSeleccionados.find(p => p.id === productoId);
+    if (producto) {
+        producto.cantidad = parseInt(nuevaCantidad) || 1;
+        actualizarTablaProductosCombo();
+    }
+}
+
+// Escuchar cambios en precio combo
+document.addEventListener('DOMContentLoaded', () => {
+    const precioInput = document.getElementById('combo-precio');
+    if (precioInput) {
+        precioInput.addEventListener('input', actualizarTablaProductosCombo);
+    }
+
+    // Preview imagen combo
+    const imagenInputCombo = document.getElementById('combo-imagen');
+    if (imagenInputCombo) {
+        imagenInputCombo.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('combo-img-preview');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // Preview imagen producto
+    const imagenInputProducto = document.getElementById('producto-imagen');
+    if (imagenInputProducto) {
+        imagenInputProducto.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('producto-img-preview');
+                    if (preview) {
+                        preview.src = e.target.result;
+                        preview.style.display = 'block';
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+
+function validarCombo() {
+    const nombre = document.getElementById('combo-nombre').value.trim();
+    const precio = parseFloat(document.getElementById('combo-precio').value) || 0;
+
+    if (!nombre) {
+        mostrarErrorCombo('El nombre del combo es requerido');
+        return false;
+    }
+
+    if (productosComboSeleccionados.length < 2) {
+        mostrarErrorCombo('El combo debe tener al menos 2 productos');
+        return false;
+    }
+
+    const precioOriginal = productosComboSeleccionados.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
+    if (precio >= precioOriginal) {
+        mostrarErrorCombo('El precio del combo debe ser menor que el precio original ($' + precioOriginal.toFixed(2) + ')');
+        return false;
+    }
+
+    if (precio <= 0) {
+        mostrarErrorCombo('El precio del combo debe ser mayor a $0');
+        return false;
+    }
+
+    return true;
+}
+
+function mostrarErrorCombo(mensaje) {
+    const errorDiv = document.getElementById('combo-validacion-error');
+    const mensajeSpan = document.getElementById('combo-error-mensaje');
+    mensajeSpan.textContent = mensaje;
+    errorDiv.classList.remove('d-none');
+}
+
+function ocultarErrorCombo() {
+    document.getElementById('combo-validacion-error').classList.add('d-none');
+}
+
+async function guardarCombo() {
+    if (!validarCombo()) return;
+
+    const comboId = document.getElementById('combo-id').value;
+    const imagenInput = document.getElementById('combo-imagen');
+
+    const formData = new FormData();
+    formData.append('nombre', document.getElementById('combo-nombre').value.trim());
+    formData.append('descripcion', document.getElementById('combo-descripcion').value.trim());
+    formData.append('precio_combo', document.getElementById('combo-precio').value);
+    formData.append('activo', document.getElementById('combo-activo').value);
+    formData.append('productos', JSON.stringify(productosComboSeleccionados.map(p => ({
+        producto_id: p.id,
+        cantidad: p.cantidad
+    }))));
+
+    if (imagenInput.files[0]) {
+        formData.append('imagen', imagenInput.files[0]);
+    }
+
+    try {
+        const url = comboId ? `${API_POS}/combos/${comboId}` : `${API_POS}/combos`;
+        const method = comboId ? 'PUT' : 'POST';
+
+        const response = await apiFetch(url, {
+            method: method,
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Error al guardar combo');
+        }
+
+        mostrarNotificacion('Éxito', comboId ? 'Combo actualizado' : 'Combo creado', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('modalCombo')).hide();
+        cargarCombos();
+
+    } catch (error) {
+        console.error('Error guardando combo:', error);
+        mostrarNotificacion('Error', error.message, 'danger');
+    }
+}
+
+async function editarCombo(id) {
+    await mostrarModalCombo(id);
+}
+
+async function eliminarCombo(id) {
+    if (!confirm('¿Estás seguro de eliminar este combo?')) return;
+
+    try {
+        const response = await apiFetch(`${API_POS}/combos/${id}`, { method: 'DELETE' });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Error al eliminar');
+        }
+
+        mostrarNotificacion('Éxito', 'Combo eliminado', 'success');
+        cargarCombos();
+
+    } catch (error) {
+        console.error('Error eliminando combo:', error);
+        mostrarNotificacion('Error', error.message, 'danger');
+    }
+}
+
+function filtrarCombos() {
+    // Implementar filtrado en frontend si es necesario
+    cargarCombos();
+}
+
+// Exponer funciones de combos globalmente
+window.cargarCombos = cargarCombos;
+window.mostrarModalCombo = mostrarModalCombo;
+window.agregarProductoCombo = agregarProductoCombo;
+window.quitarProductoCombo = quitarProductoCombo;
+window.actualizarCantidadProductoCombo = actualizarCantidadProductoCombo;
+window.guardarCombo = guardarCombo;
+window.editarCombo = editarCombo;
+window.eliminarCombo = eliminarCombo;
+window.filtrarCombos = filtrarCombos;
 

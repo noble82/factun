@@ -1,95 +1,247 @@
 :root {
-            --primary-color: #e67e22;
-            --secondary-color: #d35400;
-        }
-        body {
-            background-color: #1a1a2e;
-            color: white;
-            min-height: 100vh;
-        }
-        .navbar-cocina {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        }
-        .pedido-card {
-            background: #16213e;
-            border-radius: 15px;
-            border-left: 5px solid var(--primary-color);
-            margin-bottom: 15px;
-            transition: all 0.3s;
-        }
-        .pedido-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        .pedido-card.urgente {
-            border-left-color: #e74c3c;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
-            50% { box-shadow: 0 0 20px 10px rgba(231, 76, 60, 0.2); }
-        }
-        .pedido-card.listo {
-            border-left-color: #27ae60;
-            opacity: 0.7;
-        }
-        .pedido-card.preparando {
-            border-left-color: #f39c12;
-            background: #1a2744;
-        }
-        .mesa-badge {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-        .item-producto {
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px;
-            margin: 5px 0;
-        }
-        .item-producto .cantidad {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        .btn-listo {
-            background: #27ae60;
-            border: none;
-            font-size: 1.2rem;
-            padding: 15px 30px;
-        }
-        .btn-listo:hover {
-            background: #219a52;
-        }
-        .tiempo-espera {
-            font-size: 0.9rem;
-        }
-        .tiempo-espera.alerta {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-        .stats-bar {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .stat-item {
-            text-align: center;
-        }
-        .stat-numero {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 100px 20px;
-        }
-        .empty-state i {
-            font-size: 5rem;
-            color: #27ae60;
-            margin-bottom: 20px;
-        }
+    --cocina-primary: #e67e22;
+    --cocina-secondary: #d35400;
+    --cocina-bg: #1a1a2e;
+    --cocina-card: #16213e;
+    --cocina-success: #27ae60;
+    --cocina-warning: #f39c12;
+    --cocina-danger: #e74c3c;
+}
+body {
+    background: linear-gradient(135deg, var(--cocina-bg), #0f0f1a);
+    color: white;
+    min-height: 100vh;
+}
+.navbar-cocina {
+    background: linear-gradient(135deg, var(--cocina-primary), var(--cocina-secondary));
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
+}
+
+/* Manager Toolbar */
+.manager-toolbar {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.manager-toolbar .role-indicator {
+    background: rgba(255,255,255,0.2);
+    padding: 5px 15px;
+    border-radius: 20px;
+    color: white;
+    font-weight: 500;
+}
+.manager-toolbar .btn {
+    border-radius: 20px;
+}
+
+/* ============ ESTADÍSTICAS SUPERIORES ============ */
+.stats-bar {
+    background: rgba(255,255,255,0.08);
+    padding: 15px 20px;
+    border-radius: 15px;
+    margin-bottom: 25px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.stat-item {
+    text-align: center;
+    padding: 10px;
+}
+.stat-numero {
+    font-size: 2.5rem;
+    font-weight: 800;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+.stat-item small {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ============ TARJETAS DE PEDIDO - ESTILO KANBAN ============ */
+.pedido-card {
+    background: var(--cocina-card);
+    border-radius: 16px;
+    border-left: 6px solid var(--cocina-primary);
+    margin-bottom: 20px;
+    transition: all 0.4s ease;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.pedido-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+}
+
+/* Estado: Urgente (más de 15 min) */
+.pedido-card.urgente {
+    border-left-color: var(--cocina-danger);
+    background: linear-gradient(135deg, #2d1f1f, var(--cocina-card));
+    animation: urgente-pulse 1.5s infinite;
+}
+@keyframes urgente-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5);
+        border-left-width: 6px;
+    }
+    50% {
+        box-shadow: 0 0 25px 10px rgba(231, 76, 60, 0.3);
+        border-left-width: 8px;
+    }
+}
+
+/* Estado: Preparando */
+.pedido-card.preparando {
+    border-left-color: var(--cocina-warning);
+    background: linear-gradient(135deg, #2a2514, var(--cocina-card));
+    animation: preparando-glow 2s infinite;
+}
+@keyframes preparando-glow {
+    0%, 100% { box-shadow: 0 4px 20px rgba(243, 156, 18, 0.2); }
+    50% { box-shadow: 0 8px 30px rgba(243, 156, 18, 0.4); }
+}
+
+/* Estado: Listo */
+.pedido-card.listo {
+    border-left-color: var(--cocina-success);
+    background: linear-gradient(135deg, #1a2d1a, var(--cocina-card));
+}
+
+/* Mesa Badge */
+.mesa-badge {
+    font-size: 1.8rem;
+    font-weight: 800;
+    padding: 10px 20px !important;
+    border-radius: 12px !important;
+}
+
+/* Items del pedido */
+.items-lista {
+    max-height: 250px;
+    overflow-y: auto;
+}
+.item-producto {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px 15px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+.item-producto:hover {
+    background: rgba(255,255,255,0.12);
+    border-left-color: var(--cocina-primary);
+}
+.item-producto .cantidad {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--cocina-primary);
+    min-width: 50px;
+    text-align: center;
+    background: rgba(230, 126, 34, 0.2);
+    padding: 5px 12px;
+    border-radius: 8px;
+}
+.item-producto strong {
+    font-size: 1.1rem;
+}
+
+/* Tiempo de espera */
+.tiempo-espera {
+    font-size: 1rem;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.1);
+}
+.tiempo-espera.alerta {
+    color: #fff;
+    background: var(--cocina-danger);
+    font-weight: bold;
+    animation: tiempo-blink 1s infinite;
+}
+@keyframes tiempo-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* ============ BOTONES DE ACCIÓN ============ */
+.btn-warning.btn-lg {
+    background: linear-gradient(135deg, var(--cocina-warning), #e67e22);
+    border: none;
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 18px 30px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+}
+.btn-warning.btn-lg:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(243, 156, 18, 0.5);
+}
+.btn-warning.btn-lg:active {
+    transform: translateY(0);
+}
+
+.btn-listo {
+    background: linear-gradient(135deg, var(--cocina-success), #1e8449);
+    border: none;
+    font-size: 1.3rem;
+    font-weight: 800;
+    padding: 20px 35px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+}
+.btn-listo:hover {
+    background: linear-gradient(135deg, #2ecc71, var(--cocina-success));
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(39, 174, 96, 0.5);
+}
+.btn-listo:active {
+    transform: translateY(0) scale(1);
+}
+.btn-listo i {
+    margin-right: 8px;
+    font-size: 1.4rem;
+}
+
+/* Estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 20px;
+    border: 2px dashed rgba(255,255,255,0.1);
+}
+.empty-state i {
+    font-size: 6rem;
+    color: var(--cocina-success);
+    margin-bottom: 25px;
+    animation: check-bounce 2s infinite;
+}
+@keyframes check-bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+.empty-state h3 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+}
+.empty-state p {
+    opacity: 0.7;
+    font-size: 1.1rem;
+}
 
         /* Estilos responsivos para cocina */
         @media (max-width: 768px) {

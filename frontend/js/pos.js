@@ -101,9 +101,11 @@ function renderizarProductos(productos) {
     if (!container) return;
 
     container.innerHTML = productos.map(prod => `
-        <div class="producto-card" onclick="agregarAlCarrito(${prod.id}, '${prod.nombre}', ${prod.precio})">
-            <div class="producto-nombre">${prod.nombre}</div>
-            <div class="producto-precio">$${parseFloat(prod.precio).toFixed(2)}</div>
+        <div class="product-card" onclick="agregarAlCarrito(${prod.id}, '${prod.nombre}', ${prod.precio})">
+            ${prod.imagen ? `<img src="/${prod.imagen}" alt="${prod.nombre}" loading="lazy">` : ''}
+            ${prod.es_combo ? '<span class="badge-combo">COMBO</span>' : ''}
+            <div class="fw-bold">${prod.nombre}</div>
+            <div class="product-price">$${parseFloat(prod.precio).toFixed(2)}</div>
         </div>
     `).join('');
 
