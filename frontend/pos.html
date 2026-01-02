@@ -41,12 +41,6 @@
 <span id="viewing-as-role" class="badge bg-light text-dark"></span>
 </div>
 <div class="d-flex align-items-center gap-2">
-<a href="index.html" class="btn btn-light btn-sm">
-<i class="bi bi-receipt"></i> <span class="d-none d-md-inline">Facturación</span>
-</a>
-<a href="admin.html" class="btn btn-light btn-sm">
-<i class="bi bi-gear"></i> <span class="d-none d-md-inline">Administración</span>
-</a>
 <button class="btn btn-warning btn-sm" onclick="mostrarSelectorRol()">
 <i class="bi bi-arrow-repeat"></i> <span class="d-none d-md-inline">Cambiar Rol</span>
 </button>
@@ -871,37 +865,43 @@ function aplicarPermisosPorRol(rol) {
     panelActual.style.display = 'block';
     panelActual.classList.add('active');
 
-    // Inicializar datos según el rol
+    // Limpiar intervalos anteriores
+    if (window.intervalPorServir) clearInterval(window.intervalPorServir);
+    if (window.intervalCajero) clearInterval(window.intervalCajero);
+    if (window.intervalCocina) clearInterval(window.intervalCocina);
+
+    // Inicializar datos y auto-refresh según el rol
     if (rol === 'manager') {
-      // Cargar estadísticas del manager
       cargarEstadisticasManager();
     }
 
-    if ((rol === 'mesero') && typeof cargarMesas === 'function') {
-      cargarMesas();
-      // Iniciar polling para "Por Servir"
+    if (rol === 'mesero') {
+      if (typeof cargarMesas === 'function') cargarMesas();
+      if (typeof cargarCategorias === 'function') cargarCategorias();
       if (typeof actualizarPedidosPorServir === 'function') {
         actualizarPedidosPorServir();
-        // Actualizar cada 5 segundos
-        if (window.intervalPorServir) clearInterval(window.intervalPorServir);
-        window.intervalPorServir = setInterval(actualizarPedidosPorServir, 5000);
+        window.intervalPorServir = setInterval(actualizarPedidosPorServir, 8000);
       }
     }
 
-    if ((rol === 'mesero' || rol === 'cajero') && typeof cargarCategorias === 'function') {
-      cargarCategorias();
+    if (rol === 'cajero') {
+      if (typeof cargarCategorias === 'function') cargarCategorias();
+      if (typeof cargarPedidosCajero === 'function') {
+        cargarPedidosCajero();
+        window.intervalCajero = setInterval(cargarPedidosCajero, 10000);
+      }
+      if (typeof cargarEstadisticasDia === 'function') cargarEstadisticasDia();
     }
 
-    if ((rol === 'cajero') && typeof cargarPedidosCajero === 'function') {
-      cargarPedidosCajero();
-      // Actualizar cada 10 segundos
-      if (window.intervalCajero) clearInterval(window.intervalCajero);
-      window.intervalCajero = setInterval(cargarPedidosCajero, 10000);
+    if (rol === 'cocinero') {
+      if (typeof cargarPedidosCocina === 'function') {
+        cargarPedidosCocina();
+        // Auto-refresh cada 5 segundos para cocina
+        window.intervalCocina = setInterval(cargarPedidosCocina, 5000);
+      }
     }
 
-    if ((rol === 'cocinero') && typeof cargarPedidosCocina === 'function') {
-      cargarPedidosCocina();
-    }
+    console.log(`[POS] Auto-refresh activado para: ${rol}`);
   } else {
     console.warn(`[POS] Panel no encontrado: ${panelId}`);
   }
@@ -1117,7 +1117,7 @@ function seleccionarRol(nuevoRol) {
 <!-- Scripts principales -->
 <script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
-<script src="js/pos.js?v=18"></script>
+<script src="js/pos.js?v=19"></script>
 
 </body>
 </html>

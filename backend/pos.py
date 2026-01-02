@@ -1525,15 +1525,54 @@ def crear_pedido():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Calcular totales
+    # Calcular totales - soporta productos y combos
     subtotal = 0
+    items_expandidos = []
+
     for item in items:
-        cursor.execute('SELECT precio FROM productos WHERE id = ?', (item['producto_id'],))
-        producto = cursor.fetchone()
-        if producto:
-            item['precio_unitario'] = producto['precio']
-            item['subtotal'] = producto['precio'] * item.get('cantidad', 1)
-            subtotal += item['subtotal']
+        cantidad = item.get('cantidad', 1)
+
+        if item.get('combo_id') or item.get('es_combo'):
+            # Es un combo - obtener precio del combo
+            combo_id = item.get('combo_id')
+            cursor.execute('SELECT id, nombre, precio_combo FROM combos WHERE id = ?', (combo_id,))
+            combo = cursor.fetchone()
+            if combo:
+                item['precio_unitario'] = combo['precio_combo']
+                item['subtotal'] = combo['precio_combo'] * cantidad
+                item['nombre_item'] = combo['nombre']
+                item['es_combo'] = True
+                subtotal += item['subtotal']
+                items_expandidos.append(item)
+
+                # Obtener productos del combo para desglose en cocina
+                cursor.execute('''
+                    SELECT ci.producto_id, ci.cantidad, p.nombre, p.precio
+                    FROM combo_items ci
+                    JOIN productos p ON ci.producto_id = p.id
+                    WHERE ci.combo_id = ?
+                ''', (combo_id,))
+                combo_productos = cursor.fetchall()
+                for cp in combo_productos:
+                    items_expandidos.append({
+                        'producto_id': cp['producto_id'],
+                        'cantidad': cp['cantidad'] * cantidad,
+                        'precio_unitario': 0,  # No suma al total
+                        'subtotal': 0,
+                        'notas': f"Desglose de combo: {combo['nombre']}",
+                        'es_desglose': True
+                    })
+        else:
+            # Es un producto normal
+            cursor.execute('SELECT precio FROM productos WHERE id = ?', (item['producto_id'],))
+            producto = cursor.fetchone()
+            if producto:
+                item['precio_unitario'] = producto['precio']
+                item['subtotal'] = producto['precio'] * cantidad
+                subtotal += item['subtotal']
+                items_expandidos.append(item)
+
+    items = items_expandidos
 
     impuesto = round(subtotal * 0.13, 2)  # IVA El Salvador
     total = round(subtotal + impuesto, 2)
@@ -1549,17 +1588,18 @@ def crear_pedido():
 
     pedido_id = cursor.lastrowid
 
-    # Crear items
+    # Crear items (productos y combos)
     for item in items:
         cursor.execute('''
-            INSERT INTO pedido_items (pedido_id, producto_id, cantidad, precio_unitario, subtotal, notas)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO pedido_items (pedido_id, producto_id, combo_id, cantidad, precio_unitario, subtotal, notas)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             pedido_id,
-            item['producto_id'],
+            item.get('producto_id'),
+            item.get('combo_id'),
             item.get('cantidad', 1),
-            item['precio_unitario'],
-            item['subtotal'],
+            item.get('precio_unitario', 0),
+            item.get('subtotal', 0),
             item.get('notas', '')
         ))
 
@@ -2140,6 +2180,7 @@ def get_pedidos_cajero():
     return jsonify(pedidos)
 
 @pos_bp.route('/mesero/pedidos', methods=['GET'])
+@pos_bp.route('/mesero/pedidos-listos', methods=['GET'])
 @role_required('mesero', 'manager')
 def get_pedidos_mesero():
     """Obtiene pedidos listos para servir"""

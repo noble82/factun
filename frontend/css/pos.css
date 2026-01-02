@@ -796,6 +796,9 @@ padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
 flex-shrink: 0;
 border-top: 1px solid #dee2e6;
 background: #f8f9fa;
+position: sticky;
+bottom: 0;
+z-index: 10;
 }
 .modal-footer .btn {
 width: 100%;
@@ -803,6 +806,15 @@ min-height: 44px;
 font-size: 0.9rem;
 border-radius: 8px;
 margin: 0 !important;
+flex-shrink: 0;
+}
+/* Asegurar que los botones no se salgan del contenedor */
+#modalPago .modal-footer {
+display: flex;
+flex-wrap: wrap;
+justify-content: stretch;
+max-width: 100%;
+box-sizing: border-box;
 }
 /* Inputs en modal */
 #modalPago .form-control,

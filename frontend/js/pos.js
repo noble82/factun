@@ -94,18 +94,85 @@ function renderizarCategorias(categorias) {
     const container = document.getElementById('categorias-container');
     if (!container) return;
 
+    // Categorías de productos + Combos al final
     container.innerHTML = categorias.map(cat => `
-        <button class="btn btn-sm btn-outline-primary"
-                onclick="cargarProductosPorCategoria(${cat.id})">
+        <button class="btn btn-sm btn-outline-primary cat-btn"
+                onclick="cargarProductosPorCategoria(${cat.id})" data-cat="${cat.id}">
             ${cat.nombre}
         </button>
-    `).join('');
+    `).join('') + `
+        <button class="btn btn-sm btn-outline-warning cat-btn" onclick="cargarCombos()" data-cat="combos">
+            <i class="bi bi-box-seam"></i> Combos
+        </button>
+    `;
 
     // Hacer lo mismo para cajero
     const containerCajero = document.getElementById('categorias-container-cajero');
     if (containerCajero) {
         containerCajero.innerHTML = container.innerHTML;
     }
+}
+
+// Cargar combos disponibles
+async function cargarCombos() {
+    try {
+        const response = await apiFetch(`${API_POS}/combos`);
+        if (!response.ok) {
+            mostrarNotificacion('Info', 'No hay combos disponibles', 'info');
+            return;
+        }
+
+        const combos = await response.json();
+        renderizarCombos(combos);
+
+        // Marcar tab activo
+        document.querySelectorAll('.cat-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('[data-cat="combos"]')?.classList.add('active');
+    } catch (error) {
+        console.error('Error cargarCombos:', error);
+    }
+}
+
+// Renderizar combos en el grid de productos
+function renderizarCombos(combos) {
+    const container = document.getElementById('productos-container');
+    const containerCajero = document.getElementById('productos-container-cajero');
+
+    const html = combos.length === 0
+        ? '<p class="text-muted text-center py-4">No hay combos disponibles</p>'
+        : combos.map(combo => `
+            <div class="producto-card combo-card" onclick="agregarComboAlCarrito(${combo.id}, '${combo.nombre.replace(/'/g, "\\'")}', ${combo.precio_combo})">
+                ${combo.imagen ? `<img src="${combo.imagen}" alt="${combo.nombre}" class="producto-img">` : `<div class="producto-img-placeholder"><i class="bi bi-box-seam"></i></div>`}
+                <div class="producto-info">
+                    <span class="producto-nombre">${combo.nombre}</span>
+                    <span class="producto-precio text-warning">$${parseFloat(combo.precio_combo).toFixed(2)}</span>
+                    <small class="text-muted d-block">${combo.descripcion || 'Combo especial'}</small>
+                </div>
+            </div>
+        `).join('');
+
+    if (container) container.innerHTML = html;
+    if (containerCajero) containerCajero.innerHTML = html;
+}
+
+// Agregar combo al carrito
+function agregarComboAlCarrito(comboId, nombre, precio) {
+    const existente = carrito.find(i => i.combo_id === comboId);
+    if (existente) {
+        existente.cantidad++;
+    } else {
+        carrito.push({
+            combo_id: comboId,
+            producto_id: null,
+            producto_nombre: nombre,
+            precio: parseFloat(precio),
+            cantidad: 1,
+            esCombo: true
+        });
+    }
+    actualizarCarrito();
+    validarPedido();
+    mostrarNotificacion('Agregado', `${nombre} agregado al pedido`, 'success');
 }
 
 async function cargarProductosPorCategoria(categoriaId) {
@@ -254,23 +321,36 @@ function removerDelCarrito(idx) {
 
 function actualizarTotal() {
     const subtotal = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    const iva = subtotal * 0.13;
+
+    // IVA solo aplica para crédito fiscal (factura)
+    const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value;
+    const aplicaIVA = tipoComprobante === 'factura';
+    const iva = aplicaIVA ? subtotal * 0.13 : 0;
     const total = subtotal + iva;
 
     // Actualizar en mesero
-    document.getElementById('cart-subtotal').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('cart-iva').textContent = '$' + iva.toFixed(2);
-    document.getElementById('cart-total').textContent = '$' + total.toFixed(2);
+    const cartSubtotal = document.getElementById('cart-subtotal');
+    const cartIva = document.getElementById('cart-iva');
+    const cartTotal = document.getElementById('cart-total');
+    if (cartSubtotal) cartSubtotal.textContent = '$' + subtotal.toFixed(2);
+    if (cartIva) cartIva.textContent = aplicaIVA ? '$' + iva.toFixed(2) : '$0.00';
+    if (cartTotal) cartTotal.textContent = '$' + total.toFixed(2);
 
     // Actualizar en cajero
-    document.getElementById('cart-subtotal-cajero').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('cart-iva-cajero').textContent = '$' + iva.toFixed(2);
-    document.getElementById('cart-total-cajero').textContent = '$' + total.toFixed(2);
+    const cartSubtotalCaj = document.getElementById('cart-subtotal-cajero');
+    const cartIvaCaj = document.getElementById('cart-iva-cajero');
+    const cartTotalCaj = document.getElementById('cart-total-cajero');
+    if (cartSubtotalCaj) cartSubtotalCaj.textContent = '$' + subtotal.toFixed(2);
+    if (cartIvaCaj) cartIvaCaj.textContent = aplicaIVA ? '$' + iva.toFixed(2) : '$0.00';
+    if (cartTotalCaj) cartTotalCaj.textContent = '$' + total.toFixed(2);
 
     // Actualizar en móvil
-    document.getElementById('cart-sheet-subtotal').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('cart-sheet-iva').textContent = '$' + iva.toFixed(2);
-    document.getElementById('cart-sheet-total').textContent = '$' + total.toFixed(2);
+    const cartSheetSubtotal = document.getElementById('cart-sheet-subtotal');
+    const cartSheetIva = document.getElementById('cart-sheet-iva');
+    const cartSheetTotal = document.getElementById('cart-sheet-total');
+    if (cartSheetSubtotal) cartSheetSubtotal.textContent = '$' + subtotal.toFixed(2);
+    if (cartSheetIva) cartSheetIva.textContent = aplicaIVA ? '$' + iva.toFixed(2) : '$0.00';
+    if (cartSheetTotal) cartSheetTotal.textContent = '$' + total.toFixed(2);
 }
 
 function validarPedido() {
@@ -331,6 +411,9 @@ function toggleSeccionPropina() {
         if (seccionPropina) seccionPropina.style.display = 'none';
         if (datosClienteContainer) datosClienteContainer.style.display = 'block';
     }
+
+    // Recalcular totales (IVA solo para factura)
+    actualizarTotal();
 }
 
 // ============ PROPINA ============
@@ -382,8 +465,10 @@ async function enviarPedido() {
         tipo_pago: tipoFlojo,
         cliente_nombre: nombreCliente,
         items: carrito.map(item => ({
-            producto_id: item.producto_id,
-            cantidad: item.cantidad
+            producto_id: item.producto_id || null,
+            combo_id: item.combo_id || null,
+            cantidad: item.cantidad,
+            es_combo: item.esCombo || false
         }))
     };
 
@@ -424,8 +509,10 @@ async function crearPedidoCajero() {
         tipo_pago: 'anticipado',
         cliente_nombre: nombreCliente,
         items: carrito.map(item => ({
-            producto_id: item.producto_id,
-            cantidad: item.cantidad
+            producto_id: item.producto_id || null,
+            combo_id: item.combo_id || null,
+            cantidad: item.cantidad,
+            es_combo: item.esCombo || false
         }))
     };
 
@@ -618,8 +705,9 @@ async function confirmarPagoConComprobante() {
 
     try {
         // 1. Procesar el pago
-        const responsePago = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pagar`, {
-            method: 'POST',
+        const responsePago = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pago`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo_comprobante: tipoComprobante,
                 cliente: datosCliente,
@@ -718,8 +806,9 @@ async function confirmarPagoSinComprobante() {
     if (!pedidoActualPago) return;
 
     try {
-        const response = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pagar`, {
-            method: 'POST',
+        const response = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pago`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo_comprobante: 'ninguno',
                 propina: propinaActual
@@ -729,6 +818,10 @@ async function confirmarPagoSinComprobante() {
         if (response.ok) {
             mostrarNotificacion('Éxito', 'Pedido pagado', 'success');
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            cargarPedidosCajero();
+        } else {
+            const err = await response.json();
+            mostrarNotificacion('Error', err.error || 'Error al procesar', 'danger');
         }
     } catch (error) {
         mostrarNotificacion('Error', 'Error al procesar pago', 'danger');
@@ -1068,20 +1161,100 @@ async function cargarPedidosCocina() {
 
         if (!container) return;
 
-        container.innerHTML = pedidos.map(pedido => `
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">Pedido #${pedido.id} - Mesa ${pedido.mesa_numero}</div>
+        if (pedidos.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <i class="bi bi-check-circle text-success fs-1"></i>
+                    <h5 class="mt-3 text-muted">No hay pedidos pendientes</h5>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = pedidos.map(pedido => {
+            const esParaLlevar = !pedido.mesa_numero || pedido.tipo_pago === 'anticipado';
+            const ubicacion = esParaLlevar ? `Para Llevar - ${pedido.cliente_nombre || 'Cliente'}` : `Mesa ${pedido.mesa_numero}`;
+            const estadoActual = pedido.estado || 'en_mesa';
+
+            // Botones según el estado
+            let botones = '';
+            if (estadoActual === 'en_mesa' || estadoActual === 'pagado') {
+                botones = `<button class="btn btn-warning w-100" onclick="iniciarPreparacion(${pedido.id})">
+                    <i class="bi bi-fire"></i> Iniciar Preparación
+                </button>`;
+            } else if (estadoActual === 'en_cocina') {
+                botones = `<button class="btn btn-success w-100" onclick="marcarListo(${pedido.id})">
+                    <i class="bi bi-check-circle"></i> Marcar Listo
+                </button>`;
+            } else if (estadoActual === 'listo') {
+                botones = `<span class="badge bg-success w-100 py-2">✓ Listo para servir</span>`;
+            }
+
+            return `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card cocina-card ${estadoActual === 'en_cocina' ? 'border-warning' : ''}" data-pedido-id="${pedido.id}">
+                    <div class="card-header d-flex justify-content-between align-items-center ${estadoActual === 'en_cocina' ? 'bg-warning text-dark' : 'bg-dark text-white'}">
+                        <span><strong>#${pedido.id}</strong> - ${ubicacion}</span>
+                        <span class="badge ${estadoActual === 'en_cocina' ? 'bg-dark' : 'bg-secondary'}">${estadoActual}</span>
+                    </div>
                     <div class="card-body">
-                        ${pedido.items.map(item => `
-                            <p>• ${item.cantidad}x ${item.producto_nombre}</p>
-                        `).join('')}
+                        <ul class="list-unstyled mb-0">
+                            ${pedido.items.map(item => `
+                                <li class="d-flex justify-content-between py-1 border-bottom">
+                                    <span><strong>${item.cantidad}x</strong> ${item.producto_nombre}</span>
+                                    ${item.notas ? `<small class="text-muted">${item.notas}</small>` : ''}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    <div class="card-footer">
+                        ${botones}
                     </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     } catch (error) {
         console.error('Error cargarPedidosCocina:', error);
+    }
+}
+
+// Iniciar preparación de pedido
+async function iniciarPreparacion(pedidoId) {
+    try {
+        const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'en_cocina' })
+        });
+        if (response.ok) {
+            mostrarNotificacion('Preparación iniciada', `Pedido #${pedidoId} en cocina`, 'warning');
+            cargarPedidosCocina();
+        } else {
+            const err = await response.json();
+            mostrarNotificacion('Error', err.error || 'No se pudo iniciar', 'danger');
+        }
+    } catch (error) {
+        console.error('Error iniciarPreparacion:', error);
+    }
+}
+
+// Marcar pedido como listo
+async function marcarListo(pedidoId) {
+    try {
+        const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'listo' })
+        });
+        if (response.ok) {
+            mostrarNotificacion('¡Pedido Listo!', `Pedido #${pedidoId} listo para servir`, 'success');
+            cargarPedidosCocina();
+        } else {
+            const err = await response.json();
+            mostrarNotificacion('Error', err.error || 'No se pudo marcar', 'danger');
+        }
+    } catch (error) {
+        console.error('Error marcarListo:', error);
     }
 }
 
@@ -1187,8 +1360,15 @@ function reproducirSonidoServir() {
 
 async function marcarServido(pedidoId) {
     try {
-        await apiFetch(`${API_POS}/pedidos/${pedidoId}/servido`, { method: 'PUT' });
-        actualizarPedidosPorServir();
+        const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/estado`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: 'servido' })
+        });
+        if (response.ok) {
+            mostrarNotificacion('Servido', `Pedido #${pedidoId} entregado`, 'success');
+            actualizarPedidosPorServir();
+        }
     } catch (error) {
         console.error('Error marcarServido:', error);
     }
@@ -1276,7 +1456,7 @@ async function guardarCombo() {
     const combo = {
         nombre,
         descripcion,
-        precio,
+        precio_combo: precio,
         productos: productosSeleccionadosCombo.map(p => ({
             producto_id: p.id,
             cantidad: 1
@@ -1348,6 +1528,78 @@ async function eliminarCombo(comboId) {
 
 // ============ INICIALIZACIÓN ============
 
+// Variables para intervalos de auto-refresh
+let refreshIntervals = {
+    cocina: null,
+    cajero: null,
+    mesero: null,
+    mesas: null
+};
+
+// Configuración de intervalos (en milisegundos)
+const REFRESH_CONFIG = {
+    cocina: 5000,    // 5 segundos para cocina (pedidos entrantes)
+    cajero: 10000,   // 10 segundos para cajero
+    mesero: 8000,    // 8 segundos para mesero (pedidos listos)
+    mesas: 15000     // 15 segundos para mesas
+};
+
+// Función para iniciar auto-refresh según el panel activo
+function iniciarAutoRefresh(panel) {
+    // Limpiar todos los intervalos anteriores
+    Object.values(refreshIntervals).forEach(interval => {
+        if (interval) clearInterval(interval);
+    });
+
+    // Iniciar refresh según el panel
+    switch (panel) {
+        case 'panel-cocina':
+            refreshIntervals.cocina = setInterval(() => {
+                cargarPedidosCocina();
+            }, REFRESH_CONFIG.cocina);
+            cargarPedidosCocina(); // Cargar inmediatamente
+            break;
+
+        case 'panel-cajero':
+            refreshIntervals.cajero = setInterval(() => {
+                cargarPedidosCajero();
+                cargarEstadisticasDia();
+            }, REFRESH_CONFIG.cajero);
+            cargarPedidosCajero();
+            cargarEstadisticasDia();
+            break;
+
+        case 'panel-mesero':
+            refreshIntervals.mesero = setInterval(() => {
+                actualizarPedidosPorServir();
+            }, REFRESH_CONFIG.mesero);
+            refreshIntervals.mesas = setInterval(() => {
+                cargarMesas();
+            }, REFRESH_CONFIG.mesas);
+            actualizarPedidosPorServir();
+            break;
+
+        case 'panel-manager':
+            // Manager solo carga estadísticas
+            if (typeof cargarEstadisticasManager === 'function') {
+                cargarEstadisticasManager();
+            }
+            break;
+    }
+
+    console.log(`Auto-refresh iniciado para: ${panel}`);
+}
+
+// Función para detener auto-refresh
+function detenerAutoRefresh() {
+    Object.keys(refreshIntervals).forEach(key => {
+        if (refreshIntervals[key]) {
+            clearInterval(refreshIntervals[key]);
+            refreshIntervals[key] = null;
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos iniciales (se filtra según el rol activo)
     cargarMesas();
@@ -1369,6 +1621,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar FAB y carrito móvil
     inicializarCarritoMovil();
+
+    // Detectar visibilidad de página para pausar/reanudar refresh
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            detenerAutoRefresh();
+        } else {
+            // Reanudar según el panel activo
+            const panelActivo = document.querySelector('.work-panel:not([style*="display: none"])');
+            if (panelActivo) {
+                iniciarAutoRefresh(panelActivo.id);
+            }
+        }
+    });
 });
 
 // Inicializar componentes móviles
