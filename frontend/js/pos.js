@@ -542,86 +542,26 @@ let pedidoActualPago = null;
 // Función para abrir modal de pago desde la lista de pedidos del cajero
 async function abrirModalPago(pedidoId, total) {
     try {
-        // Cargar detalles del pedido incluyendo items
         const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}`);
-        if (!response.ok) {
-            throw new Error('No se pudo cargar el pedido');
-        }
+        if (!response.ok) throw new Error('No se pudo cargar el pedido');
 
         const pedido = await response.json();
+
+        // Calcular subtotal real (sin IVA)
+        const subtotalReal = pedido.items?.reduce((sum, item) => {
+            return sum + (parseFloat(item.precio_unitario || 0) * parseInt(item.cantidad || 1));
+        }, 0) || parseFloat(pedido.subtotal || total);
+
         pedidoActualPago = {
             id: pedidoId,
-            total: parseFloat(total),
+            subtotal: subtotalReal,
             items: pedido.items || [],
             mesa_numero: pedido.mesa_numero,
             cliente_nombre: pedido.cliente_nombre
         };
 
-        // Calcular subtotal e IVA
-        const subtotal = pedido.subtotal || (total / 1.13);
-        const iva = pedido.impuesto || (total - subtotal);
-
-        // Renderizar detalle del pago con desglose de items
-        let itemsHtml = '';
-        if (pedidoActualPago.items && pedidoActualPago.items.length > 0) {
-            itemsHtml = `
-                <div class="table-responsive mb-3">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th class="text-center">Cant</th>
-                                <th class="text-end">Precio</th>
-                                <th class="text-end">IVA</th>
-                                <th class="text-end">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${pedidoActualPago.items.map(item => {
-                                const precioUnit = parseFloat(item.precio_unitario || item.precio || 0);
-                                const cantidad = parseInt(item.cantidad || 1);
-                                const ivaItem = precioUnit * cantidad * 0.13;
-                                const totalItem = precioUnit * cantidad + ivaItem;
-                                return `
-                                    <tr>
-                                        <td>${item.producto_nombre || item.nombre}</td>
-                                        <td class="text-center">${cantidad}</td>
-                                        <td class="text-end">$${(precioUnit * cantidad).toFixed(2)}</td>
-                                        <td class="text-end text-muted">$${ivaItem.toFixed(2)}</td>
-                                        <td class="text-end fw-bold">$${totalItem.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-
-        document.getElementById('detalle-pago').innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0"><i class="bi bi-receipt"></i> Pedido #${pedidoId}</h6>
-                <span class="badge ${pedido.mesa_numero ? 'bg-primary' : 'bg-warning text-dark'}">
-                    ${pedido.mesa_numero ? `Mesa ${pedido.mesa_numero}` : 'Para llevar'}
-                </span>
-            </div>
-            ${pedido.cliente_nombre ? `<p class="text-muted mb-2"><i class="bi bi-person"></i> ${pedido.cliente_nombre}</p>` : ''}
-            ${itemsHtml}
-            <div class="border-top pt-2">
-                <div class="d-flex justify-content-between">
-                    <span>Subtotal:</span>
-                    <span>$${subtotal.toFixed(2)}</span>
-                </div>
-                <div class="d-flex justify-content-between text-muted">
-                    <span>IVA (13%):</span>
-                    <span>$${iva.toFixed(2)}</span>
-                </div>
-                <div class="d-flex justify-content-between mt-2">
-                    <strong class="fs-5">Total:</strong>
-                    <strong class="fs-5 text-success">$${parseFloat(total).toFixed(2)}</strong>
-                </div>
-            </div>
-        `;
+        // Renderizar items del pedido
+        renderizarItemsPago(pedidoActualPago);
 
         // Pre-llenar datos del cliente si existe
         if (pedido.cliente_nombre) {
@@ -629,12 +569,13 @@ async function abrirModalPago(pedidoId, total) {
             if (nombreInput) nombreInput.value = pedido.cliente_nombre;
         }
 
-        // Resetear propina
-        propinaActual = 0;
-        actualizarDisplayPropina();
+        // Resetear a ticket (sin IVA) por defecto
+        document.getElementById('tipo-ticket').checked = true;
+        onTipoComprobanteChange();
 
-        // Mostrar sección de propina solo para ticket
-        toggleSeccionPropina();
+        // Limpiar monto recibido
+        document.getElementById('monto-recibido').value = '';
+        document.getElementById('vuelto-container').style.display = 'none';
 
         // Mostrar modal
         new bootstrap.Modal(document.getElementById('modalPago')).show();
@@ -645,26 +586,171 @@ async function abrirModalPago(pedidoId, total) {
     }
 }
 
-// Versión simple para pagos rápidos sin cargar items
+// Versión simple para pagos rápidos
 function mostrarModalPago(pedidoId, total) {
-    pedidoActualPago = { id: pedidoId, total: parseFloat(total), items: [] };
+    const subtotal = parseFloat(total) / 1.13; // Aproximar subtotal
+    pedidoActualPago = { id: pedidoId, subtotal: parseFloat(total), items: [] };
 
-    document.getElementById('detalle-pago').innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6 class="mb-0"><i class="bi bi-receipt"></i> Pedido #${pedidoId}</h6>
-        </div>
-        <div class="text-center py-3">
-            <span class="fs-4 fw-bold text-success">$${parseFloat(total).toFixed(2)}</span>
-        </div>
-    `;
-
-    // Resetear propina
-    propinaActual = 0;
-    actualizarDisplayPropina();
-    toggleSeccionPropina();
+    renderizarItemsPago(pedidoActualPago);
+    document.getElementById('tipo-ticket').checked = true;
+    onTipoComprobanteChange();
+    document.getElementById('monto-recibido').value = '';
 
     new bootstrap.Modal(document.getElementById('modalPago')).show();
 }
+
+// Renderizar items del pedido en el modal
+function renderizarItemsPago(pedido) {
+    const container = document.getElementById('detalle-pago-items');
+    if (!container) return;
+
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-receipt"></i> Pedido #${pedido.id}</h6>
+            <span class="badge ${pedido.mesa_numero ? 'bg-primary' : 'bg-warning text-dark'}">
+                ${pedido.mesa_numero ? `Mesa ${pedido.mesa_numero}` : 'Para llevar'}
+            </span>
+        </div>
+    `;
+
+    if (pedido.items && pedido.items.length > 0) {
+        html += `<div class="list-group list-group-flush small mb-2">`;
+        pedido.items.forEach(item => {
+            const precio = parseFloat(item.precio_unitario || item.precio || 0);
+            const cantidad = parseInt(item.cantidad || 1);
+            const subtotalItem = precio * cantidad;
+            html += `
+                <div class="list-group-item px-0 py-1 d-flex justify-content-between">
+                    <span>${cantidad}x ${item.producto_nombre || item.nombre}</span>
+                    <span>$${subtotalItem.toFixed(2)}</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+// Cambio de tipo de comprobante (ticket vs crédito fiscal)
+function onTipoComprobanteChange() {
+    const esFactura = document.getElementById('tipo-factura')?.checked;
+    const subtotal = pedidoActualPago?.subtotal || 0;
+
+    // Calcular valores según tipo
+    const iva = esFactura ? subtotal * 0.13 : 0;
+    const total = subtotal + iva;
+
+    // Actualizar pedido actual
+    if (pedidoActualPago) {
+        pedidoActualPago.total = total;
+        pedidoActualPago.iva = iva;
+    }
+
+    // Actualizar display de totales
+    document.getElementById('pago-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+
+    const ivaRow = document.getElementById('pago-iva-row');
+    if (esFactura) {
+        ivaRow.style.display = 'flex';
+        ivaRow.style.setProperty('display', 'flex', 'important');
+        document.getElementById('pago-iva').textContent = `$${iva.toFixed(2)}`;
+    } else {
+        ivaRow.style.display = 'none';
+        ivaRow.style.setProperty('display', 'none', 'important');
+    }
+
+    document.getElementById('pago-total').textContent = `$${total.toFixed(2)}`;
+
+    // Mostrar/ocultar datos del cliente
+    const datosCliente = document.getElementById('datos-cliente-container');
+    if (datosCliente) {
+        datosCliente.style.display = esFactura ? 'block' : 'none';
+    }
+
+    // Generar botones de monto rápido
+    generarBotonesMontoRapido(total);
+
+    // Recalcular vuelto si hay monto ingresado
+    calcularVuelto();
+}
+
+// Generar botones de múltiplos de $5
+function generarBotonesMontoRapido(total) {
+    const container = document.getElementById('botones-monto-rapido');
+    if (!container) return;
+
+    // Calcular primer múltiplo de 5 >= total
+    const primerMultiplo = Math.ceil(total / 5) * 5;
+    // Si el total es exactamente múltiplo de 5, usar ese valor
+    const base = total === primerMultiplo ? primerMultiplo : primerMultiplo;
+
+    // Generar 4 botones consecutivos
+    const montos = [base, base + 5, base + 10, base + 20];
+
+    container.innerHTML = montos.map(monto => `
+        <div class="col-3">
+            <button type="button" class="btn btn-outline-primary w-100 btn-monto-rapido"
+                    onclick="seleccionarMontoRapido(${monto})">
+                $${monto}
+            </button>
+        </div>
+    `).join('');
+}
+
+// Seleccionar monto rápido
+function seleccionarMontoRapido(monto) {
+    document.getElementById('monto-recibido').value = monto.toFixed(2);
+
+    // Marcar botón activo
+    document.querySelectorAll('.btn-monto-rapido').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+        if (btn.textContent.includes(monto)) {
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-primary');
+        }
+    });
+
+    calcularVuelto();
+}
+
+// Calcular vuelto automáticamente
+function calcularVuelto() {
+    const montoRecibido = parseFloat(document.getElementById('monto-recibido')?.value) || 0;
+    const totalPagar = pedidoActualPago?.total || 0;
+    const vueltoContainer = document.getElementById('vuelto-container');
+    const vueltoLabel = document.getElementById('vuelto-label');
+    const montoVuelto = document.getElementById('monto-vuelto');
+
+    if (montoRecibido <= 0) {
+        vueltoContainer.style.display = 'none';
+        return;
+    }
+
+    vueltoContainer.style.display = 'block';
+    const diferencia = montoRecibido - totalPagar;
+
+    if (diferencia >= 0) {
+        vueltoLabel.textContent = 'Vuelto:';
+        montoVuelto.textContent = `$${diferencia.toFixed(2)}`;
+        vueltoContainer.className = 'mt-2 p-2 rounded text-center bg-success bg-opacity-25';
+        montoVuelto.className = 'fs-4 fw-bold text-success';
+    } else {
+        vueltoLabel.textContent = 'Falta:';
+        montoVuelto.textContent = `$${Math.abs(diferencia).toFixed(2)}`;
+        vueltoContainer.className = 'mt-2 p-2 rounded text-center bg-danger bg-opacity-25';
+        montoVuelto.className = 'fs-4 fw-bold text-danger';
+    }
+}
+
+// Mantener compatibilidad con función anterior
+function toggleSeccionPropina() {
+    onTipoComprobanteChange();
+}
+
+// Función vacía para compatibilidad (propina ya no se usa)
+// La función original está en línea 442
 
 async function confirmarPagoConComprobante() {
     if (!pedidoActualPago) return;
@@ -723,6 +809,7 @@ async function confirmarPagoConComprobante() {
         // 2. Generar comprobante (factura o ticket)
         const responseFactura = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/facturar`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo: tipoComprobante,
                 cliente: datosCliente
@@ -733,19 +820,26 @@ async function confirmarPagoConComprobante() {
 
         if (responseFactura.ok && facturaData.success) {
             if (tipoComprobante === 'factura') {
-                // Mostrar información del DTE generado
-                mostrarNotificacion(
-                    'Factura Generada',
-                    `DTE: ${facturaData.numero_control}\nTotal: $${facturaData.total?.toFixed(2) || pedidoActualPago.total}`,
-                    'success'
-                );
+                // Factura electrónica - enviar automáticamente a Digifact
+                mostrarNotificacion('Procesando', 'Generando factura electrónica...', 'info');
 
-                // Preguntar si desea enviar a Digifact para certificación
-                if (confirm('¿Desea enviar la factura a Digifact para certificación?')) {
-                    await enviarDTEDigifact(pedidoActualPago.id, facturaData);
+                // Enviar automáticamente a Digifact
+                const dteResult = await enviarDTEDigifact(pedidoActualPago.id, facturaData);
+
+                if (dteResult && dteResult.success) {
+                    mostrarNotificacion('Factura Certificada', `DTE: ${dteResult.dte_numero || facturaData.numero_control}`, 'success');
+                } else {
+                    mostrarNotificacion('Factura Local', `Generada localmente: ${facturaData.numero_control}`, 'warning');
                 }
+
+                // Mostrar factura para imprimir
+                mostrarComprobanteParaImprimir(facturaData, 'factura', datosCliente);
             } else {
-                mostrarNotificacion('Éxito', `Ticket generado: ${facturaData.numero}`, 'success');
+                // Ticket simple
+                mostrarNotificacion('Ticket Generado', `#${facturaData.numero || pedidoActualPago.id}`, 'success');
+
+                // Mostrar ticket para imprimir
+                mostrarComprobanteParaImprimir(facturaData, 'ticket', null);
             }
         } else {
             // Pago procesado pero comprobante falló
@@ -772,34 +866,112 @@ async function confirmarPagoConComprobante() {
     }
 }
 
-// Función para enviar DTE a Digifact
+// Función para enviar DTE a Digifact (retorna resultado)
 async function enviarDTEDigifact(pedidoId, facturaData) {
     try {
-        mostrarNotificacion('Enviando', 'Enviando factura a Digifact...', 'info');
-
         const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/enviar-dte`, {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
         });
 
         const result = await response.json();
 
         if (response.ok && result.success) {
-            mostrarNotificacion(
-                'Certificado',
-                `DTE certificado exitosamente\n${result.data?.dte_numero || ''}`,
-                'success'
-            );
+            return {
+                success: true,
+                dte_numero: result.data?.dte_numero || result.dte_numero || '',
+                mensaje: 'DTE certificado exitosamente'
+            };
         } else {
-            mostrarNotificacion(
-                'Error Digifact',
-                result.error || 'No se pudo certificar el DTE',
-                'danger'
-            );
+            console.warn('Digifact error:', result.error);
+            return {
+                success: false,
+                error: result.error || 'No se pudo certificar el DTE'
+            };
         }
     } catch (error) {
         console.error('Error enviarDTEDigifact:', error);
-        mostrarNotificacion('Error', 'Error de conexión con Digifact', 'danger');
+        return {
+            success: false,
+            error: 'Error de conexión con Digifact'
+        };
     }
+}
+
+// Función para mostrar comprobante para imprimir
+function mostrarComprobanteParaImprimir(facturaData, tipo, cliente) {
+    const pedido = pedidoActualPago;
+    const fecha = new Date().toLocaleString('es-SV');
+
+    let contenido = '';
+
+    if (tipo === 'ticket') {
+        // Ticket simple
+        contenido = `
+            <div style="font-family: monospace; width: 300px; padding: 10px;">
+                <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px;">
+                    <h3 style="margin: 0;">PUPUSERÍA</h3>
+                    <p style="margin: 5px 0; font-size: 12px;">Comprobante de Venta</p>
+                </div>
+                <div style="padding: 10px 0; font-size: 12px;">
+                    <p><strong>Ticket:</strong> #${facturaData.numero || pedido.id}</p>
+                    <p><strong>Fecha:</strong> ${fecha}</p>
+                    <hr style="border: none; border-top: 1px dashed #000;">
+                    <p><strong>Total:</strong> $${pedido.total?.toFixed(2) || '0.00'}</p>
+                </div>
+                <div style="text-align: center; font-size: 10px; margin-top: 10px;">
+                    <p>¡Gracias por su compra!</p>
+                </div>
+            </div>
+        `;
+    } else {
+        // Factura con crédito fiscal
+        contenido = `
+            <div style="font-family: Arial, sans-serif; width: 400px; padding: 15px; border: 1px solid #000;">
+                <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">
+                    <h2 style="margin: 0;">FACTURA ELECTRÓNICA</h2>
+                    <p style="margin: 5px 0;">Documento Tributario Electrónico</p>
+                </div>
+                <div style="padding: 10px 0; font-size: 13px;">
+                    <p><strong>No. Control:</strong> ${facturaData.numero_control || 'N/A'}</p>
+                    <p><strong>Código Generación:</strong> ${facturaData.codigo_generacion || 'N/A'}</p>
+                    <p><strong>Fecha:</strong> ${fecha}</p>
+                    <hr>
+                    <p><strong>Cliente:</strong> ${cliente?.nombre || 'Consumidor Final'}</p>
+                    <p><strong>NIT/DUI:</strong> ${cliente?.num_doc || 'N/A'}</p>
+                    ${cliente?.nrc ? `<p><strong>NRC:</strong> ${cliente.nrc}</p>` : ''}
+                    <hr>
+                    <table style="width: 100%; font-size: 12px;">
+                        <tr><td>Subtotal:</td><td style="text-align: right;">$${facturaData.subtotal?.toFixed(2) || '0.00'}</td></tr>
+                        <tr><td>IVA (13%):</td><td style="text-align: right;">$${facturaData.iva?.toFixed(2) || '0.00'}</td></tr>
+                        <tr style="font-weight: bold; font-size: 14px;">
+                            <td>TOTAL:</td><td style="text-align: right;">$${facturaData.total?.toFixed(2) || pedido.total?.toFixed(2) || '0.00'}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div style="text-align: center; font-size: 10px; margin-top: 15px; border-top: 1px solid #000; padding-top: 10px;">
+                    <p>Documento generado electrónicamente</p>
+                </div>
+            </div>
+        `;
+    }
+
+    // Abrir ventana de impresión
+    const ventanaImpresion = window.open('', '_blank', 'width=450,height=600');
+    ventanaImpresion.document.write(`
+        <html>
+        <head><title>${tipo === 'ticket' ? 'Ticket' : 'Factura'} #${pedido.id}</title></head>
+        <body style="margin: 0; display: flex; justify-content: center; padding: 20px;">
+            ${contenido}
+            <script>
+                window.onload = function() {
+                    window.print();
+                };
+            <\/script>
+        </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
 }
 
 async function confirmarPagoSinComprobante() {
@@ -1444,12 +1616,23 @@ function removerProductoDeCombo(idx) {
 }
 
 async function guardarCombo() {
-    const nombre = document.getElementById('combo-nombre')?.value;
-    const descripcion = document.getElementById('combo-descripcion')?.value;
+    const nombre = document.getElementById('combo-nombre')?.value?.trim();
+    const descripcion = document.getElementById('combo-descripcion')?.value?.trim() || '';
     const precio = parseFloat(document.getElementById('combo-precio')?.value);
 
-    if (!nombre || !precio || productosSeleccionadosCombo.length === 0) {
-        mostrarNotificacion('Error', 'Completa todos los campos y agrega productos', 'danger');
+    // Validaciones del frontend
+    if (!nombre) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del combo', 'danger');
+        return;
+    }
+
+    if (!precio || precio <= 0) {
+        mostrarNotificacion('Error', 'Ingresa un precio válido', 'danger');
+        return;
+    }
+
+    if (productosSeleccionadosCombo.length < 2) {
+        mostrarNotificacion('Error', 'El combo debe tener al menos 2 productos', 'warning');
         return;
     }
 
@@ -1459,18 +1642,23 @@ async function guardarCombo() {
         precio_combo: precio,
         productos: productosSeleccionadosCombo.map(p => ({
             producto_id: p.id,
-            cantidad: 1
+            cantidad: p.cantidad || 1
         }))
     };
+
+    console.log('Enviando combo:', combo);
 
     try {
         const response = await apiFetch(`${API_POS}/combos`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(combo)
         });
 
-        if (response && response.ok) {
-            mostrarNotificacion('Éxito', 'Combo creado exitosamente', 'success');
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            mostrarNotificacion('Éxito', `Combo "${nombre}" creado exitosamente`, 'success');
             // Limpiar formulario
             document.getElementById('combo-nombre').value = '';
             document.getElementById('combo-descripcion').value = '';
@@ -1478,10 +1666,12 @@ async function guardarCombo() {
             productosSeleccionadosCombo = [];
             renderizarProductosSeleccionadosCombo();
             cargarCombosExistentes();
+        } else {
+            mostrarNotificacion('Error', result.error || 'No se pudo crear el combo', 'danger');
         }
     } catch (error) {
         console.error('Error guardarCombo:', error);
-        mostrarNotificacion('Error', 'No se pudo guardar el combo', 'danger');
+        mostrarNotificacion('Error', 'Error de conexión al guardar combo', 'danger');
     }
 }
 

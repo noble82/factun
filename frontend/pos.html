@@ -506,153 +506,97 @@ placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
 </div>
 <div class="modal-body">
-<div class="row">
-<div class="col-md-6">
-<div id="detalle-pago"></div>
-<hr>
-<!-- Método de Pago -->
-<h6 class="mb-2"><i class="bi bi-wallet2"></i> Método de Pago</h6>
-<div class="btn-group w-100 mb-3" role="group">
-<input type="radio" class="btn-check" name="metodoPago" id="pago-efectivo" value="efectivo" checked onchange="onMetodoPagoChange()">
-<label class="btn btn-outline-success" for="pago-efectivo">
-<i class="bi bi-cash"></i> Efectivo
-</label>
-<input type="radio" class="btn-check" name="metodoPago" id="pago-credito" value="credito" onchange="onMetodoPagoChange()">
-<label class="btn btn-outline-warning" for="pago-credito">
-<i class="bi bi-credit-card"></i> Crédito
-</label>
+<!-- Resumen del Pedido -->
+<div id="detalle-pago-items" class="mb-3"></div>
+
+<!-- Totales -->
+<div class="card mb-3">
+<div class="card-body py-2">
+<div class="d-flex justify-content-between">
+<span>Subtotal:</span>
+<strong id="pago-subtotal">$0.00</strong>
 </div>
-<!-- Alerta de crédito del cliente -->
-<div id="info-credito-cliente" class="alert alert-warning d-none mb-3">
-<div class="d-flex justify-content-between align-items-center">
-<div>
-<i class="bi bi-credit-card"></i> <strong>Crédito disponible:</strong>
-<span id="credito-disponible-pago">$0.00</span>
+<div id="pago-iva-row" class="d-flex justify-content-between text-info" style="display:none !important;">
+<span>IVA (13%):</span>
+<strong id="pago-iva">$0.00</strong>
 </div>
-<small class="text-muted">
-Usado: <span id="credito-usado-pago">$0.00</span> /
-<span id="credito-limite-pago">$0.00</span>
-</small>
-</div>
-<div class="progress mt-2" style="height: 8px;">
-<div id="barra-credito-pago" class="progress-bar bg-warning" style="width: 0%"></div>
+<hr class="my-2">
+<div class="d-flex justify-content-between fs-5">
+<strong>Total a pagar:</strong>
+<strong class="text-success" id="pago-total">$0.00</strong>
 </div>
 </div>
-<!-- Alerta cuando no tiene crédito -->
-<div id="alerta-sin-credito" class="alert alert-danger d-none mb-3">
-<i class="bi bi-exclamation-triangle"></i>
-<strong>Sin crédito disponible.</strong>
-<span id="mensaje-sin-credito">Seleccione un cliente con crédito autorizado.</span>
 </div>
-<!-- Monto recibido (solo para efectivo) -->
-<div id="seccion-monto-recibido" class="mb-3">
-<label class="form-label">Monto recibido:</label>
-<input type="number" class="form-control form-control-lg" id="monto-recibido" step="0.01">
-</div>
-<div class="alert alert-info" id="cambio-container" style="display:none;">
-<strong>Cambio: <span id="monto-cambio">$0.00</span></strong>
-</div>
-</div>
-<div class="col-md-6">
-<h6 class="mb-3"><i class="bi bi-receipt"></i> Tipo de Comprobante</h6>
-<div class="form-check mb-2">
-<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked onchange="toggleSeccionPropina()">
-<label class="form-check-label" for="tipo-ticket">
-<strong>Ticket</strong> - Comprobante simple (no fiscal)
-</label>
-</div>
-<div class="form-check mb-3">
-<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura" onchange="toggleSeccionPropina()">
-<label class="form-check-label" for="tipo-factura">
-<strong>Factura Electrónica</strong> - DTE (requiere datos)
-</label>
-</div>
-<!-- Opción de Propina (solo para ticket/efectivo) -->
-<div id="seccion-propina" class="mb-3">
-<hr>
-<h6 class="mb-2"><i class="bi bi-gift"></i> Propina (Opcional)</h6>
-<div class="row g-2 mb-2">
-<div class="col-auto">
-<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0)">Sin propina</button>
-</div>
-<div class="col-auto">
-<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.05)">5%</button>
-</div>
-<div class="col-auto">
-<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.10)">10%</button>
-</div>
-<div class="col-auto">
-<button type="button" class="btn btn-outline-secondary btn-sm" onclick="establecerPropina(0.15)">15%</button>
-</div>
-</div>
-<div class="input-group input-group-sm">
-<span class="input-group-text">$</span>
-<input type="number" class="form-control" id="propina-monto" placeholder="Monto personalizado" step="0.01" min="0" onchange="actualizarPropinaPersonalizada()">
-</div>
-<small class="text-muted d-block mt-1">Propina: <span id="propina-display">$0.00</span></small>
-</div>
-<!-- Datos del cliente (para factura) -->
-<div id="datos-cliente-container" style="display:none;">
-<hr>
-<h6 class="mb-3"><i class="bi bi-person"></i> Datos del Cliente</h6>
-<!-- Buscador de cliente -->
+
+<!-- Tipo de Comprobante -->
 <div class="mb-3">
-<div class="input-group input-group-sm">
-<span class="input-group-text"><i class="bi bi-search"></i></span>
-<input type="text" class="form-control" id="buscar-cliente-factura"
-placeholder="Buscar cliente por nombre, DUI, NIT..."
-onkeyup="buscarClienteFactura(this.value)">
-<button class="btn btn-outline-primary" type="button" onclick="limpiarClienteFactura()">
-<i class="bi bi-x"></i>
-</button>
+<div class="form-check form-check-inline">
+<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-ticket" value="ticket" checked onchange="onTipoComprobanteChange()">
+<label class="form-check-label" for="tipo-ticket">
+<i class="bi bi-receipt"></i> Ticket (sin IVA)
+</label>
 </div>
-<div id="resultados-busqueda-cliente" class="list-group position-absolute w-100" style="z-index: 1050; max-height: 200px; overflow-y: auto;"></div>
+<div class="form-check form-check-inline">
+<input class="form-check-input" type="radio" name="tipoComprobante" id="tipo-factura" value="factura" onchange="onTipoComprobanteChange()">
+<label class="form-check-label" for="tipo-factura">
+<i class="bi bi-file-earmark-text"></i> Crédito Fiscal (con IVA)
+</label>
 </div>
-<input type="hidden" id="cliente-id-factura">
-<div class="mb-2">
-<input type="text" class="form-control form-control-sm" id="cliente-nombre" placeholder="Nombre del cliente">
 </div>
-<div class="row mb-2">
+
+<!-- Datos del cliente (solo para crédito fiscal) -->
+<div id="datos-cliente-container" class="card mb-3" style="display:none;">
+<div class="card-body py-2">
+<h6 class="mb-2"><i class="bi bi-person"></i> Datos para Crédito Fiscal</h6>
+<div class="row g-2">
+<div class="col-12">
+<input type="text" class="form-control form-control-sm" id="cliente-nombre" placeholder="Nombre / Razón Social *" required>
+</div>
 <div class="col-6">
 <select class="form-select form-select-sm" id="cliente-tipo-doc">
-<option value="">Sin documento</option>
 <option value="36">NIT</option>
 <option value="13">DUI</option>
-<option value="37">Otro</option>
 </select>
 </div>
 <div class="col-6">
-<input type="text" class="form-control form-control-sm" id="cliente-num-doc" placeholder="Número documento">
+<input type="text" class="form-control form-control-sm" id="cliente-num-doc" placeholder="Número *" required>
 </div>
+<div class="col-12">
+<input type="text" class="form-control form-control-sm" id="cliente-direccion" placeholder="Dirección *" required>
 </div>
-<div class="mb-2">
+<div class="col-6">
 <input type="text" class="form-control form-control-sm" id="cliente-nrc" placeholder="NRC (opcional)">
 </div>
-<div class="mb-2">
-<input type="text" class="form-control form-control-sm" id="cliente-direccion" placeholder="Dirección">
-</div>
-<div class="row mb-2">
 <div class="col-6">
 <input type="tel" class="form-control form-control-sm" id="cliente-telefono" placeholder="Teléfono">
 </div>
-<div class="col-6">
-<input type="email" class="form-control form-control-sm" id="cliente-correo" placeholder="Correo">
+</div>
+<input type="hidden" id="cliente-id-factura">
+<input type="hidden" id="cliente-correo">
 </div>
 </div>
-<div class="row mb-2 d-none">
-<div class="col-md-6">
-<label class="form-label small">Crédito Autorizado ($)</label>
-<input type="number" class="form-control form-control-sm" id="cliente-credito" min="0" step="0.01" value="0">
+
+<!-- Monto Recibido y Vuelto -->
+<div class="card mb-3">
+<div class="card-body py-2">
+<label class="form-label mb-2"><i class="bi bi-cash-stack"></i> Monto Recibido</label>
+<!-- Botones de múltiplos de $5 -->
+<div class="row g-2 mb-2" id="botones-monto-rapido">
+<!-- Se generan dinámicamente -->
 </div>
-<div class="col-md-6">
-<label class="form-label small">Días de Crédito</label>
-<input type="number" class="form-control form-control-sm" id="cliente-dias-credito" min="0" value="0">
+<div class="input-group">
+<span class="input-group-text">$</span>
+<input type="number" class="form-control form-control-lg text-end" id="monto-recibido"
+       step="0.01" min="0" placeholder="0.00" oninput="calcularVuelto()">
+</div>
+<!-- Vuelto -->
+<div id="vuelto-container" class="mt-2 p-2 rounded text-center" style="display:none;">
+<span id="vuelto-label">Vuelto:</span>
+<span id="monto-vuelto" class="fs-4 fw-bold">$0.00</span>
 </div>
 </div>
 </div>
-</div>
-</div>
-</div>
+
 </div>
 <div class="modal-footer">
 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -660,7 +604,7 @@ onkeyup="buscarClienteFactura(this.value)">
 <i class="bi bi-check-circle"></i> Solo Pagar
 </button>
 <button type="button" class="btn btn-success" onclick="confirmarPagoConComprobante()">
-<i class="bi bi-receipt"></i> Pagar y Emitir Comprobante
+<i class="bi bi-receipt"></i> Pagar y Comprobante
 </button>
 </div>
 </div>
@@ -1117,7 +1061,7 @@ function seleccionarRol(nuevoRol) {
 <!-- Scripts principales -->
 <script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
-<script src="js/pos.js?v=19"></script>
+<script src="js/pos.js?v=20"></script>
 
 </body>
 </html>
