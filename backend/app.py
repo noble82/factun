@@ -143,7 +143,7 @@ class DigifactClient:
             raise Exception(f"Error obteniendo token: {str(e)}")
 
     def certificar_dte(self, xml_content):
-        """Certifica DTE con Digifact"""
+        """Certifica DTE con Digifact (formato XML)"""
         if not self.token:
             self.get_token()
 
@@ -174,6 +174,57 @@ class DigifactClient:
             return resp.json()
         except Exception as e:
             raise Exception(f"Error certificando DTE: {str(e)}")
+
+    def certificar_dte_json(self, dte_json):
+        """
+        Certifica DTE con Digifact (formato JSON)
+        La API de Digifact acepta JSON directamente
+        """
+        if not self.token:
+            self.get_token()
+
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.token}',
+                'Content-Type': 'application/json'
+            }
+
+            resp = requests.post(
+                f"{self.base_url}/api/v2/transform/nuc",
+                headers=headers,
+                json=dte_json,
+                timeout=60
+            )
+
+            if resp.status_code == 401:
+                self.get_token()
+                headers['Authorization'] = f'Bearer {self.token}'
+                resp = requests.post(
+                    f"{self.base_url}/api/v2/transform/nuc",
+                    headers=headers,
+                    json=dte_json,
+                    timeout=60
+                )
+
+            resp.raise_for_status()
+            result = resp.json()
+
+            # Marcar como exitoso si no hay error
+            result['success'] = result.get('Codigo') == '0' or result.get('success', False)
+
+            return result
+        except requests.exceptions.RequestException as e:
+            return {
+                'success': False,
+                'error': f"Error de conexión con Digifact: {str(e)}",
+                'Codigo': '-1'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Error certificando DTE: {str(e)}",
+                'Codigo': '-1'
+            }
 
     def anular_dte(self, guid, serie, numero, motivo=""):
         """Anula DTE certificado"""
@@ -327,6 +378,66 @@ def certificar():
         xml_content = xml_file.read()
 
         resultado = digifact.certificar_dte(xml_content)
+
+        return jsonify({
+            "success": True,
+            "data": resultado,
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/certificar-json', methods=['POST'])
+def certificar_json():
+    """
+    Certifica DTE desde JSON estructurado (formato Digifact)
+    Recibe el DTE en formato JSON y lo envía a la API de Digifact
+
+    Body esperado:
+    {
+        "dte": { ... estructura Digifact ... },
+        "pedido_id": 123  (opcional, para actualizar estado en DB)
+    }
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'dte' not in data:
+            return jsonify({"error": "No se envió DTE en formato JSON"}), 400
+
+        dte_json = data['dte']
+        pedido_id = data.get('pedido_id')
+
+        # Digifact acepta tanto JSON como XML, pero usamos JSON directamente
+        # La API de Digifact transforma internamente
+        resultado = digifact.certificar_dte_json(dte_json)
+
+        # Si hay pedido_id, actualizar el estado en la DB
+        if pedido_id and resultado.get('success'):
+            try:
+                from database import get_db
+                conn = get_db()
+                cursor = conn.cursor()
+
+                # Guardar respuesta de Digifact
+                cursor.execute('''
+                    UPDATE pedidos SET
+                        dte_certificado = 1,
+                        dte_respuesta_digifact = ?,
+                        dte_certificado_at = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                ''', (
+                    json.dumps(resultado),
+                    datetime.now().isoformat(),
+                    datetime.now().isoformat(),
+                    pedido_id
+                ))
+                conn.commit()
+                conn.close()
+            except Exception as db_error:
+                print(f"Error actualizando pedido {pedido_id}: {db_error}")
 
         return jsonify({
             "success": True,

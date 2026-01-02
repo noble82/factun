@@ -170,7 +170,67 @@ body {
     50% { opacity: 0.7; }
 }
 
+/* ============ BARRA DE ESTADO DEL PEDIDO ============ */
+.estado-barra {
+    text-align: center;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.estado-barra .badge {
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.estado-barra.pendiente .badge {
+    background: linear-gradient(135deg, #3498db, #2980b9) !important;
+}
+.estado-barra.preparando .badge {
+    background: linear-gradient(135deg, var(--cocina-warning), #e67e22) !important;
+    animation: estado-pulse 1.5s infinite;
+}
+@keyframes estado-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+}
+
+/* Estado: Nuevo pedido */
+.pedido-card.nuevo {
+    border-left-color: #3498db;
+    background: linear-gradient(135deg, #1a2a3e, var(--cocina-card));
+}
+
 /* ============ BOTONES DE ACCIÓN ============ */
+.btn-iniciar {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border: none;
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 800;
+    padding: 20px 35px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+}
+.btn-iniciar:hover {
+    background: linear-gradient(135deg, #5dade2, #3498db);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(52, 152, 219, 0.5);
+    color: white;
+}
+.btn-iniciar:active {
+    transform: translateY(0) scale(1);
+}
+.btn-iniciar i {
+    margin-right: 8px;
+    font-size: 1.4rem;
+}
+
 .btn-warning.btn-lg {
     background: linear-gradient(135deg, var(--cocina-warning), #e67e22);
     border: none;
@@ -280,7 +340,7 @@ body {
             .item-producto .cantidad {
                 font-size: 1.2rem;
             }
-            .btn-listo, .btn-warning.btn-lg {
+            .btn-listo, .btn-warning.btn-lg, .btn-iniciar {
                 font-size: 1rem;
                 padding: 12px 20px;
             }
@@ -332,7 +392,7 @@ body {
         }
 
         /* Touch-friendly buttons */
-        .btn-listo, .btn-warning.btn-lg {
+        .btn-listo, .btn-warning.btn-lg, .btn-iniciar {
             min-height: 50px;
             -webkit-tap-highlight-color: transparent;
         }

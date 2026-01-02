@@ -154,9 +154,23 @@
                 const esParaLlevar = !pedido.mesa_numero || pedido.tipo_pago === 'anticipado';
                 const nombreCliente = pedido.cliente_nombre || 'Cliente';
 
+                // Determinar estado visual
+                const enPreparacion = pedido.estado === 'en_cocina';
+                const estadoClase = enPreparacion ? 'preparando' : (esUrgente ? 'urgente' : 'nuevo');
+                const estadoTexto = enPreparacion ? 'EN PREPARACIÓN' : 'NUEVO PEDIDO';
+                const estadoBadge = enPreparacion ? 'bg-warning' : 'bg-info';
+
                 return `
                     <div class="col-md-6 col-lg-4">
-                        <div class="pedido-card p-3 ${esUrgente ? 'urgente' : ''} ${pedido.estado === 'en_cocina' ? 'preparando' : ''}">
+                        <div class="pedido-card p-3 ${estadoClase}">
+                            <!-- Barra de estado superior -->
+                            <div class="estado-barra ${enPreparacion ? 'preparando' : 'pendiente'} mb-3">
+                                <span class="badge ${estadoBadge} w-100 py-2">
+                                    <i class="bi ${enPreparacion ? 'bi-fire' : 'bi-bell'}"></i>
+                                    ${estadoTexto}
+                                </span>
+                            </div>
+
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
                                     ${esParaLlevar
@@ -169,6 +183,7 @@
                                     <i class="bi bi-clock"></i> ${tiempoEspera} min
                                 </div>
                             </div>
+
                             ${esParaLlevar ? `
                                 <div class="alert alert-warning py-2 mb-2 text-center">
                                     <i class="bi bi-person-fill"></i>
@@ -196,12 +211,12 @@
 
                             <div class="d-grid gap-2">
                                 ${pedido.estado === 'pagado' || pedido.estado === 'en_mesa' ? `
-                                    <button class="btn btn-warning btn-lg" onclick="cambiarEstado(${pedido.id}, 'en_cocina')">
-                                        <i class="bi bi-fire"></i> Empezar a Preparar
+                                    <button class="btn btn-iniciar btn-lg" onclick="cambiarEstado(${pedido.id}, 'en_cocina')">
+                                        <i class="bi bi-play-circle-fill"></i> INICIAR PREPARACIÓN
                                     </button>
                                 ` : `
                                     <button class="btn btn-listo btn-lg text-white" onclick="cambiarEstado(${pedido.id}, 'listo')">
-                                        <i class="bi bi-check-circle"></i> LISTO PARA SERVIR
+                                        <i class="bi bi-check-circle-fill"></i> LISTO PARA SERVIR
                                     </button>
                                 `}
                             </div>

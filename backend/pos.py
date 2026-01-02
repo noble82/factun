@@ -1407,7 +1407,7 @@ def get_pedidos():
     return jsonify(pedidos)
 
 @pos_bp.route('/pedidos/<int:id>', methods=['GET'])
-@role_required('manager', 'mesero', 'cocinero')
+@role_required('manager', 'mesero', 'cocinero', 'cajero')
 def get_pedido(id):
     """Obtiene un pedido específico con sus items"""
     conn = get_db()
@@ -2787,13 +2787,14 @@ def facturar_pedido(id):
         correlativo = ControlCorrelativo.obtener_siguiente_correlativo(conn, 'factura')
         resultado = GeneradorDTE.generar_factura_consumidor(pedido, cliente_info, correlativo)
 
-        # Guardar información del DTE
+        # Guardar información del DTE (JSON y XML)
         cursor.execute('''
             UPDATE pedidos SET
                 dte_tipo = ?,
                 dte_codigo_generacion = ?,
                 dte_numero_control = ?,
                 dte_json = ?,
+                dte_xml = ?,
                 facturado_at = ?,
                 updated_at = ?
             WHERE id = ?
@@ -2801,7 +2802,8 @@ def facturar_pedido(id):
             '01',  # Factura consumidor final
             resultado['codigo_generacion'],
             resultado['numero_control'],
-            json.dumps(resultado['dte']),
+            json.dumps(resultado['json']),  # Estructura JSON Digifact
+            resultado['xml'],  # Estructura XML Digifact
             datetime.now().isoformat(),
             datetime.now().isoformat(),
             id
@@ -2830,7 +2832,10 @@ def facturar_pedido(id):
             'codigo_generacion': resultado['codigo_generacion'],
             'numero_control': resultado['numero_control'],
             'total': resultado['total'],
-            'dte': resultado['dte']
+            'subtotal': resultado['subtotal'],
+            'iva': resultado['iva'],
+            'dte_json': resultado['json'],
+            'dte_xml': resultado['xml']
         })
 
     else:

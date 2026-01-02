@@ -53,48 +53,109 @@
 </div>
 </div>
 <div class="container-fluid mt-4">
-<!-- Selector de Rol (oculto por defecto, solo visible para managers) -->
-<div id="role-selector" class="role-selector mx-auto" style="max-width: 1000px; display: none;">
-<h3 class="text-center mb-4">Selecciona tu rol de trabajo</h3>
+<!-- Panel Manager (incluye selector de roles) -->
+<div id="panel-manager" class="work-panel">
+<div class="row">
+<div class="col-12">
+<!-- Encabezado del panel manager -->
+<div class="card mb-4" style="background: linear-gradient(135deg, #6f42c1, #9c27b0); border: none;">
+<div class="card-body text-white">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+<div>
+<h4 class="mb-1"><i class="bi bi-shield-check"></i> Panel de Manager</h4>
+<p class="mb-0 opacity-75">Selecciona un rol para operar o accede a administración</p>
+</div>
+<div class="d-flex gap-2 flex-wrap">
+<a href="index.html" class="btn btn-outline-light btn-sm">
+<i class="bi bi-receipt"></i> Facturación
+</a>
+<a href="admin.html" class="btn btn-light btn-sm">
+<i class="bi bi-gear"></i> Administración
+</a>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Selector de roles integrado -->
+<div class="role-selector mx-auto" style="max-width: 1000px;">
+<h5 class="text-center mb-3"><i class="bi bi-person-workspace"></i> Operar como:</h5>
 <div class="row g-3">
-<div class="col-6 col-md-3">
+<div class="col-6 col-md-4">
 <div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('mesero')">
 <div class="role-icon role-mesero">
 <i class="bi bi-person-badge"></i>
 </div>
 <h5>Mesero</h5>
-<p class="text-muted small mb-0">Tomar pedidos y servir</p>
+<p class="text-muted small mb-0">Tomar pedidos y servir mesas</p>
 </div>
 </div>
-<div class="col-6 col-md-3">
+<div class="col-6 col-md-4">
 <div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('cajero')">
 <div class="role-icon role-cajero">
 <i class="bi bi-cash-register"></i>
 </div>
 <h5>Cajero</h5>
-<p class="text-muted small mb-0">Cobros y facturación</p>
+<p class="text-muted small mb-0">Cobros, pagos y facturación</p>
 </div>
 </div>
-<div class="col-6 col-md-3">
+<div class="col-6 col-md-4">
 <div class="card role-card h-100 text-center p-3" onclick="seleccionarRol('cocinero')">
 <div class="role-icon role-cocinero">
 <i class="bi bi-fire"></i>
 </div>
 <h5>Cocina</h5>
-<p class="text-muted small mb-0">Preparar pedidos</p>
+<p class="text-muted small mb-0">Preparar y despachar pedidos</p>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Resumen rápido del día -->
+<div class="row mt-4" id="manager-stats">
+<div class="col-6 col-md-3">
+<div class="card text-center h-100">
+<div class="card-body">
+<i class="bi bi-receipt text-primary fs-2"></i>
+<h3 class="mb-0" id="manager-stat-pedidos">-</h3>
+<small class="text-muted">Pedidos hoy</small>
+</div>
 </div>
 </div>
 <div class="col-6 col-md-3">
-<div class="card role-card h-100 text-center p-3 border-primary" onclick="window.location.href='admin.html'">
-<div class="role-icon" style="color: #6f42c1;">
-<i class="bi bi-gear-fill"></i>
-</div>
-<h5>Administración</h5>
-<p class="text-muted small mb-0">Gestión del sistema</p>
-</div>
+<div class="card text-center h-100">
+<div class="card-body">
+<i class="bi bi-cash-stack text-success fs-2"></i>
+<h3 class="mb-0" id="manager-stat-ventas">-</h3>
+<small class="text-muted">Ventas hoy</small>
 </div>
 </div>
 </div>
+<div class="col-6 col-md-3">
+<div class="card text-center h-100">
+<div class="card-body">
+<i class="bi bi-hourglass-split text-warning fs-2"></i>
+<h3 class="mb-0" id="manager-stat-pendientes">-</h3>
+<small class="text-muted">Pendientes</small>
+</div>
+</div>
+</div>
+<div class="col-6 col-md-3">
+<div class="card text-center h-100">
+<div class="card-body">
+<i class="bi bi-grid-3x3 text-info fs-2"></i>
+<h3 class="mb-0" id="manager-stat-mesas">-</h3>
+<small class="text-muted">Mesas ocupadas</small>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Selector de Rol antiguo (oculto, se mantiene por compatibilidad) -->
+<div id="role-selector" class="role-selector mx-auto" style="max-width: 1000px; display: none;"></div>
 <!-- Panel Mesero -->
 <div id="panel-mesero" class="work-panel">
 <div class="row">
@@ -683,6 +744,11 @@ onkeyup="buscarClienteFactura(this.value)">
 </div>
 </nav>
 
+<!-- Audio para notificaciones -->
+<audio id="audio-notificacion" preload="auto">
+<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp2bi4N9eoGHkJeXlI2Gf3x5fIOLk5iZlpCJgXt4d3uBiZGXmpiUjoeBfHl4eoGIj5WYl5SSjIZ/enl4eoGHjpSXlpOQi4WAfHl4eX+FjJKVlZOQjIiDf3t5eXuAhoyRlJOSkY2Ig4B8enl7f4SLkJOTkpCNiYSAfXt6e36EiY6RkpGQjoqGgoB8e3t9gYaLj5GRkI+NioaDgH18fH6Ch4uOkJCPjo2KhoOAfn19foKGio2PkI+OjYuIhYKAfn5+gYWJjI6Pjo6NjImGg4GAgIGEh4qMjY2NjIuKiIaEgoGBgoSHiouMjIyMi4qIhoSDgoKDhYeJi4uLi4uKiomHhoSEg4OEhoiJioqKioqJiYiGhYSEhISFh4iJiYmJiYmIh4aFhYWFhYaHiIiIiIiIiIiHhoaFhYWGhoeHiIiIiIeHh4eGhoaGhoaGhoeHh4eHh4eHh4eHhoaGhoaGhoeHh4eHh4eHh4eHh4aGhoaGhoaGh4eHh4eHh4eHh4eHhoaG" type="audio/wav">
+</audio>
+
 <!-- ✅ Scripts en orden crítico -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -715,12 +781,25 @@ function mostrarSelectorRol() {
     panel.classList.remove('active');
   });
 
-  // Mostrar selector de rol
-  const selector = document.getElementById('role-selector');
-  if (selector) {
-    selector.style.display = 'block';
-    // Scroll suave hacia el selector
-    selector.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Mostrar el panel-manager con el selector de roles integrado
+  const panelManager = document.getElementById('panel-manager');
+  if (panelManager) {
+    panelManager.style.display = 'block';
+    panelManager.classList.add('active');
+    // Scroll suave hacia el panel
+    panelManager.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Cargar estadísticas del manager
+    if (typeof cargarEstadisticasManager === 'function') {
+      cargarEstadisticasManager();
+    }
+  }
+
+  // Actualizar estado global
+  window.rolSystem.currentRole = 'manager';
+  const currentRoleBadge = document.getElementById('current-role');
+  if (currentRoleBadge) {
+    currentRoleBadge.textContent = 'Manager';
   }
 }
 
@@ -777,14 +856,14 @@ function aplicarPermisosPorRol(rol) {
   });
 
   // Mostrar el panel correspondiente al rol
-  // Mapeo de rol a panel ID (cocinero -> panel-cocina)
+  // Mapeo de rol a panel ID
   const panelMap = {
+    'manager': 'panel-manager',
     'mesero': 'panel-mesero',
     'cajero': 'panel-cajero',
     'cocinero': 'panel-cocina'
   };
 
-  // Manager no tiene panel en POS, debe ir a admin.html para gestión
   const panelId = panelMap[rol];
   const panelActual = document.getElementById(panelId);
 
@@ -793,23 +872,69 @@ function aplicarPermisosPorRol(rol) {
     panelActual.classList.add('active');
 
     // Inicializar datos según el rol
-    if ((rol === 'mesero' || rol === 'manager') && typeof cargarMesas === 'function') {
-      cargarMesas();
+    if (rol === 'manager') {
+      // Cargar estadísticas del manager
+      cargarEstadisticasManager();
     }
 
-    if ((rol === 'mesero' || rol === 'cajero' || rol === 'manager') && typeof cargarCategorias === 'function') {
+    if ((rol === 'mesero') && typeof cargarMesas === 'function') {
+      cargarMesas();
+      // Iniciar polling para "Por Servir"
+      if (typeof actualizarPedidosPorServir === 'function') {
+        actualizarPedidosPorServir();
+        // Actualizar cada 5 segundos
+        if (window.intervalPorServir) clearInterval(window.intervalPorServir);
+        window.intervalPorServir = setInterval(actualizarPedidosPorServir, 5000);
+      }
+    }
+
+    if ((rol === 'mesero' || rol === 'cajero') && typeof cargarCategorias === 'function') {
       cargarCategorias();
     }
 
-    if ((rol === 'cajero' || rol === 'manager') && typeof cargarPedidosCajero === 'function') {
+    if ((rol === 'cajero') && typeof cargarPedidosCajero === 'function') {
       cargarPedidosCajero();
+      // Actualizar cada 10 segundos
+      if (window.intervalCajero) clearInterval(window.intervalCajero);
+      window.intervalCajero = setInterval(cargarPedidosCajero, 10000);
     }
 
-    if ((rol === 'cocinero' || rol === 'manager') && typeof cargarPedidosCocina === 'function') {
+    if ((rol === 'cocinero') && typeof cargarPedidosCocina === 'function') {
       cargarPedidosCocina();
     }
   } else {
     console.warn(`[POS] Panel no encontrado: ${panelId}`);
+  }
+
+  // Función para cargar estadísticas del manager
+  async function cargarEstadisticasManager() {
+    try {
+      // Cargar reportes del día
+      const respReportes = await apiFetch(`${API_POS}/reportes/hoy`);
+      if (respReportes.ok) {
+        const datos = await respReportes.json();
+        const resumen = datos.resumen || datos;
+        document.getElementById('manager-stat-pedidos').textContent = resumen.total_pedidos || 0;
+        document.getElementById('manager-stat-ventas').textContent = '$' + (resumen.total_ventas || 0).toFixed(2);
+      }
+
+      // Cargar pedidos pendientes
+      const respPendientes = await apiFetch(`${API_POS}/cajero/pedidos`);
+      if (respPendientes.ok) {
+        const pedidos = await respPendientes.json();
+        document.getElementById('manager-stat-pendientes').textContent = pedidos.length || 0;
+      }
+
+      // Cargar mesas ocupadas
+      const respMesas = await apiFetch(`${API_POS}/mesas`);
+      if (respMesas.ok) {
+        const mesas = await respMesas.json();
+        const ocupadas = mesas.filter(m => m.estado === 'ocupada').length;
+        document.getElementById('manager-stat-mesas').textContent = ocupadas + '/' + mesas.length;
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas manager:', error);
+    }
   }
 
   // Reinicializar notificaciones
@@ -992,7 +1117,7 @@ function seleccionarRol(nuevoRol) {
 <!-- Scripts principales -->
 <script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
-<script src="js/pos.js?v=16"></script>
+<script src="js/pos.js?v=18"></script>
 
 </body>
 </html>

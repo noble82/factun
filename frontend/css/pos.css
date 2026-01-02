@@ -69,6 +69,7 @@ margin-bottom: 1rem;
 .role-mesero { color: var(--info-color); }
 .role-cajero { color: var(--success-color); }
 .role-cocina { color: var(--danger-color); }
+.role-cocinero { color: var(--danger-color); }
 /* Panel de trabajo */
 .work-panel {
 display: none;
@@ -721,34 +722,110 @@ margin: 0;
 max-width: 100%;
 min-height: 100vh;
 }
+.modal-dialog.modal-lg {
+max-width: 100%;
+}
 .modal-content {
 border: none;
 border-radius: 0;
 min-height: 100vh;
+display: flex;
+flex-direction: column;
 }
 .modal-header {
 border-radius: 0;
+flex-shrink: 0;
 }
 .modal-body {
-padding: 1rem;
+padding: 0.75rem;
 overflow-y: auto;
+flex: 1;
 }
 .modal-body .row {
 flex-direction: column;
+margin: 0;
 }
 .modal-body .col-md-6 {
 width: 100%;
-margin-bottom: 1rem;
+padding: 0;
+margin-bottom: 0.75rem;
 }
+/* Tabla de items en modal - responsive */
+.modal-body .table-responsive {
+margin: 0 -0.75rem;
+width: calc(100% + 1.5rem);
+}
+.modal-body .table {
+font-size: 0.8rem;
+margin-bottom: 0;
+}
+.modal-body .table th,
+.modal-body .table td {
+padding: 0.4rem 0.5rem;
+white-space: nowrap;
+}
+.modal-body .table th:first-child,
+.modal-body .table td:first-child {
+white-space: normal;
+max-width: 100px;
+}
+/* Formulario de cliente compacto */
+#datos-cliente-container {
+padding: 0.5rem;
+background: #f8f9fa;
+border-radius: 8px;
+margin-top: 0.5rem;
+}
+#datos-cliente-container h6 {
+font-size: 0.9rem;
+margin-bottom: 0.5rem;
+}
+#datos-cliente-container .form-control-sm {
+font-size: 14px !important;
+padding: 0.4rem 0.6rem;
+}
+#datos-cliente-container .row {
+margin-bottom: 0.25rem !important;
+}
+/* Modal footer con botones */
 .modal-footer {
 flex-direction: column;
 gap: 0.5rem;
-padding: 1rem;
-padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+padding: 0.75rem;
+padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+flex-shrink: 0;
+border-top: 1px solid #dee2e6;
+background: #f8f9fa;
 }
 .modal-footer .btn {
 width: 100%;
+min-height: 44px;
+font-size: 0.9rem;
+border-radius: 8px;
+margin: 0 !important;
+}
+/* Inputs en modal */
+#modalPago .form-control,
+#modalPago .form-select {
+min-height: 42px;
+font-size: 14px !important;
+}
+#modalPago .form-control-lg {
 min-height: 48px;
+font-size: 16px !important;
+}
+/* Botones de propina en móvil */
+#seccion-propina .row.g-2 {
+flex-wrap: wrap;
+}
+#seccion-propina .col-auto {
+flex: 1 1 auto;
+min-width: 70px;
+}
+#seccion-propina .btn-sm {
+width: 100%;
+padding: 0.5rem;
+font-size: 0.8rem;
 }
 }
 /* ============ MEJORAS TÁCTILES ============ */
@@ -948,6 +1025,31 @@ transform: translateY(-2px);
 box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
 }
 
+/* Estado urgente - más de 5 minutos esperando */
+.servir-card.urgente {
+border-left-color: var(--danger-color);
+animation: servir-urgente 1.5s infinite;
+}
+@keyframes servir-urgente {
+0%, 100% {
+    box-shadow: 0 2px 10px rgba(244, 67, 54, 0.3);
+    border-left-width: 4px;
+}
+50% {
+    box-shadow: 0 4px 20px rgba(244, 67, 54, 0.5);
+    border-left-width: 6px;
+}
+}
+.servir-card.urgente .tiempo-listo {
+color: var(--danger-color);
+font-weight: bold;
+animation: blink 1s infinite;
+}
+@keyframes blink {
+0%, 100% { opacity: 1; }
+50% { opacity: 0.5; }
+}
+
 /* Tabs de navegación mejorados */
 .nav-tabs.pos-tabs {
 border: none;
@@ -1024,4 +1126,278 @@ padding: 3px 8px;
 border-radius: 10px;
 font-size: 0.65rem;
 font-weight: bold;
+}
+
+/* ============ CARRITO MÓVIL ITEMS ============ */
+.cart-item-mobile {
+padding: 0.6rem 0;
+border-bottom: 1px solid #eee;
+}
+.cart-item-mobile:last-child {
+border-bottom: none;
+}
+.cart-item-mobile .btn {
+min-width: 28px;
+min-height: 28px;
+line-height: 1;
+}
+.cart-item-mobile .badge {
+min-width: 24px;
+}
+
+/* ============ CART SHEET MEJORADO ============ */
+.cart-sheet.show,
+.cart-sheet.active {
+display: block;
+transform: translateY(0);
+}
+.cart-sheet-overlay.show,
+.cart-sheet-overlay.active {
+display: block;
+}
+
+/* ============ DETALLE VENTAS CAJERO TIEMPO REAL ============ */
+.resumen-dia-card {
+background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+border: none;
+border-radius: 15px;
+}
+.resumen-dia-card .card-header {
+background: transparent;
+border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+.stat-value {
+font-size: 1.5rem;
+font-weight: bold;
+color: var(--success-color);
+}
+.stat-label {
+font-size: 0.8rem;
+color: #666;
+text-transform: uppercase;
+letter-spacing: 0.5px;
+}
+
+/* Top productos list */
+.top-producto-item {
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 0.5rem 0;
+border-bottom: 1px dashed #eee;
+}
+.top-producto-item:last-child {
+border-bottom: none;
+}
+.top-producto-item .ranking {
+width: 24px;
+height: 24px;
+border-radius: 50%;
+background: var(--primary-color);
+color: white;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 0.75rem;
+font-weight: bold;
+margin-right: 0.5rem;
+}
+.top-producto-item .nombre {
+flex: 1;
+font-weight: 500;
+}
+.top-producto-item .cantidad {
+background: #e3f2fd;
+color: var(--info-color);
+padding: 2px 8px;
+border-radius: 10px;
+font-size: 0.8rem;
+font-weight: bold;
+}
+
+/* ============ COBROS CAJERO MEJORADO ============ */
+.cobro-card {
+background: white;
+border-radius: 12px;
+padding: 1rem;
+margin-bottom: 0.75rem;
+border-left: 4px solid var(--warning-color);
+box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+transition: all 0.2s;
+}
+.cobro-card:hover {
+transform: translateX(5px);
+box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.cobro-card.listo {
+border-left-color: var(--success-color);
+}
+.cobro-card .cobro-header {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin-bottom: 0.5rem;
+}
+.cobro-card .cobro-items {
+font-size: 0.85rem;
+color: #666;
+margin-bottom: 0.75rem;
+max-height: 60px;
+overflow-y: auto;
+}
+.cobro-card .cobro-footer {
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+.cobro-card .total-cobrar {
+font-size: 1.2rem;
+font-weight: bold;
+color: var(--success-color);
+}
+
+/* ============ RESPONSIVIDAD ADICIONAL ============ */
+@media (max-width: 576px) {
+/* Cards de cobros más compactas */
+.cobro-card {
+padding: 0.75rem;
+}
+.cobro-card .cobro-header {
+flex-wrap: wrap;
+gap: 0.25rem;
+}
+/* Botón de cobrar */
+.cobro-card .btn {
+padding: 0.5rem 1rem;
+font-size: 0.85rem;
+}
+/* Resumen del día compacto */
+.resumen-dia-card .stat-value {
+font-size: 1.2rem;
+}
+/* FAB posición ajustada */
+.cart-fab {
+bottom: 85px;
+right: 12px;
+width: 56px;
+height: 56px;
+}
+/* Bottom sheet altura máxima */
+.cart-sheet {
+max-height: 75vh;
+}
+.cart-sheet-body {
+max-height: 35vh;
+}
+}
+
+/* ============ PANEL CAJERO MOBILE ============ */
+@media (max-width: 768px) {
+/* Layout cajero en móvil */
+#panel-cajero > .tab-content {
+padding-bottom: 80px;
+}
+
+/* Mostrar carrito del cajero en móvil como bottom sheet */
+#panel-cajero #cart-panel-cajero {
+display: none;
+}
+
+/* Tabs del cajero compactos */
+#cajeroTabs {
+flex-wrap: nowrap;
+overflow-x: auto;
+gap: 0.25rem;
+}
+#cajeroTabs .nav-link {
+padding: 0.5rem 0.75rem;
+font-size: 0.75rem;
+white-space: nowrap;
+}
+#cajeroTabs .nav-link i {
+font-size: 1rem;
+display: block;
+margin-bottom: 2px;
+}
+
+/* Cobros pendientes layout */
+#cajero-cobros-tab > .row {
+flex-direction: column-reverse;
+}
+#cajero-cobros-tab > .row > .col-lg-4 {
+margin-bottom: 1rem;
+}
+#cajero-cobros-tab > .row > .col-lg-8 {
+width: 100%;
+}
+
+/* Resumen del día horizontal en móvil */
+#cajero-cobros-tab .card-body > .d-flex {
+flex-wrap: wrap;
+}
+
+/* Nuevo pedido cajero - mostrar productos en full width */
+#cajero-pedido-tab > .row > .col-lg-8 {
+width: 100%;
+max-width: 100%;
+flex: 0 0 100%;
+}
+
+/* Reportes rápidos */
+#cajero-reportes-tab .btn-group {
+flex-direction: column;
+}
+#cajero-reportes-tab .btn-group .btn {
+border-radius: 8px !important;
+margin-bottom: 0.25rem;
+}
+#cajero-reportes-tab .btn-check:checked + .btn {
+background: var(--primary-color);
+border-color: var(--primary-color);
+}
+
+/* Métricas en 2 columnas */
+#metricas-reportes > .col-md-3 {
+flex: 0 0 50%;
+max-width: 50%;
+}
+#metricas-reportes .card-body {
+padding: 0.75rem;
+}
+#metricas-reportes .card-body h6 {
+font-size: 0.7rem;
+}
+#metricas-reportes .card-body h3 {
+font-size: 1.1rem;
+}
+
+/* Tablas de reportes */
+#cajero-reportes-tab > .row:last-child > .col-md-6 {
+margin-bottom: 0.75rem;
+}
+}
+
+/* ============ VISTA CAJERO - CARRITO FAB ============ */
+#panel-cajero .cart-fab-cajero {
+display: none;
+}
+
+@media (max-width: 768px) {
+#panel-cajero .cart-fab-cajero {
+display: flex;
+position: fixed;
+bottom: 20px;
+right: 15px;
+width: 60px;
+height: 60px;
+border-radius: 50%;
+background: var(--success-color);
+color: white;
+border: none;
+box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+z-index: 1040;
+font-size: 1.5rem;
+align-items: center;
+justify-content: center;
+}
 }
