@@ -3073,3 +3073,189 @@ def enviar_dte_pedido(id):
                 print(f"Error notificando error de DTE del pedido {id}: {err}")
 
         return jsonify({'error': f'Error al enviar DTE: {str(e)}'}), 500
+
+
+@pos_bp.route('/admin/dtes', methods=['GET'])
+@role_required('manager')
+def listar_dtes_admin():
+    """
+    Lista todos los DTEs para administración
+    Incluye: pendientes de envío, enviados, y con errores
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Obtener parámetros de filtro
+    estado = request.args.get('estado', 'todos')  # todos, pendientes, enviados, errores
+    fecha_desde = request.args.get('fecha_desde')
+    fecha_hasta = request.args.get('fecha_hasta')
+
+    # Query base: pedidos con DTE generado (dte_tipo no nulo)
+    query = '''
+        SELECT id, cliente_nombre, total, dte_tipo, dte_codigo_generacion,
+               dte_numero_control, facturado_at, created_at, estado,
+               tipo_comprobante
+        FROM pedidos
+        WHERE dte_tipo IS NOT NULL
+    '''
+    params = []
+
+    # Filtrar por estado de envío
+    if estado == 'pendientes':
+        # DTEs tipo 01 (factura) que no han sido certificados (sin código generación real de Digifact)
+        query += " AND dte_tipo = '01'"
+    elif estado == 'tickets':
+        # Tickets (tipo 99 o similar)
+        query += " AND dte_tipo != '01'"
+
+    # Filtrar por fechas
+    if fecha_desde:
+        query += " AND DATE(created_at) >= ?"
+        params.append(fecha_desde)
+    if fecha_hasta:
+        query += " AND DATE(created_at) <= ?"
+        params.append(fecha_hasta)
+
+    query += " ORDER BY created_at DESC LIMIT 100"
+
+    cursor.execute(query, params)
+    dtes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return jsonify({
+        'dtes': dtes,
+        'total': len(dtes)
+    })
+
+
+@pos_bp.route('/admin/dtes/<int:pedido_id>/reenviar', methods=['POST'])
+@role_required('manager')
+def reenviar_dte_digifact(pedido_id):
+    """
+    Reenvía un DTE a Digifact para certificación
+    Solo para DTEs tipo 01 (facturas electrónicas)
+    """
+    import requests
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM pedidos WHERE id = ?', (pedido_id,))
+    pedido = cursor.fetchone()
+
+    if not pedido:
+        conn.close()
+        return jsonify({'error': 'Pedido no encontrado'}), 404
+
+    pedido = dict(pedido)
+
+    if pedido.get('dte_tipo') != '01':
+        conn.close()
+        return jsonify({'error': 'Solo se pueden enviar facturas electrónicas (tipo 01)'}), 400
+
+    if not pedido.get('dte_json'):
+        conn.close()
+        return jsonify({'error': 'Este pedido no tiene DTE generado'}), 400
+
+    conn.close()
+
+    try:
+        dte_json = json.loads(pedido['dte_json'])
+
+        # Llamar al endpoint de certificación de Digifact
+        digifact_url = os.environ.get('DIGIFACT_URL', 'https://felgttestaws.digifact.com.sv')
+        digifact_user = os.environ.get('DIGIFACT_USER', '')
+        digifact_pass = os.environ.get('DIGIFACT_PASS', '')
+
+        if not digifact_user or not digifact_pass:
+            return jsonify({
+                'error': 'Credenciales de Digifact no configuradas',
+                'detalle': 'Configure DIGIFACT_USER y DIGIFACT_PASS en las variables de entorno'
+            }), 500
+
+        # Realizar la llamada a Digifact
+        response = requests.post(
+            f'{digifact_url}/api/certificar',
+            json={'dte': dte_json},
+            auth=(digifact_user, digifact_pass),
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            resp_data = response.json()
+
+            # Actualizar el pedido con la respuesta de Digifact
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE pedidos
+                SET dte_codigo_generacion = ?,
+                    updated_at = ?
+                WHERE id = ?
+            ''', (
+                resp_data.get('codigo_generacion', resp_data.get('dte_numero')),
+                datetime.now().isoformat(),
+                pedido_id
+            ))
+            conn.commit()
+            conn.close()
+
+            return jsonify({
+                'success': True,
+                'mensaje': 'DTE enviado exitosamente a Digifact',
+                'digifact_response': resp_data
+            })
+        else:
+            return jsonify({
+                'error': 'Error en respuesta de Digifact',
+                'status_code': response.status_code,
+                'detalle': response.text[:500]
+            }), 500
+
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Timeout al conectar con Digifact'}), 504
+    except requests.exceptions.ConnectionError:
+        return jsonify({'error': 'No se pudo conectar con Digifact'}), 503
+    except Exception as e:
+        return jsonify({'error': f'Error al enviar DTE: {str(e)}'}), 500
+
+
+@pos_bp.route('/admin/dtes/estadisticas', methods=['GET'])
+@role_required('manager')
+def estadisticas_dtes():
+    """
+    Obtiene estadísticas de DTEs para el dashboard
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Total de facturas electrónicas (tipo 01)
+    cursor.execute("SELECT COUNT(*) FROM pedidos WHERE dte_tipo = '01'")
+    total_facturas = cursor.fetchone()[0]
+
+    # Total de tickets (tipo != 01)
+    cursor.execute("SELECT COUNT(*) FROM pedidos WHERE dte_tipo IS NOT NULL AND dte_tipo != '01'")
+    total_tickets = cursor.fetchone()[0]
+
+    # Facturas del día
+    cursor.execute("""
+        SELECT COUNT(*) FROM pedidos
+        WHERE dte_tipo = '01' AND DATE(created_at) = DATE('now', 'localtime')
+    """)
+    facturas_hoy = cursor.fetchone()[0]
+
+    # Total facturado hoy
+    cursor.execute("""
+        SELECT COALESCE(SUM(total), 0) FROM pedidos
+        WHERE dte_tipo IS NOT NULL AND DATE(created_at) = DATE('now', 'localtime')
+    """)
+    total_hoy = cursor.fetchone()[0]
+
+    conn.close()
+
+    return jsonify({
+        'total_facturas': total_facturas,
+        'total_tickets': total_tickets,
+        'facturas_hoy': facturas_hoy,
+        'total_hoy': round(total_hoy, 2)
+    })

@@ -56,8 +56,15 @@ def validate_csrf_token(token):
         del _csrf_tokens[token]
         return False, "CSRF token has expired"
 
-    # Consume the token (one-time use)
-    del _csrf_tokens[token]
+    # Allow token reuse within 5 seconds to handle rapid requests
+    # This prevents 403 errors when buttons are double-clicked
+    # or when both mobile/desktop buttons trigger simultaneously
+    REUSE_WINDOW = 5  # seconds
+    if age_seconds > REUSE_WINDOW:
+        # Token older than 5 seconds - consume it (one-time use)
+        del _csrf_tokens[token]
+    # If within reuse window, don't delete - allow reuse
+
     return True, ""
 
 

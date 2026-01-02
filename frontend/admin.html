@@ -73,6 +73,9 @@
                     <a class="nav-link" href="#" onclick="showSection('usuarios')">
                         <i class="bi bi-people"></i> Usuarios
                     </a>
+                    <a class="nav-link" href="#" onclick="showSection('digifact')">
+                        <i class="bi bi-file-earmark-check"></i> Digifact DTE
+                    </a>
                     <a class="nav-link text-danger" href="#" onclick="cerrarSesion()">
                         <i class="bi bi-box-arrow-right"></i> Cerrar Sesi&oacute;n
                     </a>
@@ -565,6 +568,127 @@
                             </table>
                         </div>
                     </div>
+                </div>
+
+                <!-- Digifact DTE -->
+                <div id="section-digifact" class="content-section">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4><i class="bi bi-file-earmark-check"></i> Gesti&oacute;n de DTEs - Digifact</h4>
+                        <button class="btn btn-outline-primary" onclick="cargarDTEs()">
+                            <i class="bi bi-arrow-clockwise"></i> Actualizar
+                        </button>
+                    </div>
+
+                    <!-- Estadísticas de DTEs -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center py-3">
+                                    <h4 class="mb-0" id="stat-facturas-total">0</h4>
+                                    <small>Facturas Electr&oacute;nicas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center py-3">
+                                    <h4 class="mb-0" id="stat-tickets-total">0</h4>
+                                    <small>Tickets</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center py-3">
+                                    <h4 class="mb-0" id="stat-facturas-hoy">0</h4>
+                                    <small>Comprobantes Hoy</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center py-3">
+                                    <h4 class="mb-0" id="stat-total-hoy">$0.00</h4>
+                                    <small>Facturado Hoy</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label">Tipo de Comprobante</label>
+                                    <select class="form-select" id="filtro-dte-tipo" onchange="cargarDTEs()">
+                                        <option value="todos">Todos</option>
+                                        <option value="pendientes">Facturas Electr&oacute;nicas (01)</option>
+                                        <option value="tickets">Tickets</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Desde</label>
+                                    <input type="date" class="form-control" id="filtro-dte-desde" onchange="cargarDTEs()">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Hasta</label>
+                                    <input type="date" class="form-control" id="filtro-dte-hasta" onchange="cargarDTEs()">
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-secondary w-100" onclick="limpiarFiltrosDTE()">
+                                        <i class="bi bi-x-circle"></i> Limpiar Filtros
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de DTEs -->
+                    <div class="table-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="tabla-dtes">
+                                <thead>
+                                    <tr>
+                                        <th>Pedido #</th>
+                                        <th>Cliente</th>
+                                        <th>Tipo</th>
+                                        <th>N&uacute;mero Control</th>
+                                        <th>Total</th>
+                                        <th>Fecha</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-dtes">
+                                    <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ver DTE -->
+    <div class="modal fade" id="modalVerDTE" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-text"></i> Detalle de DTE</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="dte-detalle-contenido">
+                        <!-- Contenido se carga dinámicamente -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-success" id="btn-enviar-digifact" onclick="enviarDTEDigifact()">
+                        <i class="bi bi-cloud-upload"></i> Enviar a Digifact
+                    </button>
                 </div>
             </div>
         </div>

@@ -445,7 +445,16 @@ function actualizarDisplayPropina() {
 
 // ============ ENVÍO DE PEDIDOS ============
 
+// Lock para prevenir doble envío de pedidos
+let enviandoPedido = false;
+
 async function enviarPedido() {
+    // Prevenir doble envío
+    if (enviandoPedido) {
+        console.log('Pedido ya en proceso, ignorando clic duplicado');
+        return;
+    }
+
     if (!mesaSeleccionada) {
         mostrarNotificacion('Error', 'Selecciona una mesa', 'danger');
         return;
@@ -455,6 +464,13 @@ async function enviarPedido() {
         mostrarNotificacion('Error', 'El carrito está vacío', 'danger');
         return;
     }
+
+    // Activar lock
+    enviandoPedido = true;
+    const btnEnviar = document.getElementById('btn-enviar-pedido');
+    const btnEnviarMobile = document.getElementById('btn-enviar-mobile');
+    if (btnEnviar) btnEnviar.disabled = true;
+    if (btnEnviarMobile) btnEnviarMobile.disabled = true;
 
     const tipoFlojo = document.getElementById('tipo-pago')?.value || 'al_final';
     const nombreCliente = document.getElementById('cliente-nombre-pedido')?.value || '';
@@ -490,6 +506,13 @@ async function enviarPedido() {
     } catch (error) {
         console.error('Error enviarPedido:', error);
         mostrarNotificacion('Error', 'Error de conexión', 'danger');
+    } finally {
+        // Liberar lock después de un breve delay
+        setTimeout(() => {
+            enviandoPedido = false;
+            if (btnEnviar) btnEnviar.disabled = false;
+            if (btnEnviarMobile) btnEnviarMobile.disabled = false;
+        }, 1000);
     }
 }
 
@@ -497,11 +520,25 @@ async function enviarPedidoMobile() {
     await enviarPedido();
 }
 
+// Lock para prevenir doble envío de pedidos cajero
+let enviandoPedidoCajero = false;
+
 async function crearPedidoCajero() {
+    // Prevenir doble envío
+    if (enviandoPedidoCajero) {
+        console.log('Pedido cajero ya en proceso, ignorando clic duplicado');
+        return;
+    }
+
     if (carrito.length === 0) {
         mostrarNotificacion('Error', 'El carrito está vacío', 'danger');
         return;
     }
+
+    // Activar lock
+    enviandoPedidoCajero = true;
+    const btnCajero = document.getElementById('btn-crear-pedido-cajero');
+    if (btnCajero) btnCajero.disabled = true;
 
     const nombreCliente = document.getElementById('cliente-nombre-cajero')?.value || 'Cliente';
 
@@ -532,6 +569,12 @@ async function crearPedidoCajero() {
     } catch (error) {
         console.error('Error crearPedidoCajero:', error);
         mostrarNotificacion('Error', 'Error de conexión', 'danger');
+    } finally {
+        // Liberar lock después de un breve delay
+        setTimeout(() => {
+            enviandoPedidoCajero = false;
+            if (btnCajero) btnCajero.disabled = false;
+        }, 1000);
     }
 }
 

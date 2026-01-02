@@ -117,6 +117,10 @@ function showSection(section) {
         case 'combos':
             cargarCombos();
             break;
+        case 'digifact':
+            cargarDTEs();
+            cargarEstadisticasDTEs();
+            break;
     }
 }
 
@@ -2424,4 +2428,261 @@ window.guardarCombo = guardarCombo;
 window.editarCombo = editarCombo;
 window.eliminarCombo = eliminarCombo;
 window.filtrarCombos = filtrarCombos;
+
+// ============ DIGIFACT DTE ============
+
+let dteSeleccionado = null;
+
+async function cargarEstadisticasDTEs() {
+    try {
+        const response = await apiFetch(`${API_POS}/admin/dtes/estadisticas`);
+        if (!response || !response.ok) {
+            console.error('Error cargando estadísticas de DTEs');
+            return;
+        }
+
+        const data = await response.json();
+
+        document.getElementById('stat-facturas-total').textContent = data.total_facturas || 0;
+        document.getElementById('stat-tickets-total').textContent = data.total_tickets || 0;
+        document.getElementById('stat-facturas-hoy').textContent = data.facturas_hoy || 0;
+        document.getElementById('stat-total-hoy').textContent = '$' + (data.total_hoy || 0).toFixed(2);
+
+    } catch (error) {
+        console.error('Error cargando estadísticas de DTEs:', error);
+    }
+}
+
+async function cargarDTEs() {
+    const tbody = document.getElementById('tbody-dtes');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm"></div> Cargando...</td></tr>';
+
+    try {
+        // Obtener filtros
+        const tipo = document.getElementById('filtro-dte-tipo')?.value || 'todos';
+        const desde = document.getElementById('filtro-dte-desde')?.value || '';
+        const hasta = document.getElementById('filtro-dte-hasta')?.value || '';
+
+        let url = `${API_POS}/admin/dtes?estado=${tipo}`;
+        if (desde) url += `&fecha_desde=${desde}`;
+        if (hasta) url += `&fecha_hasta=${hasta}`;
+
+        const response = await apiFetch(url);
+        if (!response || !response.ok) {
+            throw new Error('Error al cargar DTEs');
+        }
+
+        const data = await response.json();
+        const dtes = data.dtes || [];
+
+        if (dtes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay DTEs registrados</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = dtes.map(dte => {
+            const fecha = new Date(dte.created_at).toLocaleString('es-SV', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+
+            const tipoLabel = dte.dte_tipo === '01' ?
+                '<span class="badge bg-primary">Factura</span>' :
+                '<span class="badge bg-secondary">Ticket</span>';
+
+            const estadoLabel = dte.dte_codigo_generacion ?
+                '<span class="badge bg-success">Certificado</span>' :
+                (dte.dte_tipo === '01' ? '<span class="badge bg-warning text-dark">Pendiente</span>' : '<span class="badge bg-info">Local</span>');
+
+            return `
+                <tr>
+                    <td><strong>#${dte.id}</strong></td>
+                    <td>${dte.cliente_nombre || 'Consumidor Final'}</td>
+                    <td>${tipoLabel}</td>
+                    <td><code>${dte.dte_numero_control || '-'}</code></td>
+                    <td><strong>$${parseFloat(dte.total || 0).toFixed(2)}</strong></td>
+                    <td>${fecha}</td>
+                    <td>${estadoLabel}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="verDetalleDTE(${dte.id})" title="Ver detalle">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${dte.dte_tipo === '01' && !dte.dte_codigo_generacion ? `
+                                <button class="btn btn-outline-success" onclick="enviarADigifact(${dte.id})" title="Enviar a Digifact">
+                                    <i class="bi bi-cloud-upload"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error cargando DTEs:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error al cargar DTEs</td></tr>';
+    }
+}
+
+async function verDetalleDTE(pedidoId) {
+    try {
+        const response = await apiFetch(`${API_POS}/pedidos/${pedidoId}/comprobante`);
+        if (!response || !response.ok) {
+            throw new Error('Error al cargar detalle del DTE');
+        }
+
+        const data = await response.json();
+        dteSeleccionado = { pedidoId, data };
+
+        const contenido = document.getElementById('dte-detalle-contenido');
+        const comprobante = data.comprobante || {};
+
+        // Mostrar información del DTE
+        let html = `
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h6>Información General</h6>
+                    <table class="table table-sm table-bordered">
+                        <tr><th>Pedido #</th><td>${pedidoId}</td></tr>
+                        <tr><th>Tipo</th><td>${data.tipo === '01' ? 'Factura Electrónica' : 'Ticket'}</td></tr>
+                        <tr><th>Número Control</th><td><code>${data.numero_control || '-'}</code></td></tr>
+                        <tr><th>Código Generación</th><td><code>${data.codigo_generacion || 'Pendiente'}</code></td></tr>
+                        <tr><th>Fecha</th><td>${data.facturado_at || '-'}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Totales</h6>
+                    <table class="table table-sm table-bordered">
+                        <tr><th>Subtotal</th><td>$${parseFloat(comprobante.Totals?.TotalCharges?.TotalCharge?.[0]?.Amount || 0).toFixed(2)}</td></tr>
+                        <tr><th>IVA (13%)</th><td>$${parseFloat(comprobante.Totals?.AdditionalInfo?.find(i => i.Name === 'IvaRetenido')?.Value || 0).toFixed(2)}</td></tr>
+                        <tr><th>Total</th><td><strong>$${parseFloat(comprobante.Totals?.GrandTotal?.InvoiceTotal || 0).toFixed(2)}</strong></td></tr>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        // Items del comprobante
+        const items = comprobante.Items || [];
+        if (items.length > 0) {
+            html += `
+                <h6>Items</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Descripción</th>
+                            <th class="text-end">Cantidad</th>
+                            <th class="text-end">Precio</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map((item, idx) => `
+                            <tr>
+                                <td>${idx + 1}</td>
+                                <td>${item.Description || ''}</td>
+                                <td class="text-end">${item.Qty || 0}</td>
+                                <td class="text-end">$${parseFloat(item.Price || 0).toFixed(2)}</td>
+                                <td class="text-end">$${parseFloat(item.Totals?.TotalItem || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // JSON completo (colapsable)
+        html += `
+            <div class="accordion mt-3" id="accordionJSON">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseJSON">
+                            <i class="bi bi-code-slash me-2"></i> Ver JSON Completo
+                        </button>
+                    </h2>
+                    <div id="collapseJSON" class="accordion-collapse collapse" data-bs-parent="#accordionJSON">
+                        <div class="accordion-body">
+                            <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow: auto; font-size: 0.75rem;">${JSON.stringify(comprobante, null, 2)}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        contenido.innerHTML = html;
+
+        // Mostrar/ocultar botón de envío según el estado
+        const btnEnviar = document.getElementById('btn-enviar-digifact');
+        if (btnEnviar) {
+            btnEnviar.style.display = (data.tipo === '01' && !data.codigo_generacion) ? 'inline-block' : 'none';
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('modalVerDTE'));
+        modal.show();
+
+    } catch (error) {
+        console.error('Error cargando detalle DTE:', error);
+        mostrarNotificacion('Error', 'No se pudo cargar el detalle del DTE', 'danger');
+    }
+}
+
+async function enviarADigifact(pedidoId) {
+    if (!confirm('¿Enviar este DTE a Digifact para certificación?\n\nEsta acción no se puede deshacer.')) {
+        return;
+    }
+
+    try {
+        mostrarNotificacion('Procesando', 'Enviando DTE a Digifact...', 'info');
+
+        const response = await apiFetch(`${API_POS}/admin/dtes/${pedidoId}/reenviar`, {
+            method: 'POST'
+        });
+
+        if (!response) {
+            throw new Error('Sin respuesta del servidor');
+        }
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            mostrarNotificacion('Éxito', 'DTE enviado exitosamente a Digifact', 'success');
+            cargarDTEs();
+            cargarEstadisticasDTEs();
+
+            // Cerrar modal si está abierto
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalVerDTE'));
+            if (modal) modal.hide();
+        } else {
+            throw new Error(data.error || data.detalle || 'Error al enviar DTE');
+        }
+
+    } catch (error) {
+        console.error('Error enviando DTE a Digifact:', error);
+        mostrarNotificacion('Error', error.message, 'danger');
+    }
+}
+
+function enviarDTEDigifact() {
+    if (dteSeleccionado && dteSeleccionado.pedidoId) {
+        enviarADigifact(dteSeleccionado.pedidoId);
+    }
+}
+
+function limpiarFiltrosDTE() {
+    document.getElementById('filtro-dte-tipo').value = 'todos';
+    document.getElementById('filtro-dte-desde').value = '';
+    document.getElementById('filtro-dte-hasta').value = '';
+    cargarDTEs();
+}
+
+// Exponer funciones de Digifact globalmente
+window.cargarDTEs = cargarDTEs;
+window.cargarEstadisticasDTEs = cargarEstadisticasDTEs;
+window.verDetalleDTE = verDetalleDTE;
+window.enviarADigifact = enviarADigifact;
+window.enviarDTEDigifact = enviarDTEDigifact;
+window.limpiarFiltrosDTE = limpiarFiltrosDTE;
 
