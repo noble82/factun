@@ -2364,6 +2364,11 @@ async function guardarCombo() {
             body: formData
         });
 
+        // Verificar si response es null (apiFetch devuelve null en errores)
+        if (!response) {
+            throw new Error('Error en la petición al servidor');
+        }
+
         const data = await response.json();
 
         if (!response.ok) {

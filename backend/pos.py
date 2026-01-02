@@ -129,6 +129,7 @@ def init_db():
             dte_codigo_generacion TEXT,
             dte_numero_control TEXT,
             dte_json TEXT,
+            dte_xml TEXT,
             facturado_at TIMESTAMP,
             -- Información de pago
             tipo_comprobante TEXT DEFAULT 'ticket',  -- 'factura' o 'ticket'
@@ -204,6 +205,10 @@ def init_db():
         pass
     try:
         cursor.execute('ALTER TABLE pedidos ADD COLUMN dte_json TEXT')
+    except:
+        pass
+    try:
+        cursor.execute('ALTER TABLE pedidos ADD COLUMN dte_xml TEXT')
     except:
         pass
     try:
@@ -509,10 +514,12 @@ def recalcular_totales_pedido(pedido_id):
     cursor = conn.cursor()
 
     # Obtener todos los items principales (NO desgloces)
+    # Nota: combo_id puede ser NULL, 0, o '' (string vacío)
     cursor.execute('''
         SELECT id, subtotal
         FROM pedido_items
-        WHERE pedido_id = ? AND (combo_id IS NULL OR combo_id = 0)
+        WHERE pedido_id = ? AND (combo_id IS NULL OR combo_id = 0 OR combo_id = '')
+          AND (notas IS NULL OR notas NOT LIKE '%Desglose de combo%')
     ''', (pedido_id,))
 
     items = cursor.fetchall()
@@ -1609,6 +1616,9 @@ def crear_pedido():
 
     conn.commit()
 
+    # Recalcular totales con IVA desglosado por item
+    recalcular_totales_pedido(pedido_id)
+
     # Obtener detalles del pedido para notificación
     cursor.execute('SELECT * FROM pedidos WHERE id = ?', (pedido_id,))
     pedido_creado = cursor.fetchone()
@@ -1762,16 +1772,31 @@ def actualizar_pago_pedido(id):
         # Para ticket, el total existente ya no tiene IVA
         nuevo_total = pedido['total'] + propina
 
-    # Actualizar pedido con información de pago
+    # Actualizar pedido con información de pago Y cambiar estado a 'pagado'
     cursor.execute('''
         UPDATE pedidos
         SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
-            impuesto = ?, total = ?, updated_at = ?
+            impuesto = ?, total = ?, estado = 'pagado',
+            pagado_at = ?, updated_at = ?
         WHERE id = ?
     ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total,
-          datetime.now().isoformat(), id))
+          datetime.now().isoformat(), datetime.now().isoformat(), id))
 
     conn.commit()
+
+    # Descontar stock cuando el pedido se marca como pagado
+    try:
+        descontar_stock_pedido(id)
+    except Exception as e:
+        print(f"Error descontando stock del pedido {id}: {e}")
+
+    # Notificar cambio de estado si hay socketio
+    if socketio:
+        try:
+            NotificadorPedidos.notificar_cambio_estado_pedido(socketio, id, 'pagado')
+        except Exception as e:
+            print(f"Error notificando cambio de estado del pedido {id}: {e}")
+
     conn.close()
 
     return jsonify({
@@ -1780,7 +1805,8 @@ def actualizar_pago_pedido(id):
         'aplicar_iva': aplicar_iva,
         'propina': propina,
         'impuesto': impuesto,
-        'total': nuevo_total
+        'total': nuevo_total,
+        'estado': 'pagado'
     })
 
 @pos_bp.route('/pedidos/<int:id>/items', methods=['POST'])

@@ -820,17 +820,9 @@ async function confirmarPagoConComprobante() {
 
         if (responseFactura.ok && facturaData.success) {
             if (tipoComprobante === 'factura') {
-                // Factura electrónica - enviar automáticamente a Digifact
-                mostrarNotificacion('Procesando', 'Generando factura electrónica...', 'info');
-
-                // Enviar automáticamente a Digifact
-                const dteResult = await enviarDTEDigifact(pedidoActualPago.id, facturaData);
-
-                if (dteResult && dteResult.success) {
-                    mostrarNotificacion('Factura Certificada', `DTE: ${dteResult.dte_numero || facturaData.numero_control}`, 'success');
-                } else {
-                    mostrarNotificacion('Factura Local', `Generada localmente: ${facturaData.numero_control}`, 'warning');
-                }
+                // Factura electrónica - generada localmente (NO enviar automáticamente a Digifact)
+                // El envío a Digifact debe ser manual/controlado desde el panel de administración
+                mostrarNotificacion('Factura Generada', `Número: ${facturaData.numero_control || facturaData.codigo_generacion}`, 'success');
 
                 // Mostrar factura para imprimir
                 mostrarComprobanteParaImprimir(facturaData, 'factura', datosCliente);
@@ -902,37 +894,85 @@ async function enviarDTEDigifact(pedidoId, facturaData) {
 function mostrarComprobanteParaImprimir(facturaData, tipo, cliente) {
     const pedido = pedidoActualPago;
     const fecha = new Date().toLocaleString('es-SV');
+    const items = pedido.items || facturaData.ticket?.items || [];
+
+    // Generar detalle de productos
+    let detalleProductos = '';
+    let subtotalCalculado = 0;
+
+    if (items.length > 0) {
+        detalleProductos = items.map(item => {
+            const cantidad = parseInt(item.cantidad || 1);
+            const precio = parseFloat(item.precio_unitario || item.precio || 0);
+            const subtotalItem = cantidad * precio;
+            subtotalCalculado += subtotalItem;
+            return `
+                <tr>
+                    <td style="text-align: left;">${cantidad}x ${item.producto_nombre || item.nombre || item.descripcion || 'Producto'}</td>
+                    <td style="text-align: right;">$${precio.toFixed(2)}</td>
+                    <td style="text-align: right;">$${subtotalItem.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
 
     let contenido = '';
 
     if (tipo === 'ticket') {
-        // Ticket simple
+        // Ticket simple CON detalle de productos
+        const subtotal = facturaData.ticket?.subtotal || subtotalCalculado || parseFloat(pedido.subtotal || 0);
+        const total = facturaData.ticket?.total || parseFloat(pedido.total || subtotal);
+
         contenido = `
-            <div style="font-family: monospace; width: 300px; padding: 10px;">
+            <div style="font-family: monospace; width: 320px; padding: 10px;">
                 <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px;">
-                    <h3 style="margin: 0;">PUPUSERÍA</h3>
-                    <p style="margin: 5px 0; font-size: 12px;">Comprobante de Venta</p>
+                    <h3 style="margin: 0;">PUPUSERÍA EL BUEN SABOR</h3>
+                    <p style="margin: 5px 0; font-size: 11px;">Comprobante de Venta</p>
                 </div>
-                <div style="padding: 10px 0; font-size: 12px;">
+                <div style="padding: 10px 0; font-size: 11px;">
                     <p><strong>Ticket:</strong> #${facturaData.numero || pedido.id}</p>
                     <p><strong>Fecha:</strong> ${fecha}</p>
-                    <hr style="border: none; border-top: 1px dashed #000;">
-                    <p><strong>Total:</strong> $${pedido.total?.toFixed(2) || '0.00'}</p>
+                    ${pedido.mesa_numero ? `<p><strong>Mesa:</strong> ${pedido.mesa_numero}</p>` : ''}
+                    ${pedido.cliente_nombre ? `<p><strong>Cliente:</strong> ${pedido.cliente_nombre}</p>` : ''}
                 </div>
-                <div style="text-align: center; font-size: 10px; margin-top: 10px;">
+                <hr style="border: none; border-top: 1px dashed #000;">
+                <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px dashed #000;">
+                            <th style="text-align: left;">Producto</th>
+                            <th style="text-align: right;">P.Unit</th>
+                            <th style="text-align: right;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${detalleProductos || '<tr><td colspan="3">Sin detalle</td></tr>'}
+                    </tbody>
+                </table>
+                <hr style="border: none; border-top: 1px dashed #000;">
+                <table style="width: 100%; font-size: 12px;">
+                    <tr><td>Subtotal:</td><td style="text-align: right;">$${subtotal.toFixed(2)}</td></tr>
+                    <tr style="font-weight: bold; font-size: 14px;">
+                        <td>TOTAL:</td><td style="text-align: right;">$${total.toFixed(2)}</td>
+                    </tr>
+                </table>
+                <div style="text-align: center; font-size: 10px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px;">
                     <p>¡Gracias por su compra!</p>
                 </div>
             </div>
         `;
     } else {
-        // Factura con crédito fiscal
+        // Factura con crédito fiscal CON detalle de productos
+        const subtotal = facturaData.subtotal || subtotalCalculado || parseFloat(pedido.subtotal || 0);
+        const iva = facturaData.iva || (subtotal * 0.13);
+        const total = facturaData.total || (subtotal + iva);
+
         contenido = `
-            <div style="font-family: Arial, sans-serif; width: 400px; padding: 15px; border: 1px solid #000;">
+            <div style="font-family: Arial, sans-serif; width: 420px; padding: 15px; border: 1px solid #000;">
                 <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">
                     <h2 style="margin: 0;">FACTURA ELECTRÓNICA</h2>
-                    <p style="margin: 5px 0;">Documento Tributario Electrónico</p>
+                    <p style="margin: 5px 0; font-size: 11px;">Documento Tributario Electrónico</p>
                 </div>
-                <div style="padding: 10px 0; font-size: 13px;">
+                <div style="padding: 10px 0; font-size: 12px;">
                     <p><strong>No. Control:</strong> ${facturaData.numero_control || 'N/A'}</p>
                     <p><strong>Código Generación:</strong> ${facturaData.codigo_generacion || 'N/A'}</p>
                     <p><strong>Fecha:</strong> ${fecha}</p>
@@ -940,17 +980,32 @@ function mostrarComprobanteParaImprimir(facturaData, tipo, cliente) {
                     <p><strong>Cliente:</strong> ${cliente?.nombre || 'Consumidor Final'}</p>
                     <p><strong>NIT/DUI:</strong> ${cliente?.num_doc || 'N/A'}</p>
                     ${cliente?.nrc ? `<p><strong>NRC:</strong> ${cliente.nrc}</p>` : ''}
-                    <hr>
-                    <table style="width: 100%; font-size: 12px;">
-                        <tr><td>Subtotal:</td><td style="text-align: right;">$${facturaData.subtotal?.toFixed(2) || '0.00'}</td></tr>
-                        <tr><td>IVA (13%):</td><td style="text-align: right;">$${facturaData.iva?.toFixed(2) || '0.00'}</td></tr>
-                        <tr style="font-weight: bold; font-size: 14px;">
-                            <td>TOTAL:</td><td style="text-align: right;">$${facturaData.total?.toFixed(2) || pedido.total?.toFixed(2) || '0.00'}</td>
-                        </tr>
-                    </table>
+                    ${cliente?.direccion ? `<p><strong>Dirección:</strong> ${cliente.direccion}</p>` : ''}
                 </div>
+                <hr>
+                <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin-bottom: 10px;">
+                    <thead>
+                        <tr style="background: #f0f0f0; border-bottom: 1px solid #000;">
+                            <th style="text-align: left; padding: 5px;">Descripción</th>
+                            <th style="text-align: right; padding: 5px;">P.Unit</th>
+                            <th style="text-align: right; padding: 5px;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${detalleProductos || '<tr><td colspan="3">Sin detalle</td></tr>'}
+                    </tbody>
+                </table>
+                <hr>
+                <table style="width: 100%; font-size: 12px;">
+                    <tr><td>Subtotal (sin IVA):</td><td style="text-align: right;">$${subtotal.toFixed(2)}</td></tr>
+                    <tr><td>IVA (13%):</td><td style="text-align: right;">$${iva.toFixed(2)}</td></tr>
+                    <tr style="font-weight: bold; font-size: 14px; border-top: 2px solid #000;">
+                        <td>TOTAL:</td><td style="text-align: right;">$${total.toFixed(2)}</td>
+                    </tr>
+                </table>
                 <div style="text-align: center; font-size: 10px; margin-top: 15px; border-top: 1px solid #000; padding-top: 10px;">
                     <p>Documento generado electrónicamente</p>
+                    <p>Conserve este documento para cualquier reclamo</p>
                 </div>
             </div>
         `;
@@ -1433,20 +1488,31 @@ async function marcarListo(pedidoId) {
 // ============ PEDIDOS POR SERVIR ============
 
 let ultimoConteoPorServir = 0;
+let pedidosNotificados = new Set(); // IDs de pedidos ya notificados
 
 async function actualizarPedidosPorServir() {
     try {
         const response = await apiFetch(`${API_POS}/mesero/pedidos-listos`);
-        if (!response.ok) return;
+        if (!response || !response.ok) return;
 
         const pedidos = await response.json();
         const badge = document.getElementById('badge-servir');
 
-        // Notificar si hay nuevos pedidos listos
-        if (pedidos.length > ultimoConteoPorServir && ultimoConteoPorServir >= 0) {
+        // Detectar pedidos REALMENTE nuevos (no notificados antes)
+        const nuevos = pedidos.filter(p => !pedidosNotificados.has(p.id));
+        if (nuevos.length > 0) {
             reproducirSonidoServir();
-            mostrarNotificacion('¡Pedido Listo!', `${pedidos.length - ultimoConteoPorServir} pedido(s) listo(s) para servir`, 'success');
+            mostrarNotificacion('¡Pedido Listo!', `${nuevos.length} pedido(s) listo(s) para servir`, 'success');
+            // Agregar los nuevos a la lista de notificados
+            nuevos.forEach(p => pedidosNotificados.add(p.id));
         }
+
+        // Limpiar pedidos que ya no están listos (servidos)
+        const idsActuales = new Set(pedidos.map(p => p.id));
+        pedidosNotificados.forEach(id => {
+            if (!idsActuales.has(id)) pedidosNotificados.delete(id);
+        });
+
         ultimoConteoPorServir = pedidos.length;
 
         if (badge) {
@@ -1727,11 +1793,12 @@ let refreshIntervals = {
 };
 
 // Configuración de intervalos (en milisegundos)
+// Ajustados para evitar saturación de API (HTTP 429)
 const REFRESH_CONFIG = {
-    cocina: 5000,    // 5 segundos para cocina (pedidos entrantes)
-    cajero: 10000,   // 10 segundos para cajero
-    mesero: 8000,    // 8 segundos para mesero (pedidos listos)
-    mesas: 15000     // 15 segundos para mesas
+    cocina: 15000,   // 15 segundos para cocina (pedidos entrantes)
+    cajero: 30000,   // 30 segundos para cajero
+    mesero: 20000,   // 20 segundos para mesero (pedidos listos)
+    mesas: 30000     // 30 segundos para mesas
 };
 
 // Función para iniciar auto-refresh según el panel activo

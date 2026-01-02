@@ -327,8 +327,12 @@ function apiFetch(url, options) {
     }
     
     // Asegurar Content-Type si no está definido y se envía body
+    // IMPORTANTE: No establecer Content-Type para FormData (el browser lo maneja con boundary)
     if (!finalHeaders['Content-Type'] && options.body) {
-        finalHeaders['Content-Type'] = 'application/json';
+        if (!(options.body instanceof FormData)) {
+            finalHeaders['Content-Type'] = 'application/json';
+        }
+        // Si es FormData, NO establecer Content-Type - el browser lo hará con boundary
     }
 
     var mergedOptions = {

@@ -31,11 +31,11 @@ socketio = SocketIO(
 # Registrar handlers de Socket.IO
 registrar_socketio_handlers(socketio)
 
-# Inicializar rate limiting
+# Inicializar rate limiting (ajustado para POS con auto-refresh)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["10000 per day", "1000 per hour"],
     storage_uri="memory://"
 )
 
@@ -153,25 +153,42 @@ class DigifactClient:
                 'Content-Type': 'application/xml'
             }
 
-            resp = requests.post(
-                f"{self.base_url}/api/v2/transform/nuc",
-                headers=headers,
-                data=xml_content,
-                timeout=60
-            )
+            retries = 0
+            max_retries = 3
+            backoff_factor = 0.5 # seconds
 
-            if resp.status_code == 401:
-                self.get_token()
-                headers['Authorization'] = f'Bearer {self.token}'
-                resp = requests.post(
-                    f"{self.base_url}/api/v2/transform/nuc",
-                    headers=headers,
-                    data=xml_content,
-                    timeout=60
-                )
+            while retries < max_retries:
+                try:
+                    resp = requests.post(
+                        f"{self.base_url}/api/v2/transform/nuc",
+                        headers=headers,
+                        data=xml_content,
+                        timeout=60
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 429:
+                        print(f"Rate limited by Digifact API (429). Retrying in {backoff_factor} seconds...")
+                        import time
+                        time.sleep(backoff_factor)
+                        backoff_factor *= 2 # Exponential backoff
+                        retries += 1
+                    elif e.response.status_code == 401:
+                        # Handle 401 (Unauthorized) by refreshing token and retrying
+                        self.get_token()
+                        headers['Authorization'] = f'Bearer {self.token}'
+                        # Continue to next iteration to retry with new token
+                        continue
+                    else:
+                        # For other HTTP errors, re-raise the exception
+                        raise e
+                except requests.exceptions.RequestException as e:
+                    # Handle other request exceptions (e.g., connection errors)
+                    raise e
 
-            resp.raise_for_status()
-            return resp.json()
+            # If max retries are reached for 429, raise an exception
+            raise Exception(f"Max retries reached for Digifact API call after receiving 429 status code.")
         except Exception as e:
             raise Exception(f"Error certificando DTE: {str(e)}")
 
@@ -206,8 +223,44 @@ class DigifactClient:
                     timeout=60
                 )
 
-            resp.raise_for_status()
-            result = resp.json()
+            retries = 0
+            max_retries = 3
+            backoff_factor = 0.5 # seconds
+
+            while retries < max_retries:
+                try:
+                    resp = requests.post(
+                        f"{self.base_url}/api/v2/transform/nuc",
+                        headers=headers,
+                        json=dte_json,
+                        timeout=60
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    # If successful, break the loop
+                    return result
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 429:
+                        print(f"Rate limited by Digifact API (429). Retrying in {backoff_factor} seconds...")
+                        import time
+                        time.sleep(backoff_factor)
+                        backoff_factor *= 2 # Exponential backoff
+                        retries += 1
+                    elif e.response.status_code == 401:
+                        # Handle 401 (Unauthorized) by refreshing token and retrying
+                        self.get_token()
+                        headers['Authorization'] = f'Bearer {self.token}'
+                        # Continue to next iteration to retry with new token
+                        continue
+                    else:
+                        # For other HTTP errors, re-raise the exception
+                        raise e
+                except requests.exceptions.RequestException as e:
+                    # Handle other request exceptions (e.g., connection errors)
+                    raise e
+
+            # If max retries are reached for 429, raise an exception
+            raise Exception(f"Max retries reached for Digifact API call after receiving 429 status code.")
 
             # Marcar como exitoso si no hay error
             result['success'] = result.get('Codigo') == '0' or result.get('success', False)
@@ -294,18 +347,42 @@ class DigifactClient:
                 timeout=30
             )
 
-            if resp.status_code == 401:
-                self.get_token()
-                headers['Authorization'] = self.token
-                resp = requests.get(
-                    f"{self.base_url}/api/SHAREDINFO",
-                    headers=headers,
-                    params=params,
-                    timeout=30
-                )
+            retries = 0
+            max_retries = 3
+            backoff_factor = 0.5 # seconds
 
-            resp.raise_for_status()
-            return resp.json()
+            while retries < max_retries:
+                try:
+                    resp = requests.get(
+                        f"{self.base_url}/api/SHAREDINFO",
+                        headers=headers,
+                        params=params,
+                        timeout=30
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 429:
+                        print(f"Rate limited by Digifact API (429). Retrying in {backoff_factor} seconds...")
+                        import time
+                        time.sleep(backoff_factor)
+                        backoff_factor *= 2 # Exponential backoff
+                        retries += 1
+                    elif e.response.status_code == 401:
+                        # Handle 401 (Unauthorized) by refreshing token and retrying
+                        self.get_token()
+                        headers['Authorization'] = self.token
+                        # Continue to next iteration to retry with new token
+                        continue
+                    else:
+                        # For other HTTP errors, re-raise the exception
+                        raise e
+                except requests.exceptions.RequestException as e:
+                    # Handle other request exceptions (e.g., connection errors)
+                    raise e
+
+            # If max retries are reached for 429, raise an exception
+            raise Exception(f"Max retries reached for Digifact API call after receiving 429 status code.")
         except Exception as e:
             raise Exception(f"Error consultando DTE: {str(e)}")
 
