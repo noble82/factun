@@ -1772,15 +1772,52 @@ def actualizar_pago_pedido(id):
         # Para ticket, el total existente ya no tiene IVA
         nuevo_total = pedido['total'] + propina
 
-    # Actualizar pedido con información de pago Y cambiar estado a 'pagado'
-    cursor.execute('''
-        UPDATE pedidos
-        SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
-            impuesto = ?, total = ?, estado = 'pagado',
-            pagado_at = ?, updated_at = ?
-        WHERE id = ?
-    ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total,
-          datetime.now().isoformat(), datetime.now().isoformat(), id))
+    # ===== DETERMINAR ESTADO FINAL SEGÚN FLUJO DE PAGO =====
+    tipo_pago = pedido['tipo_pago']  # 'anticipado' o 'al_final'
+    mesa_id = pedido['mesa_id']
+
+    # Determinar el estado después del pago según el flujo
+    if tipo_pago == 'anticipado':
+        # Para llevar: pagado → en_cocina (para que cocina prepare)
+        estado_final = 'en_cocina'
+        timestamp_field = 'cocina_at'
+    else:
+        # En mesa (al_final): pagado → cerrado (cliente ya comió, solo falta pagar)
+        estado_final = 'cerrado'
+        timestamp_field = None
+
+    # Actualizar pedido con información de pago
+    if timestamp_field:
+        cursor.execute(f'''
+            UPDATE pedidos
+            SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
+                impuesto = ?, total = ?, estado = ?,
+                pagado_at = ?, {timestamp_field} = ?, updated_at = ?
+            WHERE id = ?
+        ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total, estado_final,
+              datetime.now().isoformat(), datetime.now().isoformat(), datetime.now().isoformat(), id))
+    else:
+        cursor.execute('''
+            UPDATE pedidos
+            SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
+                impuesto = ?, total = ?, estado = ?,
+                pagado_at = ?, updated_at = ?
+            WHERE id = ?
+        ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total, estado_final,
+              datetime.now().isoformat(), datetime.now().isoformat(), id))
+
+    # ===== LIBERAR MESA SI ES PEDIDO EN MESA (al_final) =====
+    if estado_final == 'cerrado' and mesa_id:
+        # Verificar que no hay otros pedidos activos en esta mesa
+        cursor.execute('''
+            SELECT COUNT(*) FROM pedidos
+            WHERE mesa_id = ? AND id != ? AND estado NOT IN ('cerrado', 'cancelado')
+        ''', (mesa_id, id))
+        otros_pedidos = cursor.fetchone()[0]
+
+        if otros_pedidos == 0:
+            cursor.execute('UPDATE mesas SET estado = ? WHERE id = ?', ('libre', mesa_id))
+            print(f"[POS] Mesa {mesa_id} liberada después de pago del pedido {id}")
 
     conn.commit()
 
@@ -1793,7 +1830,7 @@ def actualizar_pago_pedido(id):
     # Notificar cambio de estado si hay socketio
     if socketio:
         try:
-            NotificadorPedidos.notificar_cambio_estado_pedido(socketio, id, 'pagado')
+            NotificadorPedidos.notificar_cambio_estado_pedido(socketio, id, estado_final)
         except Exception as e:
             print(f"Error notificando cambio de estado del pedido {id}: {e}")
 
@@ -1806,7 +1843,8 @@ def actualizar_pago_pedido(id):
         'propina': propina,
         'impuesto': impuesto,
         'total': nuevo_total,
-        'estado': 'pagado'
+        'estado': estado_final,
+        'mesa_liberada': estado_final == 'cerrado' and mesa_id is not None
     })
 
 @pos_bp.route('/pedidos/<int:id>/items', methods=['POST'])

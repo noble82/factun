@@ -809,12 +809,16 @@ function aplicarPermisosPorRol(rol) {
     panelActual.style.display = 'block';
     panelActual.classList.add('active');
 
-    // Limpiar intervalos anteriores
-    if (window.intervalPorServir) clearInterval(window.intervalPorServir);
-    if (window.intervalCajero) clearInterval(window.intervalCajero);
-    if (window.intervalCocina) clearInterval(window.intervalCocina);
+    // ===== SISTEMA UNIFICADO: Solo WebSocket, sin polling duplicado =====
+    // Limpiar TODOS los intervalos anteriores (legacy cleanup)
+    ['intervalPorServir', 'intervalCajero', 'intervalCocina', 'intervalMesas'].forEach(key => {
+      if (window[key]) {
+        clearInterval(window[key]);
+        window[key] = null;
+      }
+    });
 
-    // Inicializar datos y auto-refresh según el rol
+    // Cargar datos iniciales UNA VEZ según el rol (sin intervalos)
     if (rol === 'manager') {
       cargarEstadisticasManager();
     }
@@ -822,30 +826,21 @@ function aplicarPermisosPorRol(rol) {
     if (rol === 'mesero') {
       if (typeof cargarMesas === 'function') cargarMesas();
       if (typeof cargarCategorias === 'function') cargarCategorias();
-      if (typeof actualizarPedidosPorServir === 'function') {
-        actualizarPedidosPorServir();
-        window.intervalPorServir = setInterval(actualizarPedidosPorServir, 8000);
-      }
+      if (typeof actualizarPedidosPorServir === 'function') actualizarPedidosPorServir();
     }
 
     if (rol === 'cajero') {
       if (typeof cargarCategorias === 'function') cargarCategorias();
-      if (typeof cargarPedidosCajero === 'function') {
-        cargarPedidosCajero();
-        window.intervalCajero = setInterval(cargarPedidosCajero, 10000);
-      }
+      if (typeof cargarPedidosCajero === 'function') cargarPedidosCajero();
       if (typeof cargarEstadisticasDia === 'function') cargarEstadisticasDia();
     }
 
     if (rol === 'cocinero') {
-      if (typeof cargarPedidosCocina === 'function') {
-        cargarPedidosCocina();
-        // Auto-refresh cada 5 segundos para cocina
-        window.intervalCocina = setInterval(cargarPedidosCocina, 5000);
-      }
+      if (typeof cargarPedidosCocina === 'function') cargarPedidosCocina();
     }
 
-    console.log(`[POS] Auto-refresh activado para: ${rol}`);
+    // Las actualizaciones en tiempo real vienen por WebSocket (ver reinicializarNotificaciones)
+    console.log(`[POS] Datos cargados para: ${rol} (actualizaciones por WebSocket)`);
   } else {
     console.warn(`[POS] Panel no encontrado: ${panelId}`);
   }
@@ -924,25 +919,58 @@ function reinicializarNotificaciones(rol) {
   }
 }
 
-// Manejador centralizado de eventos
+// ===== SISTEMA DE DEBOUNCE PARA ACTUALIZACIONES =====
+const _updateQueue = {};
+function actualizarConDebounce(nombre, fn, delay = 500) {
+  if (_updateQueue[nombre]) clearTimeout(_updateQueue[nombre]);
+  _updateQueue[nombre] = setTimeout(() => {
+    if (typeof fn === 'function') fn();
+    delete _updateQueue[nombre];
+  }, delay);
+}
+
+// Manejador centralizado de eventos WebSocket
 function manejarEventoPedido(rol, evento) {
-  console.log(`[POS-${rol}] Evento:`, evento.tipo, evento);
+  console.log(`[WS-${rol}] Evento:`, evento.tipo);
 
-  if (rol === 'mesero' && evento.tipo === 'cambio_estado' && evento.estado === 'listo') {
-    mostrarNotificacionToast('Pedido Listo', `Pedido #${evento.pedido_id} está listo`, 'success');
-    if (typeof actualizarPedidosPorServir === 'function') actualizarPedidosPorServir();
-  }
-
-  if (rol === 'cajero') {
-    if (evento.tipo === 'cambio_estado') {
-      mostrarNotificacionToast('Estado', `Pedido #${evento.pedido_id}: ${evento.estado}`, 'info');
+  // ===== MESERO: Solo notificar pedidos listos =====
+  if (rol === 'mesero') {
+    if (evento.tipo === 'cambio_estado' && evento.estado === 'listo') {
+      mostrarNotificacionToast('Pedido Listo', `Pedido #${evento.pedido_id} listo para servir`, 'success');
     }
-    if (typeof cargarPedidosCajero === 'function') cargarPedidosCajero();
+    // Actualizar lista de pedidos por servir
+    actualizarConDebounce('mesero_pedidos', actualizarPedidosPorServir, 800);
+    // Si cambió estado de mesa (cerrado/pagado), actualizar mesas
+    if (evento.tipo === 'cambio_estado' && ['cerrado', 'pagado', 'cancelado'].includes(evento.estado)) {
+      actualizarConDebounce('mesero_mesas', cargarMesas, 1000);
+    }
   }
 
-  if (rol === 'cocina' && evento.tipo === 'nuevo_pedido') {
-    mostrarNotificacionToast('Nuevo Pedido', `Mesa ${evento.pedido.mesa_numero || 'Llevar'}`, 'warning');
-    if (typeof cargarPedidosCocina === 'function') cargarPedidosCocina();
+  // ===== CAJERO: Actualizar pedidos y estadísticas =====
+  if (rol === 'cajero') {
+    // Solo notificar eventos importantes
+    if (evento.tipo === 'nuevo_pedido' && evento.pedido?.tipo_pago === 'anticipado') {
+      mostrarNotificacionToast('Nuevo Pedido', `Para llevar: ${evento.pedido.cliente_nombre || 'Cliente'}`, 'warning');
+    }
+    // Actualizar lista de pedidos pendientes
+    actualizarConDebounce('cajero_pedidos', cargarPedidosCajero, 600);
+    // Actualizar estadísticas si hubo pago
+    if (evento.tipo === 'cambio_estado' && ['pagado', 'cerrado'].includes(evento.estado)) {
+      actualizarConDebounce('cajero_stats', cargarEstadisticasDia, 1000);
+    }
+  }
+
+  // ===== COCINA: Actualizar pedidos entrantes =====
+  if (rol === 'cocina' || rol === 'cocinero') {
+    if (evento.tipo === 'nuevo_pedido') {
+      mostrarNotificacionToast('Nuevo Pedido', `Mesa ${evento.pedido?.mesa_numero || 'Llevar'}`, 'warning');
+    }
+    actualizarConDebounce('cocina_pedidos', cargarPedidosCocina, 500);
+  }
+
+  // ===== MANAGER: Actualizar estadísticas =====
+  if (rol === 'manager') {
+    actualizarConDebounce('manager_stats', cargarEstadisticasManager, 1500);
   }
 }
 

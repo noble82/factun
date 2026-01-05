@@ -1824,8 +1824,12 @@ async function eliminarCombo(comboId) {
 }
 
 // ============ INICIALIZACIÓN ============
+// ============================================================
+// SISTEMA UNIFICADO: WebSocket es el método principal
+// El polling se maneja SOLO en notificaciones.js como fallback
+// ============================================================
 
-// Variables para intervalos de auto-refresh
+// Variables para intervalos (DESACTIVADO - WebSocket maneja actualizaciones)
 let refreshIntervals = {
     cocina: null,
     cajero: null,
@@ -1833,62 +1837,40 @@ let refreshIntervals = {
     mesas: null
 };
 
-// Configuración de intervalos (en milisegundos)
-// Ajustados para evitar saturación de API (HTTP 429)
-const REFRESH_CONFIG = {
-    cocina: 15000,   // 15 segundos para cocina (pedidos entrantes)
-    cajero: 30000,   // 30 segundos para cajero
-    mesero: 20000,   // 20 segundos para mesero (pedidos listos)
-    mesas: 30000     // 30 segundos para mesas
-};
-
 // Función para iniciar auto-refresh según el panel activo
+// NOTA: Ahora solo carga datos iniciales UNA VEZ
+// Las actualizaciones en tiempo real vienen por WebSocket
 function iniciarAutoRefresh(panel) {
-    // Limpiar todos los intervalos anteriores
-    Object.values(refreshIntervals).forEach(interval => {
-        if (interval) clearInterval(interval);
-    });
+    // Limpiar cualquier intervalo residual
+    detenerAutoRefresh();
 
-    // Iniciar refresh según el panel
+    // Solo cargar datos iniciales UNA VEZ (sin intervalos)
     switch (panel) {
         case 'panel-cocina':
-            refreshIntervals.cocina = setInterval(() => {
-                cargarPedidosCocina();
-            }, REFRESH_CONFIG.cocina);
-            cargarPedidosCocina(); // Cargar inmediatamente
+            cargarPedidosCocina();
             break;
 
         case 'panel-cajero':
-            refreshIntervals.cajero = setInterval(() => {
-                cargarPedidosCajero();
-                cargarEstadisticasDia();
-            }, REFRESH_CONFIG.cajero);
             cargarPedidosCajero();
             cargarEstadisticasDia();
             break;
 
         case 'panel-mesero':
-            refreshIntervals.mesero = setInterval(() => {
-                actualizarPedidosPorServir();
-            }, REFRESH_CONFIG.mesero);
-            refreshIntervals.mesas = setInterval(() => {
-                cargarMesas();
-            }, REFRESH_CONFIG.mesas);
             actualizarPedidosPorServir();
+            cargarMesas();
             break;
 
         case 'panel-manager':
-            // Manager solo carga estadísticas
             if (typeof cargarEstadisticasManager === 'function') {
                 cargarEstadisticasManager();
             }
             break;
     }
 
-    console.log(`Auto-refresh iniciado para: ${panel}`);
+    console.log(`[POS] Datos cargados para: ${panel} (WebSocket activo)`);
 }
 
-// Función para detener auto-refresh
+// Función para detener auto-refresh (limpia intervalos legacy)
 function detenerAutoRefresh() {
     Object.keys(refreshIntervals).forEach(key => {
         if (refreshIntervals[key]) {
@@ -1920,14 +1902,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar FAB y carrito móvil
     inicializarCarritoMovil();
 
-    // Detectar visibilidad de página para pausar/reanudar refresh
+    // Detectar visibilidad de página para recargar datos cuando vuelve a ser visible
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            detenerAutoRefresh();
-        } else {
-            // Reanudar según el panel activo
+        if (!document.hidden) {
+            // Recargar datos cuando la página vuelve a ser visible
             const panelActivo = document.querySelector('.work-panel:not([style*="display: none"])');
             if (panelActivo) {
+                console.log('[POS] Página visible, recargando datos...');
                 iniciarAutoRefresh(panelActivo.id);
             }
         }

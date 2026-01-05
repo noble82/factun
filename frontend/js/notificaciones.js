@@ -17,7 +17,8 @@ class ClienteNotificaciones {
         this.socket = null;
         this.websocketActivo = false;
         this.pollingActivo = false;
-        this.intervaloPolling = opciones.intervaloPolling || 3000; // 3 segundos
+        // Polling solo como fallback - intervalo más largo para evitar saturación
+        this.intervaloPolling = opciones.intervaloPolling || 30000; // 30 segundos (antes 3s)
         this.idIntervalo = null;
 
         // Event handlers
@@ -175,6 +176,15 @@ class ClienteNotificaciones {
     _configurarHandlersSocket() {
         this.socket.on('connect', () => {
             this.log('Conectado a servidor WebSocket');
+            this.websocketActivo = true;
+
+            // ===== DETENER POLLING SI ESTABA ACTIVO =====
+            if (this.pollingActivo && this.idIntervalo) {
+                clearInterval(this.idIntervalo);
+                this.idIntervalo = null;
+                this.pollingActivo = false;
+                this.log('Polling detenido - WebSocket activo');
+            }
 
             // Enviar información del usuario
             this.socket.emit('conectar_usuario', {

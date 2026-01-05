@@ -319,13 +319,8 @@
 
                 // Escuchar conexión confirmada para saber que WebSocket funciona
                 notif.on('conexion_confirmada', () => {
-                    console.log('[Cocina] WebSocket conectado - reduciendo polling');
+                    console.log('[Cocina] WebSocket conectado - actualizaciones en tiempo real activas');
                     websocketConectado = true;
-                    // Reducir polling si WebSocket está activo (30 segundos como respaldo)
-                    if (pollingInterval) {
-                        clearInterval(pollingInterval);
-                        pollingInterval = setInterval(cargarPedidos, 30000);
-                    }
                 });
 
                 // Escuchar nuevos pedidos y cambios (con debounce)
@@ -348,21 +343,18 @@
             }
         };
 
-        // Cargar pedidos inicialmente y cada 15 segundos (se reduce a 30s si WebSocket conecta)
+        // ===== SISTEMA UNIFICADO: WebSocket primario, polling solo si WebSocket falla =====
+        // Cargar pedidos inicialmente
         cargarPedidos();
-        pollingInterval = setInterval(cargarPedidos, 15000);
 
-        // Detener polling cuando la página no está visible
+        // NO iniciar polling automáticamente - WebSocket maneja las actualizaciones
+        // El polling se activa automáticamente en notificaciones.js solo si WebSocket falla
+
+        // Recargar datos cuando la página vuelve a ser visible
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (pollingInterval) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
-            } else {
-                // Reanudar polling al volver a la página
+            if (!document.hidden) {
+                console.log('[Cocina] Página visible - recargando datos');
                 cargarPedidos();
-                pollingInterval = setInterval(cargarPedidos, websocketConectado ? 30000 : 15000);
             }
         });
     </script>
