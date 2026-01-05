@@ -2334,8 +2334,8 @@ def get_reportes_hoy():
                 COALESCE(SUM(subtotal), 0) as subtotal_total,
                 COALESCE(SUM(impuesto), 0) as impuesto_total,
                 COALESCE(SUM(propina), 0) as propinas_total,
-                COALESCE(SUM(CASE WHEN tipo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
-                COALESCE(SUM(CASE WHEN tipo_pago = 'credito' THEN total ELSE 0 END), 0) as credito
+                COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) as efectivo,
+                COALESCE(SUM(CASE WHEN metodo_pago = 'credito' THEN total ELSE 0 END), 0) as credito
             FROM pedidos
             WHERE DATE(created_at) = ? AND estado = 'cerrado'
         ''', (hoy,))

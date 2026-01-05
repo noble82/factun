@@ -99,6 +99,18 @@
         const API_POS = '/api/pos';
         let pedidosActuales = [];
         let ultimoConteo = 0;
+        let pollingInterval = null;
+        let cargandoPedidos = false; // Flag para evitar llamadas simultáneas
+        let websocketConectado = false; // Flag para saber si WebSocket está activo
+
+        // Debounce para evitar llamadas excesivas
+        let debounceTimer = null;
+        function cargarPedidosDebounced() {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                cargarPedidos();
+            }, 500); // Espera 500ms antes de ejecutar
+        }
 
         // Actualizar hora
         function actualizarHora() {
@@ -109,18 +121,23 @@
         setInterval(actualizarHora, 1000);
         actualizarHora();
 
-        // Cargar pedidos
+        // Cargar pedidos (con protección contra llamadas simultáneas)
         async function cargarPedidos() {
+            // Evitar llamadas simultáneas
+            if (cargandoPedidos) {
+                console.log('cargarPedidos() omitido - ya hay una carga en progreso');
+                return;
+            }
+            cargandoPedidos = true;
             console.log('cargarPedidos() llamado');
             try {
                 // Usar endpoint específico de cocina
                 const response = await apiFetch(`${API_POS}/cocina/pedidos`);
                 const pedidos = await response.json();
-                console.log('Pedidos recibidos:', pedidos.length, pedidos);
+                console.log('Pedidos recibidos:', pedidos.length);
 
                 // Todos los pedidos del endpoint ya son para cocina
                 pedidosActuales = pedidos;
-                console.log('Pedidos para cocina:', pedidosActuales.length);
 
                 // Notificar si hay nuevos pedidos
                 if (pedidosActuales.length > ultimoConteo && ultimoConteo > 0) {
@@ -132,6 +149,8 @@
                 actualizarStats();
             } catch (error) {
                 console.error('Error cargando pedidos:', error);
+            } finally {
+                cargandoPedidos = false;
             }
         }
 
@@ -298,22 +317,27 @@
                 // Conectar a servidor WebSocket/polling
                 notif.conectar();
 
-                // Escuchar nuevos pedidos y cambios
+                // Escuchar conexión confirmada para saber que WebSocket funciona
+                notif.on('conexion_confirmada', () => {
+                    console.log('[Cocina] WebSocket conectado - reduciendo polling');
+                    websocketConectado = true;
+                    // Reducir polling si WebSocket está activo (30 segundos como respaldo)
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = setInterval(cargarPedidos, 30000);
+                    }
+                });
+
+                // Escuchar nuevos pedidos y cambios (con debounce)
                 notif.on('evento_pedido', (evento) => {
-                    console.log('[Cocina] Evento recibido:', evento.tipo, evento);
+                    console.log('[Cocina] Evento recibido:', evento.tipo);
 
                     if (evento.tipo === 'nuevo_pedido') {
-                        // Reproducir sonido de alerta
+                        // Reproducir sonido de alerta inmediatamente
                         reproducirSonido();
-                        // Recargar pedidos para mostrar el nuevo
-                        cargarPedidos();
-                    } else if (evento.tipo === 'cambio_estado') {
-                        // Actualizar pedidos si cambió estado
-                        cargarPedidos();
-                    } else if (evento.tipo === 'item_modificado') {
-                        // Recargar para ver cambios en items
-                        cargarPedidos();
                     }
+                    // Usar debounce para evitar múltiples llamadas seguidas
+                    cargarPedidosDebounced();
                 });
 
                 // Guardar instancia global para debugging
@@ -324,9 +348,23 @@
             }
         };
 
-        // Cargar pedidos cada 5 segundos
+        // Cargar pedidos inicialmente y cada 15 segundos (se reduce a 30s si WebSocket conecta)
         cargarPedidos();
-        setInterval(cargarPedidos, 5000);
+        pollingInterval = setInterval(cargarPedidos, 15000);
+
+        // Detener polling cuando la página no está visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+            } else {
+                // Reanudar polling al volver a la página
+                cargarPedidos();
+                pollingInterval = setInterval(cargarPedidos, websocketConectado ? 30000 : 15000);
+            }
+        });
     </script>
 </body>
 </html>

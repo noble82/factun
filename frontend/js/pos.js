@@ -1376,9 +1376,7 @@ async function cargarPedidosCajero() {
                 </div>
             `;
         }).join('');
-
-        // También cargar estadísticas del día
-        cargarEstadisticasDia();
+        // Nota: cargarEstadisticasDia() se llama desde iniciarAutoRefresh() para evitar duplicación
     } catch (error) {
         console.error('Error cargarPedidosCajero:', error);
     }
