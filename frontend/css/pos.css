@@ -562,14 +562,17 @@ animation: pulse-animation 0.3s ease;
 50% { transform: scale(1.2); }
 100% { transform: scale(1); }
 }
+/* Clases para forzar visibilidad SOLO en móvil (JS las agrega/remueve) */
+/* En desktop siempre ocultos */
+.cart-fab.mobile-active,
+.cart-fab.mobile-hidden,
+.bottom-nav.mobile-active,
+.bottom-nav.mobile-hidden {
+display: none !important;
+}
+
+/* Solo en móvil las clases mobile-active funcionan */
 @media (max-width: 768px) {
-.cart-fab {
-display: flex;
-align-items: center;
-justify-content: center;
-}
-}
-/* Clases para forzar visibilidad en móvil (JS las agrega/remueve) */
 .cart-fab.mobile-active {
 display: flex !important;
 align-items: center !important;
@@ -584,6 +587,7 @@ visibility: visible !important;
 }
 .bottom-nav.mobile-hidden {
 display: none !important;
+}
 }
 /* ============ BOTTOM SHEET CARRITO ============ */
 .cart-sheet {
@@ -658,6 +662,16 @@ z-index: 1045;
 }
 .cart-sheet-overlay.show {
 display: block;
+}
+
+/* En desktop, SIEMPRE ocultar elementos móviles */
+@media (min-width: 769px) {
+.cart-fab,
+.cart-sheet,
+.cart-sheet-overlay,
+.bottom-nav {
+display: none !important;
+}
 }
 /* ============ BOTTOM NAVIGATION ============ */
 .bottom-nav {
