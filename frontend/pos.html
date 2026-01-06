@@ -576,8 +576,55 @@ placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
 </div>
 </div>
 
-<!-- Monto Recibido y Vuelto -->
-<div class="card mb-3">
+<!-- Método de Pago -->
+<div class="mb-3">
+<label class="form-label mb-2"><i class="bi bi-wallet2"></i> Método de Pago</label>
+<div class="btn-group w-100" role="group">
+<input type="radio" class="btn-check" name="metodoPago" id="metodo-efectivo" value="efectivo" checked onchange="onMetodoPagoChange()">
+<label class="btn btn-outline-success" for="metodo-efectivo">
+<i class="bi bi-cash-stack"></i> Efectivo
+</label>
+<input type="radio" class="btn-check" name="metodoPago" id="metodo-credito" value="credito" onchange="onMetodoPagoChange()">
+<label class="btn btn-outline-warning" for="metodo-credito">
+<i class="bi bi-credit-card-2-front"></i> Crédito Cliente
+</label>
+</div>
+</div>
+
+<!-- Sección Crédito Cliente (solo si método es crédito) -->
+<div id="seccion-credito-cliente" class="card mb-3 border-warning" style="display:none;">
+<div class="card-body py-2">
+<label class="form-label mb-2"><i class="bi bi-person-check"></i> Buscar Cliente con Crédito</label>
+<input type="text" class="form-control form-control-sm mb-2" id="buscar-cliente-pago-credito"
+       placeholder="Buscar por nombre, DUI o NIT..." onkeyup="buscarClientePagoCredito(this.value)">
+<div id="resultados-cliente-pago-credito" class="list-group mb-2" style="max-height:150px;overflow-y:auto;"></div>
+<input type="hidden" id="cliente-pago-credito-id">
+<!-- Info del cliente seleccionado -->
+<div id="info-cliente-credito-pago" style="display:none;">
+<div class="alert alert-info py-2 mb-0">
+<div class="d-flex justify-content-between">
+<span><i class="bi bi-person-fill"></i> <strong id="cliente-credito-nombre-pago">-</strong></span>
+</div>
+<hr class="my-1">
+<div class="d-flex justify-content-between small">
+<span>Crédito Autorizado:</span>
+<strong id="cliente-credito-autorizado-pago">$0.00</strong>
+</div>
+<div class="d-flex justify-content-between small">
+<span>Crédito Utilizado:</span>
+<strong id="cliente-credito-utilizado-pago">$0.00</strong>
+</div>
+<div class="d-flex justify-content-between">
+<span>Disponible:</span>
+<strong class="text-success" id="cliente-credito-disponible-pago">$0.00</strong>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Monto Recibido y Vuelto (solo para efectivo) -->
+<div id="seccion-monto-recibido" class="card mb-3">
 <div class="card-body py-2">
 <label class="form-label mb-2"><i class="bi bi-cash-stack"></i> Monto Recibido</label>
 <!-- Botones de múltiplos de $5 -->
@@ -845,8 +892,23 @@ function aplicarPermisosPorRol(rol) {
     console.warn(`[POS] Panel no encontrado: ${panelId}`);
   }
 
-  // Función para cargar estadísticas del manager
+  // Función para cargar estadísticas del manager (con throttle para evitar 429)
+  let _managerStatsLoading = false;
+  let _managerStatsLastCall = 0;
+  const MANAGER_STATS_THROTTLE = 5000; // Mínimo 5 segundos entre llamadas
+
   async function cargarEstadisticasManager() {
+    const now = Date.now();
+
+    // Throttle: evitar llamadas muy seguidas
+    if (_managerStatsLoading || (now - _managerStatsLastCall) < MANAGER_STATS_THROTTLE) {
+      console.log('[Manager] Stats throttled - esperando...');
+      return;
+    }
+
+    _managerStatsLoading = true;
+    _managerStatsLastCall = now;
+
     try {
       // Cargar reportes del día
       const respReportes = await apiFetch(`${API_POS}/reportes/hoy`);
@@ -873,6 +935,8 @@ function aplicarPermisosPorRol(rol) {
       }
     } catch (error) {
       console.error('Error cargando estadísticas manager:', error);
+    } finally {
+      _managerStatsLoading = false;
     }
   }
 

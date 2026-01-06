@@ -368,34 +368,176 @@ function validarPedido() {
 // ============ FLUJO DE PAGO ============
 
 function toggleOpcionesPago() {
-    const tipoFlojo = document.getElementById('tipo-pago')?.value || 'anticipado';
+    const tipoFlujo = document.getElementById('tipo-pago')?.value || 'anticipado';
     const opcionesLlevar = document.getElementById('opciones-para-llevar');
 
-    if (tipoFlojo === 'anticipado') {
-        opcionesLlevar.style.display = 'block';
+    // Tab de mesas en panel mesero
+    const tabMesas = document.querySelector('[data-bs-target="#mesas-tab"]');
+    const tabMenu = document.querySelector('[data-bs-target="#menu-tab"]');
+    const mesasTab = document.getElementById('mesas-tab');
+    const menuTab = document.getElementById('menu-tab');
+
+    if (tipoFlujo === 'anticipado') {
+        // PARA LLEVAR: Mostrar nombre cliente, ocultar mesas
+        if (opcionesLlevar) opcionesLlevar.style.display = 'block';
+
+        // Deshabilitar y ocultar tab de mesas
+        if (tabMesas) {
+            tabMesas.classList.add('disabled');
+            tabMesas.style.opacity = '0.5';
+            tabMesas.style.pointerEvents = 'none';
+        }
+
+        // Limpiar mesa seleccionada (para llevar no usa mesa)
+        mesaSeleccionada = null;
+        const mesaDisplay = document.getElementById('mesa-seleccionada');
+        if (mesaDisplay) {
+            mesaDisplay.textContent = 'Para Llevar';
+            mesaDisplay.classList.remove('bg-primary');
+            mesaDisplay.classList.add('bg-warning');
+        }
+
+        // Cambiar a tab de Menú automáticamente
+        if (tabMenu && menuTab) {
+            // Usar Bootstrap Tab API si está disponible
+            const bsTab = bootstrap?.Tab?.getOrCreateInstance(tabMenu);
+            if (bsTab) {
+                bsTab.show();
+            } else {
+                // Fallback manual
+                tabMesas?.classList.remove('active');
+                tabMenu?.classList.add('active');
+                if (mesasTab) mesasTab.classList.remove('show', 'active');
+                if (menuTab) menuTab.classList.add('show', 'active');
+            }
+        }
+
+        console.log('[POS] Modo PARA LLEVAR activado - mesas bloqueadas');
     } else {
-        opcionesLlevar.style.display = 'none';
+        // EN MESA: Ocultar nombre cliente, mostrar mesas
+        if (opcionesLlevar) opcionesLlevar.style.display = 'none';
+
+        // Habilitar tab de mesas
+        if (tabMesas) {
+            tabMesas.classList.remove('disabled');
+            tabMesas.style.opacity = '1';
+            tabMesas.style.pointerEvents = 'auto';
+        }
+
+        // Restaurar display de mesa
+        const mesaDisplay = document.getElementById('mesa-seleccionada');
+        if (mesaDisplay && !mesaSeleccionada) {
+            mesaDisplay.textContent = '';
+            mesaDisplay.classList.remove('bg-warning');
+            mesaDisplay.classList.add('bg-primary');
+        }
+
+        console.log('[POS] Modo EN MESA activado - mesas disponibles');
     }
+
+    // Revalidar pedido
+    validarPedido();
 }
 
 function toggleOpcionesPagoMobile() {
-    const tipoFlojo = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
-    // Lógica similar para móvil
+    const tipoFlujo = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
+    const opcionesLlevarMobile = document.getElementById('opciones-para-llevar-mobile');
+
+    if (tipoFlujo === 'anticipado') {
+        if (opcionesLlevarMobile) opcionesLlevarMobile.style.display = 'block';
+        mesaSeleccionada = null;
+    } else {
+        if (opcionesLlevarMobile) opcionesLlevarMobile.style.display = 'none';
+    }
+
+    validarPedido();
 }
 
 function onMetodoPagoChange() {
     const metodo = document.querySelector('input[name="metodoPago"]:checked')?.value;
     const seccionRecibido = document.getElementById('seccion-monto-recibido');
-    const infoCreditoCliente = document.getElementById('info-credito-cliente');
-    const alertaSinCredito = document.getElementById('alerta-sin-credito');
+    const seccionCredito = document.getElementById('seccion-credito-cliente');
 
     if (metodo === 'efectivo') {
-        seccionRecibido.style.display = 'block';
-        infoCreditoCliente.classList.add('d-none');
-        alertaSinCredito.classList.add('d-none');
+        // Mostrar sección de monto recibido, ocultar crédito
+        if (seccionRecibido) seccionRecibido.style.display = 'block';
+        if (seccionCredito) seccionCredito.style.display = 'none';
+
+        // Limpiar selección de cliente crédito
+        document.getElementById('cliente-pago-credito-id').value = '';
+        document.getElementById('info-cliente-credito-pago').style.display = 'none';
     } else {
-        seccionRecibido.style.display = 'none';
-        infoCreditoCliente.classList.remove('d-none');
+        // Mostrar sección de crédito, ocultar monto recibido
+        if (seccionRecibido) seccionRecibido.style.display = 'none';
+        if (seccionCredito) seccionCredito.style.display = 'block';
+    }
+}
+
+// Buscar cliente para pago a crédito
+async function buscarClientePagoCredito(valor) {
+    const container = document.getElementById('resultados-cliente-pago-credito');
+    if (!valor || valor.length < 2) {
+        container.innerHTML = '';
+        return;
+    }
+
+    try {
+        const response = await apiFetch(`/api/clientes/buscar?q=${encodeURIComponent(valor)}`);
+        if (!response.ok) return;
+
+        const clientes = await response.json();
+
+        container.innerHTML = clientes.map(cliente => `
+            <button type="button" class="list-group-item list-group-item-action py-1"
+                    onclick="seleccionarClientePagoCredito(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'")}')">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${cliente.nombre}</span>
+                    ${cliente.credito_autorizado > 0
+                        ? `<span class="badge bg-success">Crédito: $${cliente.credito_autorizado}</span>`
+                        : '<span class="badge bg-secondary">Sin crédito</span>'}
+                </div>
+            </button>
+        `).join('');
+    } catch (error) {
+        console.error('Error buscarClientePagoCredito:', error);
+    }
+}
+
+// Seleccionar cliente para pago a crédito
+async function seleccionarClientePagoCredito(clienteId, clienteNombre) {
+    document.getElementById('cliente-pago-credito-id').value = clienteId;
+    document.getElementById('resultados-cliente-pago-credito').innerHTML = '';
+    document.getElementById('buscar-cliente-pago-credito').value = clienteNombre;
+
+    // Cargar información de crédito del cliente
+    try {
+        const response = await apiFetch(`/api/clientes/${clienteId}/credito`);
+        if (response.ok) {
+            const data = await response.json();
+
+            document.getElementById('cliente-credito-nombre-pago').textContent = data.nombre;
+            document.getElementById('cliente-credito-autorizado-pago').textContent = '$' + (data.credito_autorizado || 0).toFixed(2);
+            document.getElementById('cliente-credito-utilizado-pago').textContent = '$' + (data.credito_utilizado || 0).toFixed(2);
+            document.getElementById('cliente-credito-disponible-pago').textContent = '$' + (data.credito_disponible || 0).toFixed(2);
+
+            // Cambiar color según disponibilidad
+            const disponibleEl = document.getElementById('cliente-credito-disponible-pago');
+            const total = pedidoActualPago?.subtotal || 0;
+            if (data.credito_disponible >= total) {
+                disponibleEl.classList.remove('text-danger');
+                disponibleEl.classList.add('text-success');
+            } else {
+                disponibleEl.classList.remove('text-success');
+                disponibleEl.classList.add('text-danger');
+            }
+
+            document.getElementById('info-cliente-credito-pago').style.display = 'block';
+
+            // Guardar datos para uso posterior
+            window.clienteCreditoSeleccionado = data;
+        }
+    } catch (error) {
+        console.error('Error cargando crédito del cliente:', error);
     }
 }
 
@@ -455,8 +597,18 @@ async function enviarPedido() {
         return;
     }
 
-    if (!mesaSeleccionada) {
-        mostrarNotificacion('Error', 'Selecciona una mesa', 'danger');
+    const tipoFlujo = document.getElementById('tipo-pago')?.value || 'al_final';
+    const nombreCliente = document.getElementById('cliente-nombre-pedido')?.value || '';
+
+    // Validar según tipo de flujo
+    if (tipoFlujo === 'al_final' && !mesaSeleccionada) {
+        mostrarNotificacion('Error', 'Selecciona una mesa para pedido en mesa', 'danger');
+        return;
+    }
+
+    if (tipoFlujo === 'anticipado' && !nombreCliente.trim()) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del cliente para llevar', 'warning');
+        document.getElementById('cliente-nombre-pedido')?.focus();
         return;
     }
 
@@ -472,13 +624,10 @@ async function enviarPedido() {
     if (btnEnviar) btnEnviar.disabled = true;
     if (btnEnviarMobile) btnEnviarMobile.disabled = true;
 
-    const tipoFlojo = document.getElementById('tipo-pago')?.value || 'al_final';
-    const nombreCliente = document.getElementById('cliente-nombre-pedido')?.value || '';
-
     const pedido = {
-        mesa_id: mesaSeleccionada.id,
+        mesa_id: tipoFlujo === 'al_final' ? mesaSeleccionada?.id : null,  // Sin mesa para llevar
         mesero: localStorage.getItem('username') || 'Sistema',
-        tipo_pago: tipoFlojo,
+        tipo_pago: tipoFlujo,
         cliente_nombre: nombreCliente,
         items: carrito.map(item => ({
             producto_id: item.producto_id || null,
@@ -496,12 +645,31 @@ async function enviarPedido() {
 
         if (response.ok) {
             const result = await response.json();
-            mostrarNotificacion('Éxito', `Pedido #${result.pedido_id} creado`, 'success');
+            const tipoMsg = tipoFlujo === 'anticipado' ? 'Para Llevar' : `Mesa ${mesaSeleccionada?.numero}`;
+            mostrarNotificacion('Éxito', `Pedido #${result.pedido_id} (${tipoMsg}) creado`, 'success');
+
+            // Limpiar carrito y formulario
             carrito = [];
             actualizarCarrito();
             mesaSeleccionada = null;
+
+            // Limpiar campo de nombre cliente
+            const inputNombre = document.getElementById('cliente-nombre-pedido');
+            if (inputNombre) inputNombre.value = '';
+
+            // Restaurar display de mesa
+            const mesaDisplay = document.getElementById('mesa-seleccionada');
+            if (mesaDisplay) {
+                mesaDisplay.textContent = tipoFlujo === 'anticipado' ? 'Para Llevar' : '';
+            }
+
+            // Recargar mesas si fue pedido en mesa
+            if (tipoFlujo === 'al_final') {
+                cargarMesas();
+            }
         } else {
-            mostrarNotificacion('Error', 'No se pudo crear el pedido', 'danger');
+            const errorData = await response.json().catch(() => ({}));
+            mostrarNotificacion('Error', errorData.error || 'No se pudo crear el pedido', 'danger');
         }
     } catch (error) {
         console.error('Error enviarPedido:', error);
@@ -801,7 +969,30 @@ async function confirmarPagoConComprobante() {
     const tipoComprobante = document.querySelector('input[name="tipoComprobante"]:checked')?.value;
     const btnPagar = document.querySelector('#modalPago .btn-success');
 
-    // Obtener datos del cliente
+    // Obtener método de pago seleccionado
+    const metodoPago = document.querySelector('input[name="metodoPago"]:checked')?.value || 'efectivo';
+    let clienteIdCredito = null;
+
+    // Si es pago a crédito, validar que haya cliente seleccionado
+    if (metodoPago === 'credito') {
+        clienteIdCredito = document.getElementById('cliente-pago-credito-id')?.value;
+        if (!clienteIdCredito) {
+            mostrarNotificacion('Error', 'Debe seleccionar un cliente para pago a crédito', 'warning');
+            return;
+        }
+
+        // Verificar crédito disponible
+        const disponibleText = document.getElementById('cliente-credito-disponible-pago')?.textContent || '$0';
+        const disponible = parseFloat(disponibleText.replace('$', '')) || 0;
+        const total = pedidoActualPago.total || 0;
+
+        if (disponible < total) {
+            mostrarNotificacion('Error', `Crédito insuficiente. Disponible: $${disponible.toFixed(2)}, Total: $${total.toFixed(2)}`, 'danger');
+            return;
+        }
+    }
+
+    // Obtener datos del cliente (para factura)
     const datosCliente = {
         nombre: document.getElementById('cliente-nombre')?.value || '',
         tipo_doc: document.getElementById('cliente-tipo-doc')?.value || '36',
@@ -833,14 +1024,16 @@ async function confirmarPagoConComprobante() {
     }
 
     try {
-        // 1. Procesar el pago
+        // 1. Procesar el pago (con método de pago y cliente si es crédito)
         const responsePago = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pago`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo_comprobante: tipoComprobante,
                 cliente: datosCliente,
-                propina: propinaActual
+                propina: propinaActual,
+                metodo_pago: metodoPago,
+                cliente_id: clienteIdCredito ? parseInt(clienteIdCredito) : null
             })
         });
 
@@ -883,6 +1076,9 @@ async function confirmarPagoConComprobante() {
 
         // Cerrar modal y recargar
         bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+
+        // Limpiar formulario de crédito
+        limpiarFormularioPagoCredito();
 
         // Recargar lista de pedidos según el rol
         if (typeof cargarPedidosCajero === 'function') {
@@ -1075,19 +1271,46 @@ function mostrarComprobanteParaImprimir(facturaData, tipo, cliente) {
 async function confirmarPagoSinComprobante() {
     if (!pedidoActualPago) return;
 
+    // Obtener método de pago seleccionado
+    const metodoPago = document.querySelector('input[name="metodoPago"]:checked')?.value || 'efectivo';
+    let clienteId = null;
+
+    // Si es pago a crédito, validar que haya cliente seleccionado
+    if (metodoPago === 'credito') {
+        clienteId = document.getElementById('cliente-pago-credito-id')?.value;
+        if (!clienteId) {
+            mostrarNotificacion('Error', 'Debe seleccionar un cliente para pago a crédito', 'warning');
+            return;
+        }
+
+        // Verificar crédito disponible
+        const disponibleText = document.getElementById('cliente-credito-disponible-pago')?.textContent || '$0';
+        const disponible = parseFloat(disponibleText.replace('$', '')) || 0;
+        const total = pedidoActualPago.total || 0;
+
+        if (disponible < total) {
+            mostrarNotificacion('Error', `Crédito insuficiente. Disponible: $${disponible.toFixed(2)}, Total: $${total.toFixed(2)}`, 'danger');
+            return;
+        }
+    }
+
     try {
         const response = await apiFetch(`${API_POS}/pedidos/${pedidoActualPago.id}/pago`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tipo_comprobante: 'ninguno',
-                propina: propinaActual
+                propina: propinaActual,
+                metodo_pago: metodoPago,
+                cliente_id: clienteId ? parseInt(clienteId) : null
             })
         });
 
         if (response.ok) {
-            mostrarNotificacion('Éxito', 'Pedido pagado', 'success');
+            const tipoMsg = metodoPago === 'credito' ? 'Pago a crédito registrado' : 'Pedido pagado';
+            mostrarNotificacion('Éxito', tipoMsg, 'success');
             bootstrap.Modal.getInstance(document.getElementById('modalPago')).hide();
+            limpiarFormularioPagoCredito();
             cargarPedidosCajero();
         } else {
             const err = await response.json();
@@ -1096,6 +1319,24 @@ async function confirmarPagoSinComprobante() {
     } catch (error) {
         mostrarNotificacion('Error', 'Error al procesar pago', 'danger');
     }
+}
+
+// Función para limpiar el formulario de pago a crédito
+function limpiarFormularioPagoCredito() {
+    const buscar = document.getElementById('buscar-cliente-pago-credito');
+    const clienteId = document.getElementById('cliente-pago-credito-id');
+    const resultados = document.getElementById('resultados-cliente-pago-credito');
+    const infoCliente = document.getElementById('info-cliente-credito-pago');
+
+    if (buscar) buscar.value = '';
+    if (clienteId) clienteId.value = '';
+    if (resultados) resultados.innerHTML = '';
+    if (infoCliente) infoCliente.style.display = 'none';
+
+    // Resetear a efectivo
+    const radioEfectivo = document.getElementById('metodo-efectivo');
+    if (radioEfectivo) radioEfectivo.checked = true;
+    onMetodoPagoChange();
 }
 
 // ============ CLIENTE PARA FACTURA ============
@@ -1161,11 +1402,31 @@ async function buscarClienteCredito(valor) {
     }
 }
 
-function seleccionarClienteCredito(clienteId, clienteNombre) {
+async function seleccionarClienteCredito(clienteId, clienteNombre) {
     document.getElementById('id-cliente-credito').value = clienteId;
     document.getElementById('nombre-cliente-credito').textContent = clienteNombre;
     document.getElementById('form-credito-cliente').style.display = 'block';
     document.getElementById('resultados-cliente-credito').innerHTML = '';
+
+    // Cargar información de crédito actual del cliente
+    try {
+        const response = await apiFetch(`/api/clientes/${clienteId}/credito`);
+        if (response.ok) {
+            const data = await response.json();
+
+            // Llenar campos con datos actuales
+            document.getElementById('monto-credito-autorizado').value = data.credito_autorizado || 0;
+            document.getElementById('dias-credito-cliente').value = data.dias_credito || 0;
+
+            // Mostrar información de crédito utilizado y disponible
+            document.getElementById('credito-utilizado-info').textContent = '$' + (data.credito_utilizado || 0).toFixed(2);
+            document.getElementById('credito-disponible-info').textContent = '$' + (data.credito_disponible || 0).toFixed(2);
+
+            console.log('[Crédito] Info cargada para cliente:', clienteNombre, data);
+        }
+    } catch (error) {
+        console.error('Error cargando crédito del cliente:', error);
+    }
 }
 
 async function guardarCreditoCliente() {

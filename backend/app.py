@@ -31,12 +31,13 @@ socketio = SocketIO(
 # Registrar handlers de Socket.IO
 registrar_socketio_handlers(socketio)
 
-# Inicializar rate limiting (ajustado para POS con múltiples usuarios y auto-refresh)
+# Inicializar rate limiting (ajustado para POS con múltiples usuarios y WebSocket)
 # Límites altos porque un POS hace muchas peticiones legítimas
+# Aumentados para evitar 429 durante supervisión activa del manager
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["50000 per day", "5000 per hour", "200 per minute"],
+    default_limits=["100000 per day", "10000 per hour", "500 per minute"],
     storage_uri="memory://"
 )
 

@@ -744,6 +744,44 @@ def get_credito_cliente(id):
         return jsonify({'error': str(e)}), 500
 
 
+@clientes_bp.route('/clientes/<int:id>/credito', methods=['POST'])
+def actualizar_credito_cliente(id):
+    """Actualiza el crédito autorizado y días de crédito del cliente"""
+    try:
+        data = request.get_json()
+        monto_autorizado = data.get('monto_autorizado', 0)
+        dias_credito = data.get('dias_credito', 0)
+
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Verificar que el cliente existe
+        cursor.execute('SELECT id, nombre FROM clientes WHERE id = ? AND activo = 1', (id,))
+        cliente = cursor.fetchone()
+        if not cliente:
+            conn.close()
+            return jsonify({'error': 'Cliente no encontrado'}), 404
+
+        # Actualizar crédito
+        cursor.execute('''
+            UPDATE clientes
+            SET credito_autorizado = ?, dias_credito = ?, updated_at = datetime('now')
+            WHERE id = ?
+        ''', (monto_autorizado, dias_credito, id))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'mensaje': f'Crédito actualizado para {cliente["nombre"]}',
+            'credito_autorizado': monto_autorizado,
+            'dias_credito': dias_credito
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @clientes_bp.route('/clientes/<int:id>/verificar-credito', methods=['POST'])
 def verificar_credito_cliente(id):
     """Verifica si el cliente puede realizar una compra a crédito"""

@@ -1741,7 +1741,8 @@ def actualizar_estado_pedido(id):
 def actualizar_pago_pedido(id):
     """
     Actualiza información de pago del pedido
-    Recibe: tipo_comprobante, aplicar_iva, propina
+    Recibe: tipo_comprobante, aplicar_iva, propina, metodo_pago, cliente_id
+    metodo_pago: 'efectivo' o 'credito'
     """
     data = request.get_json()
     conn = get_db()
@@ -1758,6 +1759,8 @@ def actualizar_pago_pedido(id):
     tipo_comprobante = data.get('tipo_comprobante', 'ticket')
     aplicar_iva = data.get('aplicar_iva', 0)
     propina = data.get('propina', 0)
+    metodo_pago = data.get('metodo_pago', 'efectivo')  # 'efectivo' o 'credito'
+    cliente_id = data.get('cliente_id')  # ID del cliente para pago a crédito
 
     # Calcular nuevo total si hay cambios
     subtotal = pedido['subtotal']
@@ -1772,39 +1775,62 @@ def actualizar_pago_pedido(id):
         # Para ticket, el total existente ya no tiene IVA
         nuevo_total = pedido['total'] + propina
 
+    # ===== VALIDAR PAGO A CRÉDITO =====
+    if metodo_pago == 'credito':
+        if not cliente_id:
+            conn.close()
+            return jsonify({'error': 'Debe seleccionar un cliente para pago a crédito'}), 400
+
+        # Obtener información de crédito del cliente
+        cursor.execute('''
+            SELECT id, nombre, credito_autorizado, credito_utilizado
+            FROM clientes WHERE id = ?
+        ''', (cliente_id,))
+        cliente = cursor.fetchone()
+
+        if not cliente:
+            conn.close()
+            return jsonify({'error': 'Cliente no encontrado'}), 404
+
+        credito_autorizado = cliente['credito_autorizado'] or 0
+        credito_utilizado = cliente['credito_utilizado'] or 0
+        credito_disponible = credito_autorizado - credito_utilizado
+
+        if credito_disponible < nuevo_total:
+            conn.close()
+            return jsonify({
+                'error': f'Crédito insuficiente. Disponible: ${credito_disponible:.2f}, Total: ${nuevo_total:.2f}'
+            }), 400
+
+        # Actualizar crédito utilizado del cliente
+        nuevo_credito_utilizado = credito_utilizado + nuevo_total
+        cursor.execute('''
+            UPDATE clientes SET credito_utilizado = ? WHERE id = ?
+        ''', (nuevo_credito_utilizado, cliente_id))
+        print(f"[POS] Crédito actualizado para cliente {cliente['nombre']}: utilizado ${nuevo_credito_utilizado:.2f}")
+
     # ===== DETERMINAR ESTADO FINAL SEGÚN FLUJO DE PAGO =====
     tipo_pago = pedido['tipo_pago']  # 'anticipado' o 'al_final'
     mesa_id = pedido['mesa_id']
 
     # Determinar el estado después del pago según el flujo
     if tipo_pago == 'anticipado':
-        # Para llevar: pagado → en_cocina (para que cocina prepare)
-        estado_final = 'en_cocina'
-        timestamp_field = 'cocina_at'
+        # Para llevar: pagado (cocina verá el pedido y hará clic en "Iniciar preparación")
+        # Flujo: pendiente_pago → pagado → en_cocina (cocina) → listo → servido → cerrado
+        estado_final = 'pagado'
     else:
         # En mesa (al_final): pagado → cerrado (cliente ya comió, solo falta pagar)
         estado_final = 'cerrado'
-        timestamp_field = None
 
-    # Actualizar pedido con información de pago
-    if timestamp_field:
-        cursor.execute(f'''
-            UPDATE pedidos
-            SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
-                impuesto = ?, total = ?, estado = ?,
-                pagado_at = ?, {timestamp_field} = ?, updated_at = ?
-            WHERE id = ?
-        ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total, estado_final,
-              datetime.now().isoformat(), datetime.now().isoformat(), datetime.now().isoformat(), id))
-    else:
-        cursor.execute('''
-            UPDATE pedidos
-            SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
-                impuesto = ?, total = ?, estado = ?,
-                pagado_at = ?, updated_at = ?
-            WHERE id = ?
-        ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total, estado_final,
-              datetime.now().isoformat(), datetime.now().isoformat(), id))
+    # Actualizar pedido con información de pago (incluyendo método de pago y cliente)
+    cursor.execute('''
+        UPDATE pedidos
+        SET tipo_comprobante = ?, aplicar_iva = ?, propina = ?,
+            impuesto = ?, total = ?, estado = ?, metodo_pago = ?,
+            cliente_id = ?, pagado_at = ?, updated_at = ?
+        WHERE id = ?
+    ''', (tipo_comprobante, aplicar_iva, propina, impuesto, nuevo_total, estado_final,
+          metodo_pago, cliente_id, datetime.now().isoformat(), datetime.now().isoformat(), id))
 
     # ===== LIBERAR MESA SI ES PEDIDO EN MESA (al_final) =====
     if estado_final == 'cerrado' and mesa_id:
@@ -1844,6 +1870,7 @@ def actualizar_pago_pedido(id):
         'impuesto': impuesto,
         'total': nuevo_total,
         'estado': estado_final,
+        'metodo_pago': metodo_pago,
         'mesa_liberada': estado_final == 'cerrado' and mesa_id is not None
     })
 
