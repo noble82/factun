@@ -678,7 +678,10 @@ placeholder="Nombre, DUI o NIT..." onkeyup="buscarClienteCredito(this.value)">
 <div class="cart-sheet" id="cart-sheet">
 <div class="cart-sheet-header">
 <div class="drag-handle"></div>
-<h5 class="mb-0"><i class="bi bi-cart3"></i> Pedido Actual</h5>
+<h5 class="mb-0">
+<i class="bi bi-cart3"></i> Pedido
+<span id="cart-sheet-mesa" class="badge bg-warning ms-2">Para Llevar</span>
+</h5>
 <button class="btn btn-sm btn-outline-secondary" onclick="toggleCartSheet()">
 <i class="bi bi-x-lg"></i>
 </button>
@@ -874,6 +877,10 @@ function aplicarPermisosPorRol(rol) {
       if (typeof cargarMesas === 'function') cargarMesas();
       if (typeof cargarCategorias === 'function') cargarCategorias();
       if (typeof actualizarPedidosPorServir === 'function') actualizarPedidosPorServir();
+      // Aplicar estado inicial de opciones de pago (bloquear mesas si es anticipado)
+      if (typeof toggleOpcionesPago === 'function') {
+        setTimeout(() => toggleOpcionesPago(), 100);
+      }
     }
 
     if (rol === 'cajero') {
@@ -885,6 +892,20 @@ function aplicarPermisosPorRol(rol) {
     if (rol === 'cocinero') {
       if (typeof cargarPedidosCocina === 'function') cargarPedidosCocina();
     }
+
+    // Actualizar visibilidad del FAB móvil según el rol
+    // Solo mesero, cajero y manager pueden usar el carrito
+    // Usar timeout más largo y retry para asegurar que pos.js esté cargado
+    const initFAB = () => {
+      if (typeof actualizarVisibilidadFAB === 'function') {
+        actualizarVisibilidadFAB(rol);
+        console.log('[POS] FAB inicializado para rol:', rol);
+      } else {
+        // Reintentar si la función aún no está disponible
+        setTimeout(initFAB, 100);
+      }
+    };
+    setTimeout(initFAB, 200);
 
     // Las actualizaciones en tiempo real vienen por WebSocket (ver reinicializarNotificaciones)
     console.log(`[POS] Datos cargados para: ${rol} (actualizaciones por WebSocket)`);
@@ -1144,6 +1165,12 @@ function seleccionarRol(nuevoRol) {
 
   // Apply UI changes
   aplicarPermisosPorRol(nuevoRol);
+
+  // Actualizar visibilidad del FAB móvil según el rol
+  if (typeof actualizarVisibilidadFAB === 'function') {
+    actualizarVisibilidadFAB(nuevoRol);
+  }
+
   mostrarNotificacionToast('Rol Simulado', `Viendo como ${nuevoRol}`, 'success');
 
   console.log(`✅ Rol simulado a: ${nuevoRol} (rol original: ${usuario.rol_original})`);
@@ -1153,7 +1180,7 @@ function seleccionarRol(nuevoRol) {
 <!-- Scripts principales -->
 <script src="js/role-control.js"></script>
 <script src="js/auth-check.js?v=5"></script>
-<script src="js/pos.js?v=20"></script>
+<script src="js/pos.js?v=22"></script>
 
 </body>
 </html>

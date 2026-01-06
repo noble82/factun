@@ -65,8 +65,36 @@ function renderizarMesas() {
 
 function seleccionarMesa(mesaId, mesaNumero) {
     mesaSeleccionada = { id: mesaId, numero: mesaNumero };
-    document.getElementById('mesa-seleccionada').textContent = `Mesa ${mesaNumero}`;
-    document.getElementById('mesa-seleccionada').style.display = 'inline-block';
+
+    // Actualizar display desktop
+    const mesaDisplay = document.getElementById('mesa-seleccionada');
+    if (mesaDisplay) {
+        mesaDisplay.textContent = `Mesa ${mesaNumero}`;
+        mesaDisplay.style.display = 'inline-block';
+        mesaDisplay.classList.remove('bg-warning');
+        mesaDisplay.classList.add('bg-primary');
+    }
+
+    // Actualizar badge en cart-sheet móvil
+    actualizarBadgeMesaMovil();
+
+    // Actualizar en móvil: Sincronizar select y ocultar campo nombre
+    const selectMobile = document.getElementById('tipo-pago-mobile');
+    const inputNombreMobile = document.getElementById('cliente-nombre-mobile');
+    if (selectMobile) {
+        selectMobile.value = 'al_final';
+    }
+    if (inputNombreMobile) {
+        inputNombreMobile.style.display = 'none';
+    }
+
+    // En móvil, navegar automáticamente al menú después de seleccionar mesa
+    const esMobile = window.innerWidth <= 768;
+    if (esMobile) {
+        navegarMobile('menu');
+        mostrarNotificacion('Mesa Seleccionada', `Mesa ${mesaNumero} - Agrega productos`, 'success');
+    }
+
     renderizarMesas();
     validarPedido();
 }
@@ -305,6 +333,22 @@ function actualizarFabCount() {
     }
 }
 
+// Actualizar badge de mesa en cart-sheet móvil
+function actualizarBadgeMesaMovil() {
+    const badge = document.getElementById('cart-sheet-mesa');
+    if (!badge) return;
+
+    if (mesaSeleccionada) {
+        badge.textContent = `Mesa ${mesaSeleccionada.numero}`;
+        badge.classList.remove('bg-warning');
+        badge.classList.add('bg-primary');
+    } else {
+        badge.textContent = 'Para Llevar';
+        badge.classList.remove('bg-primary');
+        badge.classList.add('bg-warning');
+    }
+}
+
 function cambiarCantidad(idx, nuevaCantidad) {
     if (nuevaCantidad <= 0) {
         removerDelCarrito(idx);
@@ -441,13 +485,28 @@ function toggleOpcionesPago() {
 
 function toggleOpcionesPagoMobile() {
     const tipoFlujo = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
-    const opcionesLlevarMobile = document.getElementById('opciones-para-llevar-mobile');
+    const inputNombreMobile = document.getElementById('cliente-nombre-mobile');
 
     if (tipoFlujo === 'anticipado') {
-        if (opcionesLlevarMobile) opcionesLlevarMobile.style.display = 'block';
+        // PARA LLEVAR: Mostrar campo de nombre, ir a menú
+        if (inputNombreMobile) {
+            inputNombreMobile.style.display = 'block';
+            inputNombreMobile.placeholder = 'Nombre cliente *';
+        }
         mesaSeleccionada = null;
+        // Actualizar badge
+        actualizarBadgeMesaMovil();
+        // Navegar al menú
+        navegarMobile('menu');
+        console.log('[Mobile] Modo PARA LLEVAR - navegando a menú');
     } else {
-        if (opcionesLlevarMobile) opcionesLlevarMobile.style.display = 'none';
+        // EN MESA: Ocultar campo de nombre, ir a mesas
+        if (inputNombreMobile) {
+            inputNombreMobile.style.display = 'none';
+        }
+        // Navegar a mesas para seleccionar
+        navegarMobile('mesas');
+        console.log('[Mobile] Modo EN MESA - navegando a mesas');
     }
 
     validarPedido();
@@ -685,7 +744,98 @@ async function enviarPedido() {
 }
 
 async function enviarPedidoMobile() {
-    await enviarPedido();
+    // Prevenir doble envío
+    if (enviandoPedido) {
+        console.log('Pedido móvil ya en proceso, ignorando clic duplicado');
+        return;
+    }
+
+    // Leer valores del formulario MÓVIL
+    const tipoFlujo = document.getElementById('tipo-pago-mobile')?.value || 'anticipado';
+    const nombreCliente = document.getElementById('cliente-nombre-mobile')?.value || '';
+
+    // Validar según tipo de flujo
+    if (tipoFlujo === 'al_final' && !mesaSeleccionada) {
+        mostrarNotificacion('Error', 'Selecciona una mesa para pedido en mesa', 'danger');
+        return;
+    }
+
+    if (tipoFlujo === 'anticipado' && !nombreCliente.trim()) {
+        mostrarNotificacion('Error', 'Ingresa el nombre del cliente', 'warning');
+        document.getElementById('cliente-nombre-mobile')?.focus();
+        return;
+    }
+
+    if (carrito.length === 0) {
+        mostrarNotificacion('Error', 'El carrito está vacío', 'danger');
+        return;
+    }
+
+    // Activar lock
+    enviandoPedido = true;
+    const btnEnviarMobile = document.getElementById('btn-enviar-mobile');
+    if (btnEnviarMobile) {
+        btnEnviarMobile.disabled = true;
+        btnEnviarMobile.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Enviando...';
+    }
+
+    const pedido = {
+        mesa_id: tipoFlujo === 'al_final' ? mesaSeleccionada?.id : null,
+        mesero: localStorage.getItem('username') || 'Sistema',
+        tipo_pago: tipoFlujo,
+        cliente_nombre: nombreCliente,
+        items: carrito.map(item => ({
+            producto_id: item.producto_id || null,
+            combo_id: item.combo_id || null,
+            cantidad: item.cantidad,
+            es_combo: item.esCombo || false
+        }))
+    };
+
+    try {
+        const response = await apiFetch(`${API_POS}/pedidos`, {
+            method: 'POST',
+            body: JSON.stringify(pedido)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            const tipoMsg = tipoFlujo === 'anticipado' ? 'Para Llevar' : `Mesa ${mesaSeleccionada?.numero}`;
+            mostrarNotificacion('Éxito', `Pedido #${result.pedido_id} (${tipoMsg}) creado`, 'success');
+
+            // Limpiar carrito y formulario
+            carrito = [];
+            actualizarCarrito();
+            mesaSeleccionada = null;
+
+            // Limpiar campo de nombre cliente móvil
+            const inputNombreMobile = document.getElementById('cliente-nombre-mobile');
+            if (inputNombreMobile) inputNombreMobile.value = '';
+
+            // Cerrar bottom sheet
+            toggleCartSheet();
+
+            // Recargar mesas si fue pedido en mesa
+            if (tipoFlujo === 'al_final') {
+                cargarMesas();
+            }
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            mostrarNotificacion('Error', errorData.error || 'No se pudo crear el pedido', 'danger');
+        }
+    } catch (error) {
+        console.error('Error enviarPedidoMobile:', error);
+        mostrarNotificacion('Error', 'Error de conexión', 'danger');
+    } finally {
+        // Liberar lock después de un breve delay
+        setTimeout(() => {
+            enviandoPedido = false;
+            if (btnEnviarMobile) {
+                btnEnviarMobile.disabled = false;
+                btnEnviarMobile.innerHTML = '<i class="bi bi-send"></i> Enviar Pedido';
+            }
+        }, 1000);
+    }
 }
 
 // Lock para prevenir doble envío de pedidos cajero
@@ -1542,11 +1692,29 @@ async function cambiarPeriodoReportes(periodo) {
 // ============ MOBILE ============
 
 function navegarMobile(seccion) {
-    const tabs = ['mesas', 'menu', 'servir'];
-    tabs.forEach(tab => {
-        const el = document.getElementById(`${tab}-tab`);
-        if (el) el.classList.toggle('active', tab === seccion);
+    // Activar el tab de Bootstrap correspondiente
+    const tabButton = document.querySelector(`[data-bs-target="#${seccion}-tab"]`);
+    if (tabButton) {
+        // Usar la API de Bootstrap Tab
+        const bsTab = bootstrap?.Tab?.getOrCreateInstance(tabButton);
+        if (bsTab) {
+            bsTab.show();
+        } else {
+            // Fallback: simular clic en el tab
+            tabButton.click();
+        }
+    }
+
+    // Actualizar estado activo en bottom-nav
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+        item.classList.remove('active');
     });
+    const navItem = document.getElementById(`nav-${seccion}`);
+    if (navItem) {
+        navItem.classList.add('active');
+    }
+
+    console.log(`[Mobile] Navegando a: ${seccion}`);
 }
 
 function toggleCartSheet() {
@@ -2176,16 +2344,72 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Roles que pueden usar el carrito (crear pedidos)
+const ROLES_CON_CARRITO = ['mesero', 'cajero', 'manager'];
+
+// Actualizar visibilidad del FAB según el rol actual
+function actualizarVisibilidadFAB(rol) {
+    const cartFab = document.getElementById('cart-fab');
+    const cartSheet = document.getElementById('cart-sheet');
+    const cartOverlay = document.getElementById('cart-sheet-overlay');
+    const bottomNav = document.getElementById('bottom-nav');
+
+    const esMobile = window.innerWidth <= 768;
+    const rolPermiteCarrito = ROLES_CON_CARRITO.includes(rol);
+
+    // Guardar rol activo para referencia futura
+    localStorage.setItem('rolActivo', rol);
+
+    console.log(`[FAB] Rol: ${rol}, Móvil: ${esMobile}, Permite carrito: ${rolPermiteCarrito}`);
+
+    if (esMobile && rolPermiteCarrito) {
+        // Mostrar FAB para roles permitidos en móvil usando clases CSS
+        if (cartFab) {
+            cartFab.classList.add('mobile-active');
+            cartFab.classList.remove('mobile-hidden');
+        }
+        if (bottomNav) {
+            bottomNav.classList.add('mobile-active');
+            bottomNav.classList.remove('mobile-hidden');
+        }
+    } else {
+        // Ocultar FAB para cocinero o en desktop
+        if (cartFab) {
+            cartFab.classList.remove('mobile-active');
+            cartFab.classList.add('mobile-hidden');
+        }
+        // Cerrar bottom sheet si estaba abierto
+        if (cartSheet) cartSheet.classList.remove('show', 'active');
+        if (cartOverlay) cartOverlay.classList.remove('show', 'active');
+        // Ocultar bottom nav para cocinero
+        if (!rolPermiteCarrito && bottomNav) {
+            bottomNav.classList.remove('mobile-active');
+            bottomNav.classList.add('mobile-hidden');
+        }
+    }
+}
+
 // Inicializar componentes móviles
 function inicializarCarritoMovil() {
     const cartFab = document.getElementById('cart-fab');
     const cartSheet = document.getElementById('cart-sheet');
+    const bottomNav = document.getElementById('bottom-nav');
 
-    // Detectar si es móvil
+    // Detectar si es móvil y rol actual
     const esMobile = window.innerWidth <= 768;
+    const rolActual = localStorage.getItem('rolActivo') || '';
 
-    if (esMobile && cartFab) {
-        cartFab.style.display = 'flex';
+    // Solo mostrar si es móvil Y el rol permite carrito
+    if (esMobile && cartFab && ROLES_CON_CARRITO.includes(rolActual)) {
+        cartFab.classList.add('mobile-active');
+        cartFab.classList.remove('mobile-hidden');
+        if (bottomNav) {
+            bottomNav.classList.add('mobile-active');
+            bottomNav.classList.remove('mobile-hidden');
+        }
+    } else if (cartFab) {
+        cartFab.classList.remove('mobile-active');
+        cartFab.classList.add('mobile-hidden');
     }
 
     // Agregar soporte para gestos de deslizar en el bottom sheet
@@ -2214,11 +2438,20 @@ function inicializarCarritoMovil() {
     // Escuchar cambios de tamaño de ventana
     window.addEventListener('resize', () => {
         const fab = document.getElementById('cart-fab');
+        const nav = document.getElementById('bottom-nav');
+        const rolActual = localStorage.getItem('rolActivo') || '';
+
         if (fab) {
-            if (window.innerWidth <= 768) {
-                fab.style.display = 'flex';
+            if (window.innerWidth <= 768 && ROLES_CON_CARRITO.includes(rolActual)) {
+                fab.classList.add('mobile-active');
+                fab.classList.remove('mobile-hidden');
+                if (nav) {
+                    nav.classList.add('mobile-active');
+                    nav.classList.remove('mobile-hidden');
+                }
             } else {
-                fab.style.display = 'none';
+                fab.classList.remove('mobile-active');
+                fab.classList.add('mobile-hidden');
                 // Cerrar bottom sheet si está abierto
                 const sheet = document.getElementById('cart-sheet');
                 const overlay = document.getElementById('cart-sheet-overlay');
