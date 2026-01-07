@@ -117,7 +117,7 @@ function renderizarReportes() {
 
     const resumen = datosActuales.resumen || {};
     const dias = datosActuales.dias || [];
-    const topProductos = datosActuales.top_productos || [];
+    const topProductos = datosActuales.top_productos || datosActuales.productos || [];
     const categorias = datosActuales.categorias || [];
 
     // Actualizar métricas
@@ -259,8 +259,8 @@ function renderizarTablaProductos(productos) {
             <tr>
                 <td>${idx + 1}</td>
                 <td>${p.producto_nombre}</td>
-                <td class="text-end">${p.total_cantidad || 0}</td>
-                <td class="text-end">$${parseFloat(p.total_subtotal || 0).toFixed(2)}</td>
+                <td class="text-end">${p.total_cantidad || p.cantidad_vendida || 0}</td>
+                <td class="text-end">$${parseFloat(p.total_subtotal || p.subtotal || 0).toFixed(2)}</td>
             </tr>
         `;
     });
@@ -295,15 +295,16 @@ function renderizarTablaCategorias(categorias) {
             <tbody>
     `;
 
-    const totalVentas = categorias.reduce((sum, c) => sum + parseFloat(c.total_subtotal || 0), 0);
+    const totalVentas = categorias.reduce((sum, c) => sum + parseFloat(c.total_subtotal || c.subtotal || 0), 0);
 
     categorias.forEach(c => {
-        const porcentaje = totalVentas > 0 ? ((parseFloat(c.total_subtotal) / totalVentas) * 100).toFixed(1) : 0;
+        const subtotalCat = parseFloat(c.total_subtotal || c.subtotal || 0);
+        const porcentaje = totalVentas > 0 ? ((subtotalCat / totalVentas) * 100).toFixed(1) : 0;
         html += `
             <tr>
                 <td>${c.categoria_nombre}</td>
-                <td class="text-end">${c.total_cantidad || 0}</td>
-                <td class="text-end">$${parseFloat(c.total_subtotal || 0).toFixed(2)}</td>
+                <td class="text-end">${c.total_cantidad || c.cantidad_vendida || 0}</td>
+                <td class="text-end">$${subtotalCat.toFixed(2)}</td>
                 <td class="text-end"><span class="badge bg-primary">${porcentaje}%</span></td>
             </tr>
         `;

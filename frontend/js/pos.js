@@ -1633,7 +1633,7 @@ async function cambiarPeriodoReportes(periodo) {
 
         const datos = await response.json();
         const resumen = datos.resumen || datos;
-        const productos = datos.productos || [];
+        const productos = datos.productos || datos.top_productos || [];
         const categorias = datos.categorias || [];
 
         // Actualizar métricas principales
@@ -1659,8 +1659,8 @@ async function cambiarPeriodoReportes(periodo) {
                         <span>${prod.producto_nombre || prod.nombre}</span>
                     </div>
                     <div>
-                        <span class="badge bg-info">${prod.cantidad_vendida || prod.cantidad}</span>
-                        <span class="text-success ms-2">$${(prod.subtotal || 0).toFixed(2)}</span>
+                        <span class="badge bg-info">${prod.cantidad_vendida || prod.total_cantidad || prod.cantidad}</span>
+                        <span class="text-success ms-2">$${(prod.subtotal || prod.total_subtotal || 0).toFixed(2)}</span>
                     </div>
                 </div>
             `).join('');
@@ -1675,8 +1675,8 @@ async function cambiarPeriodoReportes(periodo) {
                 <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
                     <span>${cat.categoria_nombre || cat.nombre}</span>
                     <div>
-                        <span class="badge bg-secondary">${cat.cantidad_vendida || cat.cantidad}</span>
-                        <span class="text-success ms-2">$${(cat.subtotal || 0).toFixed(2)}</span>
+                        <span class="badge bg-secondary">${cat.cantidad_vendida || cat.total_cantidad || cat.cantidad}</span>
+                        <span class="text-success ms-2">$${(cat.subtotal || cat.total_subtotal || 0).toFixed(2)}</span>
                     </div>
                 </div>
             `).join('');

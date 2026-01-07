@@ -2474,7 +2474,7 @@ def get_reportes_hoy():
     })
 
 @pos_bp.route('/reportes/periodo', methods=['GET'])
-@role_required('manager')
+@role_required('manager', 'cajero')
 def get_reportes_periodo():
     """
     Obtiene reporte para un período determinado
@@ -2512,7 +2512,17 @@ def get_reportes_periodo():
         WHERE fecha BETWEEN ? AND ?
     ''', (inicio, fin))
 
-    resumen_periodo = dict(cursor.fetchone())
+    row = cursor.fetchone()
+    resumen_periodo = {
+        'dias': row['dias'] or 0,
+        'total_pedidos': row['total_pedidos'] or 0,
+        'total_ventas': float(row['total_ventas'] or 0),
+        'subtotal_total': float(row['subtotal_total'] or 0),
+        'impuesto_total': float(row['impuesto_total'] or 0),
+        'efectivo': float(row['efectivo'] or 0),
+        'credito': float(row['credito'] or 0),
+        'pedido_promedio': float(row['pedido_promedio_promedio'] or 0)
+    }
 
     # Obtener desglose diario
     cursor.execute('''
